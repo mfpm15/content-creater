@@ -1506,6 +1506,14 @@ def _parse_openai_image_response(
     return None, "image response has neither url nor b64_json"
 
 
+_QUOTA_EXHAUSTED_MARKERS = ("resource_exhausted", "quota_exhausted", "exhausted your capacity")
+
+
+def _is_quota_exhausted(detail: str) -> bool:
+    lowered = str(detail or "").lower()
+    return any(marker in lowered for marker in _QUOTA_EXHAUSTED_MARKERS)
+
+
 def _request_openai_image(endpoint: str, payload: dict) -> tuple[bytes | None, str]:
     """
     调用 OpenAI 兼容 /images/generations 接口，带退避重试与 key 轮换。
@@ -1575,7 +1583,11 @@ def _request_openai_image(endpoint: str, payload: dict) -> tuple[bytes | None, s
                 retryable = len(configured_keys) > 1
             elif status in OPENAI_IMAGE_RETRYABLE_STATUS_CODES:
                 failure_detail = _openai_image_http_failure(response, status, api_key)
-                retryable = True
+                # A 429 that reports an exhausted quota will not recover within the
+                # backoff window; retrying only burns more of the shared quota.
+                retryable = not (
+                    status == 429 and _is_quota_exhausted(failure_detail)
+                )
             elif status >= 400:
                 return None, _openai_image_http_failure(response, status, api_key)
             else:

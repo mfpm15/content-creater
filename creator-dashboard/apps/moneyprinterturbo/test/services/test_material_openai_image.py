@@ -332,6 +332,25 @@ class TestOpenAIImageProvider(unittest.TestCase):
         # 没有生成任何残留文件
         self.assertEqual(os.listdir(self.save_dir), [])
 
+    def test_generate_images_openai_does_not_retry_exhausted_quota(self):
+        """A 429 reporting an exhausted quota must not burn more requests on retries."""
+        response = _image_response(
+            {"error": {"message": "[429]: You have exhausted your capacity on this model. RESOURCE_EXHAUSTED"}},
+            status_code=429,
+        )
+
+        with (
+            patch("app.services.material.requests.post", return_value=response) as post,
+            patch("app.services.material.time.sleep") as sleep,
+        ):
+            results = material.generate_images_openai(
+                "storm clouds", minimum_duration=5, save_dir=self.save_dir
+            )
+
+        self.assertEqual(results, [])
+        self.assertEqual(post.call_count, 1)
+        sleep.assert_not_called()
+
     def test_generate_images_openai_redacts_api_key_in_failure_detail(self):
         """失败详情不能把 API key 明文写进日志。"""
         config.app["openai_image_api_keys"] = ["sk-secret-123"]

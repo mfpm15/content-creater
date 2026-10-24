@@ -383,10 +383,16 @@ def generate_terms(task_id, params, video_script):
         # 开启素材按文案顺序匹配后，关键词本身也必须按脚本叙事顺序生成；
         # 否则后续即使顺序下载和顺序拼接，也只能复用一组全局主题词，
         # 无法改善“后面内容的画面提前出现”的问题。
+        # Each AI-generated image costs one request of a tight per-model quota;
+        # three images with zoom motion cover a short video without exhausting it.
+        if params.video_source == "openai_image":
+            amount = 3
+        else:
+            amount = 8 if params.match_materials_to_script else 5
         video_terms = llm.generate_terms(
             video_subject=params.video_subject,
             video_script=utils.remove_pause_tags(video_script),
-            amount=8 if params.match_materials_to_script else 5,
+            amount=amount,
             match_script_order=params.match_materials_to_script,
         )
     else:
