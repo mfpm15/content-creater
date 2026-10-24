@@ -59,7 +59,7 @@ python creator-dashboard\test_dashboard.py
 
 ## Konfigurasi LLM
 
-Semua tool diarahkan ke satu endpoint OpenCompatible:
+Semua tool diarahkan ke satu endpoint OpenAI-compatible:
 
 - Base URL: `http://localhost:20128/v1`
 - Model: `ag/gemini-3.8-flash-high`
