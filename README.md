@@ -17,6 +17,8 @@ Satu dashboard lokal untuk menjalankan, memantau, dan membuka lima tool pembuat 
 
 Dashboard sendiri berjalan di http://127.0.0.1:3210. Dari sana tiap tool bisa di-start, di-stop, dicek status kesiapannya, dan dilihat lognya.
 
+**Article Drafter** (menu di sidebar, http://127.0.0.1:3210/articles.html): isi poin draft, hasilkan artikel `.md` dan `.docx` lewat 9Router, plus prompt gambar siap tempel ke Nano Banana atau ChatGPT. Gambar hasilnya diunggah balik dan dokumen dibangun ulang dengan gambar tertanam. Tanpa dependensi tambahan. Hasil tersimpan di `creator-dashboard/output/articles/` (tidak masuk git).
+
 ## Struktur
 
 ```
