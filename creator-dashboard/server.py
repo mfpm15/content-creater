@@ -139,9 +139,6 @@ class ManagedProcess:
             process = self.process
             if process is None or process.poll() is not None:
                 return True, "Tool is not running"
-            stop_command = self.tool.get("stopCommand")
-            if isinstance(stop_command, list) and stop_command:
-                subprocess.run(stop_command, cwd=self.tool["_resolvedDirectory"], capture_output=True, timeout=120, check=False)
             try:
                 if os.name == "nt":
                     subprocess.run(

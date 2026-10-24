@@ -13,7 +13,6 @@ Satu dashboard lokal untuk menjalankan, memantau, dan membuka lima tool pembuat 
 | Podcastfy | Website, PDF, teks, atau video menjadi percakapan podcast | API (FastAPI) | http://127.0.0.1:8080/docs |
 | OpenCreator | Workspace kreator: script, image, video, dubbing, agent, workflow | Web (Vite) | http://127.0.0.1:19861 |
 | Short Video Factory | Editor desktop: template, subtitle, efek, render batch | Desktop (Electron) | jendela Electron |
-| SupoClip | Video panjang menjadi klip vertikal 9:16 (pilih momen oleh LLM, skor viral, subtitle, editor) | Web (Docker Compose) | http://127.0.0.1:3107 |
 | AI YouTube Shorts Generator | Potong video panjang menjadi Shorts dengan highlight dari LLM | CLI | dijalankan manual |
 
 Dashboard sendiri berjalan di http://127.0.0.1:3210. Dari sana tiap tool bisa di-start, di-stop, dicek status kesiapannya, dan dilihat lognya.
@@ -42,7 +41,6 @@ content-creater/
 - Node.js 22+ (corepack tersedia)
 - FFmpeg di PATH
 - Opsional: gateway LLM OpenAI-compatible, misalnya 9Router di `http://localhost:20128/v1`
-- Docker Desktop, hanya untuk SupoClip (butuh Postgres dan Redis)
 
 ## Mulai cepat
 
@@ -74,7 +72,6 @@ File konfigurasi lokal tidak ikut di repo (diabaikan oleh `.gitignore`). Setelah
 | MoneyPrinterTurbo | `creator-dashboard/apps/moneyprinterturbo/config.toml` (salin dari `config.example.toml`) |
 | Podcastfy | `creator-dashboard/apps/podcastfy/.env` |
 | AI YouTube Shorts Generator | `creator-dashboard/apps/ai-youtube-shorts-generator/.env` (salin dari `.env.example`) |
-| SupoClip | `creator-dashboard/apps/supoclip/.env` (salin dari `.env.example`; set `LLM=openai:<model>`, `OPENAI_API_KEY`, `OPENAI_BASE_URL=http://host.docker.internal:20128/v1`, `TRANSCRIPTION_PROVIDER=whisper`, dan ganti semua secret) |
 | OpenCreator, Short Video Factory | default LLM ada di source (`creator-services.ts`, `src/lib/llm/config.ts`), ubah di UI tiap tool |
 
 Jangan commit API key.

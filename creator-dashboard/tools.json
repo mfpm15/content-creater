@@ -132,44 +132,6 @@
       ]
     },
     {
-      "id": "supoclip",
-      "name": "SupoClip",
-      "shortName": "SupoClip",
-      "description": "Clipper video panjang menjadi klip vertikal 9:16 dengan pemilihan momen oleh LLM, skor viral, subtitle sinkron kata, editor, dan publish. Jalan lewat Docker Compose.",
-      "category": "AI Video Clipper",
-      "icon": "film",
-      "color": "cyan",
-      "workingDirectory": "apps/supoclip",
-      "command": [
-        "cmd",
-        "/d",
-        "/c",
-        "docker compose up --build"
-      ],
-      "stopCommand": [
-        "cmd",
-        "/d",
-        "/c",
-        "docker compose down"
-      ],
-      "url": "http://127.0.0.1:3107",
-      "healthUrl": "http://127.0.0.1:8000/health",
-      "port": 3107,
-      "type": "web",
-      "requirements": [
-        "Docker Desktop",
-        "9Router di port 20128",
-        "Whisper lokal atau AssemblyAI"
-      ],
-      "capabilities": [
-        "Long video to clips",
-        "Virality score",
-        "Face-centered crop",
-        "Word subtitles",
-        "Editor"
-      ]
-    },
-    {
       "id": "ai-youtube-shorts",
       "name": "AI YouTube Shorts Generator",
       "shortName": "Shorts Generator",
