@@ -1,0 +1,7 @@
+# Podcastfy requirements.txt contains two stale/incompatible pins.
+# - httpx 0.28.1 conflicts with langchain-google-vertexai 2.0.7.
+# - litellm 1.52.2 is unavailable from the configured package index,
+#   while the project metadata permits the compatible 1.52.0 release.
+# uv --override replaces both direct pins during setup.
+httpx==0.27.2
+litellm==1.52.0

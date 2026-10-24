@@ -1,0 +1,334 @@
+<template>
+  <div class="w-full h-full">
+    <v-form class="w-full h-full" :disabled="disabled">
+      <v-sheet class="h-full p-2 flex flex-col" border rounded>
+        <div class="flex gap-2 mb-2">
+          <v-text-field
+            v-model="appStore.videoAssetsFolder"
+            :label="t('features.assets.config.folderLabel')"
+            density="compact"
+            hide-details
+            readonly
+          >
+          </v-text-field>
+          <v-btn
+            class="mt-[2px]"
+            prepend-icon="mdi-folder-open"
+            :disabled="disabled"
+            @click="handleSelectFolder"
+          >
+            {{ t('common.buttons.selectFolder') }}
+          </v-btn>
+        </div>
+
+        <div class="flex-1 h-0 w-full border">
+          <div
+            v-if="videoAssets.length"
+            class="w-full max-h-full overflow-y-auto grid grid-cols-3 gap-2 p-2"
+          >
+            <div
+              class="w-full h-full max-h-[200px]"
+              v-for="(item, index) in videoAssets"
+              :key="index"
+            >
+              <VideoAutoPreview :asset="item" />
+            </div>
+          </div>
+          <v-empty-state
+            v-else
+            :headline="t('emptyStates.noContent')"
+            :text="t('emptyStates.hintSelectFolder')"
+          ></v-empty-state>
+        </div>
+
+        <div class="my-2">
+          <v-btn
+            block
+            prepend-icon="mdi-refresh"
+            :disabled="disabled || !appStore.videoAssetsFolder"
+            :loading="refreshAssetsLoading"
+            @click="refreshAssets"
+          >
+            {{ t('common.buttons.refreshAssets') }}
+          </v-btn>
+        </div>
+      </v-sheet>
+    </v-form>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { h, onMounted, ref } from 'vue'
+import { useTranslation } from 'i18next-vue'
+import { useAppStore } from '@/store'
+import { useToast } from 'vue-toastification'
+import { ListFilesFromFolderRecord } from '~/electron/types'
+import { RenderVideoParams } from '~/electron/ffmpeg/types'
+import VideoAutoPreview from '@/components/VideoAutoPreview.vue'
+import ActionToastEmbed from '@/components/ActionToastEmbed.vue'
+import random from 'random'
+import { formatErrorForCopy } from '@/lib/error-copy'
+import { trackAnalytics } from '@/lib/analytics'
+
+const toast = useToast()
+const appStore = useAppStore()
+const { t } = useTranslation()
+
+defineProps<{
+  disabled?: boolean
+}>()
+
+// 选择文件夹
+const handleSelectFolder = async () => {
+  const folderPath = await window.electron.selectFolder({
+    title: t('dialogs.selectAssetsFolder'),
+    defaultPath: appStore.videoAssetsFolder,
+  })
+  console.log('用户选择分镜素材文件夹，绝对路径：', folderPath)
+  if (folderPath) {
+    appStore.videoAssetsFolder = folderPath
+    refreshAssets(true)
+  }
+}
+
+// 刷新素材库
+const videoAssets = ref<ListFilesFromFolderRecord[]>([])
+const videoDurationCache = ref(new Map<string, number>())
+const refreshAssetsLoading = ref(false)
+const getAssetCountBucket = (count: number) => {
+  if (count === 0) return '0'
+  if (count === 1) return '1'
+  if (count <= 5) return '2–5'
+  if (count <= 20) return '6–20'
+  return '21+'
+}
+
+const refreshAssets = async (trackSelection = false) => {
+  if (!appStore.videoAssetsFolder) {
+    return
+  }
+  refreshAssetsLoading.value = true
+  try {
+    const assets = await window.electron.listFilesFromFolder({
+      folderPath: appStore.videoAssetsFolder,
+    })
+    const mp4Assets = assets.filter((asset) => asset.name.toLowerCase().endsWith('.mp4'))
+    if (trackSelection) {
+      trackAnalytics('media_import_finished', {
+        outcome: 'success',
+        media_type: 'video',
+        count_bucket: getAssetCountBucket(mp4Assets.length),
+      })
+    }
+    console.info('素材库刷新完成', { assetCount: assets.length, mp4Count: mp4Assets.length })
+    videoDurationCache.value.clear()
+    if (!mp4Assets.length) {
+      if (assets.length) {
+        toast.warning(t('features.assets.errors.noMp4InFolder'))
+      } else {
+        toast.warning(t('emptyStates.assetsFolderEmpty'))
+      }
+      videoAssets.value = []
+      return
+    }
+
+    videoAssets.value = mp4Assets
+    toast.success(t('features.assets.success.loadSucceeded'))
+  } catch (error: any) {
+    if (trackSelection) {
+      trackAnalytics('media_import_finished', { outcome: 'failed', media_type: 'video' })
+    }
+    console.dir(error)
+    const errorMessage = error?.error?.message || error?.message || error
+    toast.error({
+      component: {
+        // 使用vnode方式创建自定义错误弹窗实例，以获得良好的类型提示
+        render: () =>
+          h(ActionToastEmbed, {
+            message: t('features.assets.errors.loadFailed'),
+            detail: String(errorMessage),
+            actionText: t('common.buttons.copyErrorDetail'),
+            onActionTirgger: () => {
+              navigator.clipboard.writeText(
+                formatErrorForCopy(t('features.assets.errors.loadFailed'), String(errorMessage)),
+              )
+              toast.success(t('common.messages.success.copySuccess'))
+            },
+          }),
+      },
+    })
+  } finally {
+    refreshAssetsLoading.value = false
+  }
+}
+onMounted(() => {
+  refreshAssets()
+})
+
+const readVideoDuration = (assetPath: string) => {
+  const cached = videoDurationCache.value.get(assetPath)
+  if (typeof cached === 'number' && Number.isFinite(cached) && cached > 0) {
+    return Promise.resolve(cached)
+  }
+
+  return new Promise<number>((resolve, reject) => {
+    const video = document.createElement('video')
+    const normalizedPath = assetPath.replace(/\\/g, '/')
+    const src = normalizedPath.startsWith('/')
+      ? `file://${normalizedPath}`
+      : `file:///${normalizedPath}`
+    const timeout = window.setTimeout(() => {
+      cleanup()
+      reject(new Error('读取视频元数据超时'))
+    }, 8000)
+
+    const cleanup = () => {
+      window.clearTimeout(timeout)
+      video.removeEventListener('loadedmetadata', onLoaded)
+      video.removeEventListener('error', onError)
+      video.pause()
+      video.removeAttribute('src')
+      video.load()
+    }
+
+    const onLoaded = () => {
+      const duration = video.duration
+      cleanup()
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error('视频时长无效'))
+        return
+      }
+      videoDurationCache.value.set(assetPath, duration)
+      resolve(duration)
+    }
+
+    const onError = () => {
+      cleanup()
+      reject(new Error('视频元数据读取失败'))
+    }
+
+    video.preload = 'metadata'
+    video.addEventListener('loadedmetadata', onLoaded)
+    video.addEventListener('error', onError)
+    video.src = encodeURI(src)
+  })
+}
+
+// 获取视频分镜随机素材片段
+const getVideoSegments = async (options: { duration: number }) => {
+  const targetDurationMs = Math.ceil(options.duration * 1000)
+  if (!Number.isFinite(targetDurationMs) || targetDurationMs <= 0) {
+    throw new Error(t('features.assets.errors.audioDurationInvalid'))
+  }
+
+  if (!videoAssets.value.length) {
+    throw new Error(t('features.assets.errors.noVideoAssets'))
+  }
+
+  // 搜集随机素材片段
+  const segments: Pick<RenderVideoParams, 'videoFiles' | 'timeRanges'> = {
+    videoFiles: [],
+    timeRanges: [],
+  }
+  const minSegmentDurationMs = 2000
+  const maxSegmentDurationMs = 15000
+
+  let currentTotalDurationMs = 0
+  let tempVideoAssets = [...videoAssets.value]
+  const unreadableAssetPaths = new Set<string>()
+  let unreadableAssetCount = 0
+  const unreadableAssetSamples: string[] = []
+  const formatTimestamp = (milliseconds: number) => (milliseconds / 1000).toFixed(3)
+  const recordUnreadableAsset = (assetName: string, reason: string) => {
+    unreadableAssetCount += 1
+    if (unreadableAssetSamples.length < 3) {
+      unreadableAssetSamples.push(`${assetName}: ${reason.slice(0, 100)}`)
+    }
+  }
+  const reportUnreadableAssets = () => {
+    if (unreadableAssetCount > 0) {
+      console.warn('部分视频素材不可用，已跳过', {
+        count: unreadableAssetCount,
+        samples: unreadableAssetSamples,
+      })
+    }
+  }
+
+  while (currentTotalDurationMs < targetDurationMs) {
+    // 如果素材库中没有剩余素材，时长还不够，重新来一轮
+    if (tempVideoAssets.length === 0) {
+      tempVideoAssets = videoAssets.value.filter((asset) => !unreadableAssetPaths.has(asset.path))
+      if (!tempVideoAssets.length) {
+        reportUnreadableAssets()
+        throw new Error(t('features.assets.errors.noUsableVideoAssets'))
+      }
+      continue
+    }
+
+    // 直接随机选取并移除素材，避免按路径再次扫描数组
+    const randomAssetIndex = random.int(0, tempVideoAssets.length - 1)
+    const [randomAsset] = tempVideoAssets.splice(randomAssetIndex, 1)
+    if (!randomAsset) {
+      continue
+    }
+
+    let randomAssetDurationMs = 0
+    try {
+      randomAssetDurationMs = Math.floor((await readVideoDuration(randomAsset.path)) * 1000)
+    } catch (error) {
+      unreadableAssetPaths.add(randomAsset.path)
+      recordUnreadableAsset(
+        randomAsset.name,
+        error instanceof Error ? error.message : String(error),
+      )
+      continue
+    }
+
+    if (randomAssetDurationMs <= 0) {
+      unreadableAssetPaths.add(randomAsset.path)
+      recordUnreadableAsset(randomAsset.name, '视频时长无效')
+      continue
+    }
+
+    const remainingDurationMs = targetDurationMs - currentTotalDurationMs
+    const randomSegmentDurationMs =
+      randomAssetDurationMs < minSegmentDurationMs
+        ? Math.min(randomAssetDurationMs, remainingDurationMs)
+        : Math.min(
+            remainingDurationMs,
+            Math.max(
+              1,
+              Math.floor(
+                random.float(
+                  minSegmentDurationMs,
+                  Math.min(maxSegmentDurationMs, randomAssetDurationMs),
+                ),
+              ),
+            ),
+          )
+    const maxStartMs = randomAssetDurationMs - randomSegmentDurationMs
+    const randomSegmentStartMs = maxStartMs > 0 ? Math.floor(random.float(0, maxStartMs)) : 0
+
+    segments.videoFiles.push(randomAsset.path)
+    segments.timeRanges.push([
+      formatTimestamp(randomSegmentStartMs),
+      formatTimestamp(randomSegmentStartMs + randomSegmentDurationMs),
+    ])
+    currentTotalDurationMs += randomSegmentDurationMs
+  }
+
+  reportUnreadableAssets()
+  console.debug('随机素材片段生成完成', {
+    segmentCount: segments.videoFiles.length,
+    totalDurationSeconds: formatTimestamp(currentTotalDurationMs),
+  })
+
+  return segments
+}
+
+defineExpose({ getVideoSegments })
+</script>
+
+<style lang="scss" scoped>
+//
+</style>

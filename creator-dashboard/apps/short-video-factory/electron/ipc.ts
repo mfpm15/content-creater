@@ -1,0 +1,324 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { BrowserWindow, ipcMain, dialog, app, shell } from 'electron'
+import { sqBulkInsertOrUpdate, sqDelete, sqInsert, sqQuery, sqUpdate } from './sqlite'
+import { ListFilesFromFolderParams, OpenExternalParams, SelectFolderParams } from './types'
+import type { AnalyticsContextParams, AnalyticsTrackParams } from './analytics-types'
+import { edgeTtsGetVoiceList, edgeTtsSynthesizeToBase64, edgeTtsSynthesizeToFile } from './tts'
+import type { EdgeTtsSynthesizeToFileParams } from './tts/types'
+import { renderVideo } from './ffmpeg'
+import {
+  isTrustedAnalyticsSender,
+  markAnalyticsActive,
+  setAnalyticsContext,
+  trackAnalyticsEvent,
+} from './lib/analytics/service'
+import { exportDiagnostics } from './diagnostics'
+import { AppLogLevel, writeRendererLog } from './logger'
+import { checkForUpdates } from './updater'
+import { setupEffectRendererFrameWriter } from './effect-engine/export-task-manager'
+import { getMetadataState } from './metadata/runtime'
+import { validateExternalHttpsUrl } from './lib/external-url'
+import { openDirectory } from './lib/open-directory'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+let windowMaximizedByApp = false
+
+process.env.APP_ROOT = path.join(__dirname, '..')
+
+// 🚧 使用['ENV_NAME'] 避免 vite:define plugin - Vite@2.x
+export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
+export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
+
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
+  ? path.join(process.env.APP_ROOT, 'public')
+  : RENDERER_DIST
+
+function canUsePath(folderPath?: string | null) {
+  if (!folderPath) {
+    return false
+  }
+
+  try {
+    fs.accessSync(folderPath, fs.constants.R_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function tryGetElectronPath(name: Parameters<typeof app.getPath>[0]) {
+  try {
+    return app.getPath(name)
+  } catch (error: any) {
+    console.warn(`[select-folder] getPath(${name}) failed:`, error?.message ?? String(error))
+    return null
+  }
+}
+
+function resolveDefaultFolderPath(customPath?: string | null) {
+  if (canUsePath(customPath)) {
+    return customPath!
+  }
+
+  const fallbackPathKeys: Parameters<typeof app.getPath>[0][] = [
+    'downloads',
+    'desktop',
+    'documents',
+    'home',
+  ]
+
+  for (const key of fallbackPathKeys) {
+    const folderPath = tryGetElectronPath(key)
+    if (canUsePath(folderPath)) {
+      return folderPath
+    }
+  }
+
+  if (canUsePath(process.cwd())) {
+    return process.cwd()
+  }
+
+  return null
+}
+
+export default function initIPC() {
+  const activeTtsSynthesisControllers = new Map<string, AbortController>()
+  setupEffectRendererFrameWriter()
+  ipcMain.on('app-log', (_event, payload: { level: AppLogLevel; args: unknown[] }) => {
+    const level = payload?.level
+    const args = payload?.args
+    if (
+      !level ||
+      !Array.isArray(args) ||
+      !['log', 'info', 'warn', 'error', 'debug'].includes(level)
+    ) {
+      return
+    }
+    writeRendererLog(level, ...args)
+  })
+
+  // sqlite 查询
+  ipcMain.handle('sqlite-query', (_event, params) => sqQuery(params))
+  // sqlite 插入
+  ipcMain.handle('sqlite-insert', (_event, params) => sqInsert(params))
+  // sqlite 更新
+  ipcMain.handle('sqlite-update', (_event, params) => sqUpdate(params))
+  // sqlite 删除
+  ipcMain.handle('sqlite-delete', (_event, params) => sqDelete(params))
+  // sqlite 批量插入或更新
+  ipcMain.handle('sqlite-bulk-insert-or-update', (_event, params) => sqBulkInsertOrUpdate(params))
+
+  // 是否最大化
+  ipcMain.handle('is-win-maxed', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return Boolean(win?.isMaximized() || windowMaximizedByApp)
+  })
+  //最小化
+  ipcMain.on('win-min', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    win?.minimize()
+  })
+  //最大化
+  ipcMain.on('win-max', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win?.isMaximized() || windowMaximizedByApp) {
+      win?.restore()
+      windowMaximizedByApp = false
+    } else {
+      win?.maximize()
+      windowMaximizedByApp = true
+    }
+  })
+  // 切换最大化/还原
+  ipcMain.on('toggle-window-maximize', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+
+    if (win.isMaximized() || windowMaximizedByApp) {
+      win.restore()
+      windowMaximizedByApp = false
+    } else {
+      win.maximize()
+      windowMaximizedByApp = true
+    }
+  })
+  // 拖拽前准备窗口状态：最大化时先还原，再返回还原后的窗口尺寸
+  ipcMain.handle('prepare-window-drag', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return null
+
+    const wasMaximized = win.isMaximized() || windowMaximizedByApp
+    if (wasMaximized) {
+      win.restore()
+      windowMaximizedByApp = false
+    }
+
+    return {
+      bounds: win.getBounds(),
+      wasMaximized,
+    }
+  })
+  // 获取窗口位置和大小
+  ipcMain.handle('get-window-bounds', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return win?.getBounds()
+  })
+  // 设置窗口位置
+  ipcMain.on('set-window-position', (event, x: number, y: number) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    win?.setPosition(Math.round(x), Math.round(y))
+  })
+  //关闭程序
+  ipcMain.on('win-close', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    win?.close()
+  })
+
+  // 设置缩放倍率
+  ipcMain.on('set-zoom-factor', (event, factor: number) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    win?.webContents.setZoomFactor(factor)
+  })
+
+  // 打开外部链接
+  ipcMain.handle('open-external', (_event, params: OpenExternalParams) => {
+    return shell.openExternal(validateExternalHttpsUrl(params?.url))
+  })
+
+  ipcMain.handle('metadata-get-state', (event) => {
+    const frame = event.senderFrame
+    if (!frame || frame !== event.sender.mainFrame) {
+      throw new Error('Metadata state is only available to the main application frame.')
+    }
+    const frameUrl = new URL(frame.url)
+    if (VITE_DEV_SERVER_URL) {
+      const devOrigin = new URL(VITE_DEV_SERVER_URL).origin
+      if (frameUrl.origin !== devOrigin) throw new Error('Untrusted metadata IPC sender.')
+    } else if (frameUrl.protocol !== 'file:') {
+      throw new Error('Untrusted metadata IPC sender.')
+    }
+    return getMetadataState()
+  })
+
+  ipcMain.handle('export-diagnostics', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return exportDiagnostics(win, (phase) =>
+      event.sender.send('diagnostics-export-progress', phase),
+    )
+  })
+
+  ipcMain.handle('check-for-updates', () => checkForUpdates(app.getVersion()))
+
+  // 选择文件夹
+  ipcMain.handle('open-directory', (_event, folderPath: string) => openDirectory(folderPath))
+
+  ipcMain.handle('select-folder', async (event, params?: SelectFolderParams) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) {
+      throw new Error('无法获取窗口')
+    }
+
+    const defaultPath = resolveDefaultFolderPath(params?.defaultPath)
+
+    const dialogOptions: Electron.OpenDialogOptions = {
+      properties: ['openDirectory'],
+      title: params?.title || '选择文件夹',
+    }
+
+    if (defaultPath) {
+      dialogOptions.defaultPath = defaultPath
+    } else {
+      console.warn('[select-folder] all fallback defaultPath attempts unavailable')
+    }
+
+    const result = await dialog.showOpenDialog(win, dialogOptions)
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0] // 返回绝对路径
+    }
+    return null
+  })
+
+  // 读取文件夹内所有文件
+  ipcMain.handle('list-files-from-folder', async (_event, params: ListFilesFromFolderParams) => {
+    const files = await fs.promises.readdir(params.folderPath, { withFileTypes: true })
+    return files
+      .filter((file) => file.isFile())
+      .map((file) => ({
+        name: file.name,
+        path: path.join(params.folderPath, file.name).replace(/\\/g, '/'),
+      }))
+  })
+
+  // 获取EdgeTTS语音列表
+  ipcMain.handle('edge-tts-get-voice-list', () => edgeTtsGetVoiceList())
+
+  // 匿名统计：仅接受主窗口主 frame 的白名单事件，不接受渲染器控制身份或目标站点。
+  ipcMain.handle('analytics-track', (event, params: AnalyticsTrackParams) => {
+    if (!isTrustedAnalyticsSender(event.sender.id, event.frameId === 0, event.senderFrame.url)) {
+      return
+    }
+    return trackAnalyticsEvent(params)
+  })
+  ipcMain.handle('analytics-set-context', (event, params: AnalyticsContextParams) => {
+    if (!isTrustedAnalyticsSender(event.sender.id, event.frameId === 0, event.senderFrame.url)) {
+      return
+    }
+    return setAnalyticsContext(params)
+  })
+  ipcMain.handle('analytics-mark-active', (event, durationMs: unknown) => {
+    if (!isTrustedAnalyticsSender(event.sender.id, event.frameId === 0, event.senderFrame.url)) {
+      return
+    }
+    return markAnalyticsActive(durationMs)
+  })
+
+  // 语音合成并获取Base64
+  ipcMain.handle('edge-tts-synthesize-to-base64', (_event, params) =>
+    edgeTtsSynthesizeToBase64(params),
+  )
+
+  // 保存语音合成到文件
+  ipcMain.on('cancel-edge-tts-synthesis', (event, requestId: unknown) => {
+    if (typeof requestId !== 'string' || !requestId) return
+    activeTtsSynthesisControllers.get(`${event.sender.id}:${requestId}`)?.abort()
+  })
+  ipcMain.handle('edge-tts-synthesize-to-file', (event, params: EdgeTtsSynthesizeToFileParams) => {
+    const requestId = params?.requestId
+    if (!requestId) return edgeTtsSynthesizeToFile(params)
+
+    const requestKey = `${event.sender.id}:${requestId}`
+    const controller = new AbortController()
+    activeTtsSynthesisControllers.set(requestKey, controller)
+
+    return edgeTtsSynthesizeToFile({ ...params, abortSignal: controller.signal }).finally(() => {
+      if (activeTtsSynthesisControllers.get(requestKey) === controller) {
+        activeTtsSynthesisControllers.delete(requestKey)
+      }
+    })
+  })
+
+  // 渲染视频
+  ipcMain.handle('render-video', (_event, params) => {
+    // 进度回调
+    const onProgress = (progress: number) => {
+      _event.sender.send('render-video-progress', progress)
+    }
+
+    // 创建 AbortController
+    const controller = new AbortController()
+    const onCancel = (event: Electron.IpcMainEvent) => {
+      if (event.sender === _event.sender) {
+        controller.abort()
+      }
+    }
+
+    ipcMain.on('cancel-render-video', onCancel)
+
+    return renderVideo({ ...params, onProgress, abortSignal: controller.signal }).finally(() => {
+      ipcMain.off('cancel-render-video', onCancel)
+    })
+  })
+}

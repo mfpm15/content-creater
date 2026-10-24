@@ -1,0 +1,30 @@
+# deps / build
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+dist/
+dist-electron/
+release/
+.runtime/
+.pnpm-store/
+.uv-cache/
+
+# secrets / local config
+.env
+.env.local
+config.toml
+*.key
+
+# logs / generated
+*.log
+storage/
+output/
+tmp/
+*.mp4
+*.mp3
+*.wav
+
+# huge macOS fonts (>50MB)
+creator-dashboard/apps/moneyprinterturbo/resource/fonts/STHeiti*.ttc

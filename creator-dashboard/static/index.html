@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Dashboard lokal untuk mengelola seluruh tool produksi konten AI." />
+  <title>Creator Control Center</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#top" aria-label="Creator Control Center">
+        <span class="brand-mark">C</span>
+        <span><strong>Creator</strong><small>Control Center</small></span>
+      </a>
+      <nav aria-label="Navigasi utama">
+        <a class="nav-link active" href="#tools"><span>▦</span> Semua Tools</a>
+        <a class="nav-link" href="#workflow"><span>⌁</span> Workflow</a>
+        <a class="nav-link" href="#system"><span>◉</span> Status Sistem</a>
+      </nav>
+      <div class="sidebar-note">
+        <span class="pulse"></span>
+        <div><strong>Local-first</strong><small>Semua service hanya di 127.0.0.1</small></div>
+      </div>
+    </aside>
+
+    <main id="top">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">WORKSPACE PRODUKSI</p>
+          <h1>Selamat datang, Faiz</h1>
+        </div>
+        <div class="topbar-actions">
+          <button id="refreshButton" class="icon-button" type="button" title="Refresh status">↻</button>
+          <div class="avatar">FP</div>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="hero-label">AI CONTENT OPERATING SYSTEM</span>
+          <h2>Satu pintu untuk seluruh<br /><em>creator tool</em> Anda.</h2>
+          <p>Jalankan, pantau, dan buka setiap aplikasi produksi konten tanpa berpindah folder atau menghafal perintah terminal.</p>
+          <div class="hero-actions">
+            <button id="startRecommended" class="primary-button" type="button">Mulai MoneyPrinter</button>
+            <a class="secondary-button" href="#workflow">Lihat workflow</a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="orb orb-one"></div><div class="orb orb-two"></div>
+          <div class="visual-card back-card"><span>VIDEO</span><strong>9:16</strong></div>
+          <div class="visual-card front-card"><span class="play">▶</span><div><small>AUTO CREATE</small><strong>Ready to render</strong></div></div>
+          <div class="floating-chip chip-one">✦ AI Script</div>
+          <div class="floating-chip chip-two">CC Subtitle</div>
+        </div>
+      </section>
+
+      <section id="tools" class="section-block">
+        <div class="section-heading">
+          <div><p class="eyebrow">TOOLBOX</p><h2>Creator tools</h2></div>
+          <div class="filter-row" role="group" aria-label="Filter tool">
+            <button class="filter active" data-filter="all" type="button">Semua</button>
+            <button class="filter" data-filter="web" type="button">Web</button>
+            <button class="filter" data-filter="desktop" type="button">Desktop</button>
+            <button class="filter" data-filter="cli" type="button">CLI</button>
+          </div>
+        </div>
+        <div id="toolGrid" class="tool-grid" aria-live="polite"></div>
+      </section>
+
+      <section id="workflow" class="section-block workflow-section">
+        <div class="section-heading"><div><p class="eyebrow">RECOMMENDED FLOW</p><h2>Dari ide sampai publikasi</h2></div></div>
+        <div class="workflow-grid">
+          <article><span>01</span><strong>Riset & Script</strong><p>Gunakan OpenCreator untuk merancang topik, sudut pandang, dan naskah.</p></article>
+          <article><span>02</span><strong>Produksi Video</strong><p>MoneyPrinterTurbo menyatukan footage, narration, subtitle, dan BGM.</p></article>
+          <article><span>03</span><strong>Repurpose</strong><p>AI Shorts Generator mengubah video panjang menjadi beberapa highlight.</p></article>
+          <article><span>04</span><strong>Finishing</strong><p>Short Video Factory menangani template, efek, dan pemeriksaan akhir.</p></article>
+        </div>
+      </section>
+
+      <section id="system" class="section-block system-section">
+        <div class="section-heading"><div><p class="eyebrow">SYSTEM</p><h2>Ringkasan layanan</h2></div></div>
+        <div class="metric-grid">
+          <article><small>Tool terdaftar</small><strong id="totalTools">0</strong></article>
+          <article><small>Service siap</small><strong id="readyTools">0</strong></article>
+          <article><small>Sedang dimulai</small><strong id="startingTools">0</strong></article>
+          <article><small>CLI pipeline</small><strong id="cliTools">0</strong></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="logModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+      <header><div><p class="eyebrow">PROCESS LOG</p><h2 id="logTitle">Log</h2></div><button class="icon-button" data-close-modal type="button">×</button></header>
+      <pre id="logOutput">Belum ada log.</pre>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

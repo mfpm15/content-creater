@@ -1,0 +1,163 @@
+{
+  "tools": [
+    {
+      "id": "moneyprinterturbo",
+      "name": "MoneyPrinterTurbo",
+      "shortName": "MoneyPrinter",
+      "description": "Buat video faceless lengkap dari topik: naskah, footage, suara, subtitle, musik, dan ekspor MP4.",
+      "category": "Video Generator",
+      "icon": "sparkles",
+      "color": "violet",
+      "workingDirectory": "apps/moneyprinterturbo",
+      "command": [
+        "cmd",
+        "/d",
+        "/c",
+        "set MPT_WEBUI_HOST=127.0.0.1&&set MPT_WEBUI_PORT=8501&&call .\\webui.bat"
+      ],
+      "url": "http://127.0.0.1:8501",
+      "healthUrl": "http://127.0.0.1:8501/_stcore/health",
+      "port": 8501,
+      "type": "web",
+      "requirements": [
+        "Python 3.11+",
+        "uv",
+        "FFmpeg"
+      ],
+      "capabilities": [
+        "Topic to video",
+        "TTS",
+        "Subtitle",
+        "Stock footage",
+        "BGM"
+      ]
+    },
+    {
+      "id": "opencreator",
+      "name": "OpenCreator",
+      "shortName": "OpenCreator",
+      "description": "Workspace kreator terpadu untuk script, image, video, dubbing, translation, agent, dan workflow berbasis project.",
+      "category": "Creator Workspace",
+      "icon": "layers",
+      "color": "blue",
+      "workingDirectory": "apps/opencreator",
+      "command": [
+        "cmd",
+        "/d",
+        "/c",
+        "corepack pnpm templates:compile&&corepack pnpm --filter @opencreator/protocol build&&corepack pnpm --filter @opencreator/skill-market build&&corepack pnpm --filter @opencreator/writing-templates build&&corepack pnpm --filter @opencreator/web exec vite --host 127.0.0.1 --port 19861"
+      ],
+      "url": "http://127.0.0.1:19861",
+      "healthUrl": "http://127.0.0.1:19861",
+      "port": 19861,
+      "type": "web",
+      "requirements": [
+        "Node.js 22+",
+        "pnpm 9.15",
+        "Codex CLI"
+      ],
+      "capabilities": [
+        "Creator workspace",
+        "Agent",
+        "Translation",
+        "Image generation",
+        "Video tools"
+      ]
+    },
+    {
+      "id": "short-video-factory",
+      "name": "Short Video Factory",
+      "shortName": "Video Factory",
+      "description": "Aplikasi desktop untuk template video, subtitle, efek, editing, dan produksi video pendek secara batch.",
+      "category": "Desktop Editor",
+      "icon": "clapperboard",
+      "color": "indigo",
+      "workingDirectory": "apps/short-video-factory",
+      "command": [
+        "cmd",
+        "/d",
+        "/c",
+        "set ELECTRON_RUN_AS_NODE=&&set NODE_OPTIONS=--max-old-space-size=4096&&corepack pnpm dev"
+      ],
+      "url": null,
+      "healthUrl": null,
+      "port": null,
+      "type": "desktop",
+      "requirements": [
+        "Node.js 22.17+",
+        "pnpm 10.12.4"
+      ],
+      "capabilities": [
+        "Desktop editor",
+        "Templates",
+        "Subtitle effects",
+        "Batch video",
+        "Local render"
+      ]
+    },
+    {
+      "id": "podcastfy",
+      "name": "Podcastfy",
+      "shortName": "Podcastfy API",
+      "description": "Ubah website, PDF, teks, atau video menjadi percakapan podcast multibahasa dengan beberapa pilihan TTS.",
+      "category": "Podcast Generator",
+      "icon": "mic",
+      "color": "rose",
+      "workingDirectory": "apps/podcastfy",
+      "command": [
+        "cmd",
+        "/d",
+        "/c",
+        "if exist .venv\\Scripts\\python.exe (.venv\\Scripts\\python.exe -m podcastfy.api.fast_app) else (uv run python -m podcastfy.api.fast_app)"
+      ],
+      "environment": {
+        "HOST": "127.0.0.1",
+        "PORT": "8080"
+      },
+      "url": "http://127.0.0.1:8080/docs",
+      "healthUrl": "http://127.0.0.1:8080/health",
+      "port": 8080,
+      "type": "api",
+      "requirements": [
+        "Python 3.11",
+        "uv",
+        "FFmpeg"
+      ],
+      "capabilities": [
+        "Source to podcast",
+        "Multi-speaker",
+        "Multilingual",
+        "TTS",
+        "REST API"
+      ]
+    },
+    {
+      "id": "ai-youtube-shorts",
+      "name": "AI YouTube Shorts Generator",
+      "shortName": "Shorts Generator",
+      "description": "Potong video panjang menjadi kandidat highlight vertikal berdasarkan transkripsi dan penilaian potensi viral.",
+      "category": "CLI Pipeline",
+      "icon": "scissors",
+      "color": "emerald",
+      "workingDirectory": "apps/ai-youtube-shorts-generator",
+      "command": null,
+      "url": null,
+      "healthUrl": null,
+      "port": null,
+      "type": "cli",
+      "requirements": [
+        "Python 3.10+",
+        "FFmpeg",
+        "API key 9Router atau local model"
+      ],
+      "capabilities": [
+        "Long video to shorts",
+        "Highlight ranking",
+        "Whisper",
+        "Vertical crop",
+        "JSON output"
+      ],
+      "exampleCommand": ".venv\\Scripts\\python.exe main.py \"C:\\Videos\\input.mp4\" --mode local --num-clips 3"
+    }
+  ]
+}
