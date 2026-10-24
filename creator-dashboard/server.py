@@ -15,7 +15,9 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
+
+import article_drafter
 
 ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent.resolve()
@@ -251,8 +253,73 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _route_parts(self) -> list[str]:
         return [part for part in urlparse(self.path).path.split("/") if part]
 
+    def _read_body(self, limit: int) -> bytes | None:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0 or length > limit:
+            self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "Body terlalu besar atau tidak valid"})
+            return None
+        return self.rfile.read(length)
+
+    def _article_error(self, exc: Exception) -> None:
+        if isinstance(exc, FileNotFoundError):
+            self._json(HTTPStatus.NOT_FOUND, {"error": "Tidak ditemukan"})
+        elif isinstance(exc, ValueError):
+            self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        elif isinstance(exc, article_drafter.LLMError):
+            self._json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+        else:
+            raise exc
+
+    def _articles_get(self, parts: list[str]) -> None:
+        try:
+            if parts == ["api", "articles"]:
+                self._json(HTTPStatus.OK, {"articles": article_drafter.list_articles()})
+            elif len(parts) == 3:
+                self._json(HTTPStatus.OK, article_drafter.get_article(unquote(parts[2])))
+            elif len(parts) == 5 and parts[3] == "files":
+                name = unquote(parts[4])
+                data, content_type = article_drafter.read_file(unquote(parts[2]), name)
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
+        except Exception as exc:  # noqa: BLE001 - dipetakan ke status HTTP di _article_error
+            self._article_error(exc)
+
+    def _articles_post(self, parts: list[str]) -> None:
+        try:
+            if parts == ["api", "articles"]:
+                raw = self._read_body(200_000)
+                if raw is None:
+                    return
+                self._json(HTTPStatus.OK, article_drafter.generate(json.loads(raw or b"{}")))
+            elif len(parts) == 4 and parts[3] == "rebuild":
+                self._json(HTTPStatus.OK, article_drafter.build_outputs(unquote(parts[2])))
+            elif len(parts) == 5 and parts[3] == "images":
+                raw = self._read_body(article_drafter.MAX_IMAGE_BYTES + 1024)
+                if raw is None:
+                    return
+                self._json(HTTPStatus.OK, article_drafter.save_image(unquote(parts[2]), unquote(parts[4]), raw))
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
+        except json.JSONDecodeError:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "Body bukan JSON valid"})
+        except Exception as exc:  # noqa: BLE001
+            self._article_error(exc)
+
     def do_GET(self) -> None:
         parts = self._route_parts()
+        if parts[:2] == ["api", "articles"]:
+            self._articles_get(parts)
+            return
         if parts == ["api", "tools"]:
             self._json(HTTPStatus.OK, {"tools": [public_tool(tool) for tool in TOOLS]})
             return
@@ -268,6 +335,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parts = self._route_parts()
+        if parts[:2] == ["api", "articles"]:
+            self._articles_post(parts)
+            return
         if len(parts) != 4 or parts[:2] != ["api", "tools"]:
             self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
             return

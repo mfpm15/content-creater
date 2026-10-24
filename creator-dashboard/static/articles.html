@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Article Drafter - Creator Control Center</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/articles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Creator Control Center">
+        <span class="brand-mark">C</span>
+        <span><strong>Creator</strong><small>Control Center</small></span>
+      </a>
+      <nav aria-label="Navigasi utama">
+        <a class="nav-link" href="/"><span>▦</span> Semua Tools</a>
+        <a class="nav-link active" href="/articles.html"><span>✎</span> Article Drafter</a>
+      </nav>
+      <div class="sidebar-note">
+        <span class="pulse"></span>
+        <div><strong>Local-first</strong><small>Teks hanya dikirim ke 9Router lokal</small></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div><p class="eyebrow">ARTICLE DRAFTER</p><h1>Dari poin draft jadi artikel</h1></div>
+      </header>
+
+      <section class="section-block drafter-grid">
+        <form id="draftForm" class="panel" autocomplete="off">
+          <h2>1. Isi informasi draft</h2>
+          <label>Judul kerja <input name="title" maxlength="200" placeholder="Boleh kasar, AI boleh usulkan judul akhir" /></label>
+          <div class="row2">
+            <label>Audiens <input name="audience" maxlength="200" placeholder="Misal: pemula keamanan siber" /></label>
+            <label>Panjang (kata) <input name="words" type="number" min="200" max="6000" value="1200" /></label>
+          </div>
+          <div class="row2">
+            <label>Bahasa artikel
+              <select name="language"><option>Indonesia</option><option>Inggris</option></select>
+            </label>
+            <label>Nada
+              <select name="tone"><option>semi-formal</option><option>formal</option><option>santai</option><option>edukatif</option></select>
+            </label>
+          </div>
+          <label>Poin-poin draft <span class="req">wajib</span>
+            <textarea name="points" rows="9" required placeholder="Tulis bebas: ide utama, poin, urutan, contoh. Ini sumber isi artikel."></textarea>
+          </label>
+          <label>Sumber / catatan yang boleh dipakai
+            <textarea name="sources" rows="4" placeholder="Link, kutipan, data. Fakta di luar ini ditandai [PERLU VERIFIKASI]."></textarea>
+          </label>
+          <h3>Gambar penjelasan</h3>
+          <div class="row2">
+            <label>Jumlah gambar <input name="image_count" type="number" min="0" max="8" value="2" /></label>
+            <label>Bahasa teks di gambar
+              <select name="image_text_language"><option>Indonesia</option><option>Inggris</option></select>
+            </label>
+          </div>
+          <label>Gaya visual <input name="image_style" maxlength="300" value="infografis bersih, flat, palet biru-ungu" /></label>
+          <label>Permintaan gambar (satu per baris)
+            <textarea name="image_requests" rows="3" placeholder="Misal: diagram alur login dengan 2FA&#10;Perbandingan serangan phishing vs smishing"></textarea>
+          </label>
+          <button id="generateButton" class="primary-button" type="submit">Generate artikel</button>
+          <p id="formStatus" class="form-status" role="status"></p>
+        </form>
+
+        <div class="panel" id="resultPanel">
+          <h2>2. Hasil</h2>
+          <div id="emptyState" class="empty">Belum ada artikel. Isi form lalu klik Generate. Proses bisa 30-120 detik.</div>
+          <div id="result" hidden>
+            <h3 id="resultTitle"></h3>
+            <p id="resultSummary" class="muted"></p>
+            <div id="downloads" class="downloads"></div>
+            <p class="muted small" id="resultPath"></p>
+
+            <h3>Prompt gambar</h3>
+            <p class="muted small">Salin ke Nano Banana atau ChatGPT. Simpan hasilnya, lalu unggah di sini (PNG atau JPG, maks 10 MB). Dokumen dibangun ulang otomatis.</p>
+            <div id="imageList"></div>
+
+            <h3>Pratinjau Markdown</h3>
+            <pre id="mdPreview" class="md-preview"></pre>
+          </div>
+          <h3>Artikel sebelumnya</h3>
+          <ul id="history" class="history"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast" hidden></div>
+  <script src="/articles.js" defer></script>
+</body>
+</html>

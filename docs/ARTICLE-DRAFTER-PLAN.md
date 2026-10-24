@@ -1,6 +1,18 @@
 # Draft Rencana: Menu Article Drafter
 
-Status: DRAFT, belum ada kode. Menunggu keputusan di bagian "Pertanyaan terbuka".
+Status: tahap 1 selesai dan berjalan (lihat "Yang sudah dibangun"). Sisa bagian dokumen ini adalah rencana awal; jalur gambar akhirnya diubah menjadi prompt untuk Nano Banana / ChatGPT.
+
+## Yang sudah dibangun
+
+- Menu **Article Drafter** di dashboard: `creator-dashboard/static/articles.html` (+ `.js`, `.css`), logika di `creator-dashboard/article_drafter.py`, endpoint `/api/articles` di `server.py`.
+- Input form menjadi `.md`, `.docx` (OOXML ditulis langsung, tanpa `python-docx`), dan `image-prompts.md`.
+- Prompt gambar berbahasa Inggris, mandiri, memuat subjek, komposisi, gaya, palet, rasio, dan teks di dalam gambar. Disalin dengan satu klik.
+- Unggah PNG/JPG per id gambar. Dokumen dibangun ulang otomatis. Sebelum gambar ada, `.docx` memuat penanda `[GAMBAR: id]`.
+- LLM: 9Router (`stream: false` wajib, karena 9Router default membalas SSE). Fakta di luar poin dan sumber ditandai `[PERLU VERIFIKASI]`.
+- Tes: `python creator-dashboard/test_article_drafter.py` (tanpa LLM asli). Diuji juga dengan 9Router asli: ~30-45 detik per artikel.
+
+Belum dikerjakan: diagram buatan lokal (diagram-design), integrasi Napkin, ekspor mind map Xmind, revisi per bagian.
+
 
 ## Tujuan
 
