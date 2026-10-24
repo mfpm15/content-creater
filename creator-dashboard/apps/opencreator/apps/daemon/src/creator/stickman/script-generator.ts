@@ -43,6 +43,7 @@ export async function generateStickmanScript(input: {
       },
       body: JSON.stringify({
         model: input.model,
+        stream: false,
         response_format: { type: 'json_object' },
         messages: [{
           role: 'user',
@@ -59,5 +60,16 @@ export async function generateStickmanScript(input: {
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
   const content = payload.choices?.[0]?.message?.content;
   if (!content) throw new Error('stickman_script_invalid_response');
-  return parseStickmanScript(JSON.parse(content));
+  const cleanJson = extractJsonPayload(content);
+  return parseStickmanScript(JSON.parse(cleanJson));
+}
+
+function extractJsonPayload(raw: string): string {
+  const trimmed = raw.trim();
+  const match = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (match && match[1]) return match[1].trim();
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) return trimmed.slice(firstBrace, lastBrace + 1);
+  return trimmed;
 }

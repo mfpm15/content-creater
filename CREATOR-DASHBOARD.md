@@ -4,6 +4,7 @@ Dashboard lokal ini menjadi pintu masuk untuk lima repository yang sekarang ters
 
 - **MoneyPrinterTurbo** untuk membuat video faceless dari topik.
 - **OpenCreator** untuk workspace kreator dan workflow berbasis Agent.
+- **Remotion Studio** untuk video editor visual berbasis React (timeline, preview, layer dragging).
 - **Short Video Factory** untuk editor desktop, template, dan finishing.
 - **Podcastfy** untuk mengubah sumber menjadi podcast berbentuk percakapan.
 - **AI YouTube Shorts Generator** untuk memotong video panjang menjadi highlight vertikal.
@@ -52,6 +53,7 @@ Creator Control Center        3210
 MoneyPrinterTurbo WebUI       8501
 Podcastfy API                 8080
 OpenCreator Web              19861
+Remotion Studio               3300
 ```
 
 Short Video Factory berjalan sebagai aplikasi Electron, bukan service web. Statusnya dinilai dari process tree yang dikelola dashboard, bukan dari port HTTP. AI YouTube Shorts Generator adalah CLI pipeline, sehingga dashboard menyediakan command yang dapat disalin.

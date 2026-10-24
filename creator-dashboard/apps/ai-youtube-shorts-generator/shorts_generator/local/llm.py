@@ -26,6 +26,7 @@ def call_openai_llm(prompt: str) -> str:
     response = client.chat.completions.create(
         model=OPENAI_MODEL,
         temperature=0.7,
+        stream=False,
         messages=[{"role": "user", "content": prompt}],
     )
     return response.choices[0].message.content or ""

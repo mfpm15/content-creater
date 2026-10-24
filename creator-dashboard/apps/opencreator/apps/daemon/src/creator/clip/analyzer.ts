@@ -51,6 +51,7 @@ export async function analyzeClips(input: {
     headers: { authorization: `Bearer ${input.apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify({
       model: input.model,
+      stream: false,
       response_format: { type: 'json_object' },
       messages: [{
         role: 'user',
@@ -62,7 +63,8 @@ export async function analyzeClips(input: {
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
   const content = payload.choices?.[0]?.message?.content;
   if (!content) throw new Error('clip_analyzer_invalid_response');
-  const parsed = parseClipCandidates(JSON.parse(content), input.duration)
+  const cleanJson = extractJsonPayload(content);
+  const parsed = parseClipCandidates(JSON.parse(cleanJson), input.duration)
     .filter(candidate => {
       const duration = candidate.end - candidate.start;
       return duration >= input.minDuration && duration <= input.maxDuration;
@@ -70,6 +72,16 @@ export async function analyzeClips(input: {
     .slice(0, input.count);
   if (parsed.length === 0) throw new Error('clip_analyzer_no_candidates');
   return parsed;
+}
+
+function extractJsonPayload(raw: string): string {
+  const trimmed = raw.trim();
+  const match = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (match && match[1]) return match[1].trim();
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) return trimmed.slice(firstBrace, lastBrace + 1);
+  return trimmed;
 }
 
 function buildClipAnalysisPrompt(input: {

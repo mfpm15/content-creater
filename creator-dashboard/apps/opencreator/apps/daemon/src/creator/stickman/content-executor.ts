@@ -1103,6 +1103,7 @@ export function createStickmanConfiguredCompletion(input: {
         },
         body: JSON.stringify({
           model: config.llm.model,
+          stream: false,
           response_format: { type: 'json_object' },
           messages: [{ role: 'user', content: request.prompt }]
         })
@@ -1117,9 +1118,20 @@ export function createStickmanConfiguredCompletion(input: {
       throw new CreatorExecutorError('creator_llm_invalid_response', 'LLM response did not contain JSON');
     }
     try {
-      return JSON.parse(content) as Record<string, CreatorJson>;
+      const cleanJson = extractJsonPayload(content);
+      return JSON.parse(cleanJson) as Record<string, CreatorJson>;
     } catch {
       throw new CreatorExecutorError('creator_llm_invalid_response', 'LLM response was not valid JSON');
     }
   };
+}
+
+function extractJsonPayload(raw: string): string {
+  const trimmed = raw.trim();
+  const match = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (match && match[1]) return match[1].trim();
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) return trimmed.slice(firstBrace, lastBrace + 1);
+  return trimmed;
 }

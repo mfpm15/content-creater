@@ -47,9 +47,9 @@ if not exist .venv\Scripts\python.exe (
   uv venv --python 3.11 .venv
   if errorlevel 1 (popd & goto :failed)
 )
-uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt openai
 if errorlevel 1 (popd & goto :failed)
-echo     Dependensi local-mode bersifat opsional dan cukup besar.
+echo     Dependensi local-mode dan OpenAI (9Router) siap.
 popd
 
 echo [4/4] Menyiapkan aplikasi Node.js...
@@ -63,6 +63,11 @@ set "PATH=%CD%\creator-dashboard\bin;%PATH%"
 pushd creator-dashboard\apps\opencreator
 call corepack pnpm install --frozen-lockfile
 if errorlevel 1 (popd & goto :failed)
+call corepack pnpm templates:compile
+call corepack pnpm --filter @opencreator/config build
+call corepack pnpm --filter @opencreator/protocol build
+call corepack pnpm --filter @opencreator/skill-market build
+call corepack pnpm --filter @opencreator/writing-templates build
 popd
 pushd creator-dashboard\apps\short-video-factory
 call corepack pnpm install --frozen-lockfile

@@ -45,7 +45,7 @@
         "cmd",
         "/d",
         "/c",
-        "corepack pnpm templates:compile&&corepack pnpm --filter @opencreator/protocol build&&corepack pnpm --filter @opencreator/skill-market build&&corepack pnpm --filter @opencreator/writing-templates build&&corepack pnpm --filter @opencreator/web exec vite --host 127.0.0.1 --port 19861"
+        "corepack pnpm templates:compile&&corepack pnpm --filter @opencreator/config build&&corepack pnpm --filter @opencreator/protocol build&&corepack pnpm --filter @opencreator/skill-market build&&corepack pnpm --filter @opencreator/writing-templates build&&corepack pnpm --filter @opencreator/web exec vite --host 127.0.0.1 --port 19861"
       ],
       "url": "http://127.0.0.1:19861",
       "healthUrl": "http://127.0.0.1:19861",
@@ -62,6 +62,37 @@
         "Translation",
         "Image generation",
         "Video tools"
+      ]
+    },
+    {
+      "id": "remotion-studio",
+      "name": "Remotion Studio",
+      "shortName": "Remotion",
+      "description": "Video editor visual berbasis React: live preview frame-by-frame, timeline player, drag-and-drop layer canvas, dan Claude Code Agent Skills.",
+      "category": "React Video Editor",
+      "icon": "film",
+      "color": "cyan",
+      "workingDirectory": "apps/opencreator/packages/stickman-remotion",
+      "command": [
+        "cmd",
+        "/d",
+        "/c",
+        "node node_modules\\@remotion\\cli\\remotion-cli.js preview src\\index.ts --port=3300"
+      ],
+      "url": "http://127.0.0.1:3300",
+      "healthUrl": "http://127.0.0.1:3300",
+      "port": 3300,
+      "type": "web",
+      "requirements": [
+        "Node.js 20+",
+        "Remotion 4.0+"
+      ],
+      "capabilities": [
+        "React Video Studio",
+        "Live Canvas Preview",
+        "Timeline Scrubbing",
+        "Interactive Drag & Drop",
+        "Claude Code Agent Skills"
       ]
     },
     {
