@@ -271,7 +271,7 @@ export function createDefaultCreatorServicesConfig(): CreatorServicesConfig {
       apiKey: '9router-local',
       model: 'ag/gemini-3.8-flash-high',
       jsonMode: false,
-      source: 'custom'
+      source: 'codex'
     },
     transcription: {
       provider: 'openai',
@@ -325,11 +325,11 @@ export function createDefaultCreatorServicesConfig(): CreatorServicesConfig {
       }
     },
     image: {
-      provider: 'openai',
+      provider: 'codex-native',
       openai: {
-        baseUrl: 'http://localhost:20128/v1',
-        apiKey: '9router-local',
-        model: 'ag/gemini-3.1-flash-image'
+        baseUrl: '',
+        apiKey: '',
+        model: 'gpt-image-1'
       },
       jimeng: {
         baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',

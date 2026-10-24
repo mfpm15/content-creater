@@ -53,10 +53,11 @@ def main() -> int:
         assert "application/json" in content_type
         payload = json.loads(body.decode("utf-8"))
         tools = payload["tools"]
-        assert len(tools) == 5
+        assert len(tools) == 6
         assert {tool["id"] for tool in tools} == {
             "moneyprinterturbo",
             "opencreator",
+            "remotion-studio",
             "short-video-factory",
             "podcastfy",
             "ai-youtube-shorts",
