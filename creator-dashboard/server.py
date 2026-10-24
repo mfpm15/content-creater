@@ -277,6 +277,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         try:
             if parts == ["api", "articles"]:
                 self._json(HTTPStatus.OK, {"articles": article_drafter.list_articles()})
+            elif parts == ["api", "articles", "options"]:
+                self._json(HTTPStatus.OK, article_drafter.options())
+            elif len(parts) == 4 and parts[2] == "jobs":
+                self._json(HTTPStatus.OK, article_drafter.job_status(unquote(parts[3])))
             elif len(parts) == 3:
                 self._json(HTTPStatus.OK, article_drafter.get_article(unquote(parts[2])))
             elif len(parts) == 5 and parts[3] == "files":
@@ -300,7 +304,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 raw = self._read_body(200_000)
                 if raw is None:
                     return
-                self._json(HTTPStatus.OK, article_drafter.generate(json.loads(raw or b"{}")))
+                self._json(HTTPStatus.ACCEPTED, article_drafter.start_job(json.loads(raw or b"{}")))
+            elif len(parts) == 4 and parts[3] == "resume":
+                self._json(HTTPStatus.ACCEPTED, article_drafter.resume_job(unquote(parts[2])))
             elif len(parts) == 4 and parts[3] == "rebuild":
                 self._json(HTTPStatus.OK, article_drafter.build_outputs(unquote(parts[2])))
             elif len(parts) == 5 and parts[3] == "images":

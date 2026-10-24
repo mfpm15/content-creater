@@ -19,6 +19,11 @@ Dashboard sendiri berjalan di http://127.0.0.1:3210. Dari sana tiap tool bisa di
 
 **Article Drafter** (menu di sidebar, http://127.0.0.1:3210/articles.html): isi poin draft, hasilkan artikel `.md` dan `.docx` lewat 9Router, plus prompt gambar siap tempel ke Nano Banana atau ChatGPT. Gambar hasilnya diunggah balik dan dokumen dibangun ulang dengan gambar tertanam. Tanpa dependensi tambahan. Hasil tersimpan di `creator-dashboard/output/articles/` (tidak masuk git).
 
+- **Panjang:** 200 sampai 30.000 kata. Artikel panjang ditulis bertahap (kerangka, daftar pustaka, tiap bagian 3 paralel, prompt gambar) dengan bilah progres. Bila gagal di tengah, bagian yang sudah jadi tersimpan dan tombol Lanjutkan hanya menulis sisanya. Uji nyata: 15.108 kata dalam sekitar 8 menit.
+- **Struktur baku** menurut jenis artikel: analisis/white paper, IMRaD, laporan, populer, tutorial. Artikel bernomor memakai abstrak, kata kunci, daftar isi (di atas ±3.000 kata), penomoran 1., 1.1, kesimpulan, dan daftar pustaka. Nomor halaman ada di Word.
+- **Sumber rujukan:** isi kolom Sumber, lalu sistem membuat Daftar Pustaka gaya IEEE dan sitasi `[n]` di teks. Sitasi ke nomor yang tidak ada diganti `[PERLU VERIFIKASI]`. Opsi "Sarankan rujukan tambahan" menaruh saran AI di bagian terpisah bertanda belum diverifikasi.
+- **Gaya visual:** pilih satu dari 13 gaya, atau Acak (tiap gambar beda gaya).
+
 ## Struktur
 
 ```

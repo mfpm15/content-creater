@@ -1,7 +1,9 @@
 const form = document.querySelector('#draftForm');
 const statusLine = document.querySelector('#formStatus');
 const generateButton = document.querySelector('#generateButton');
+const progressBox = document.querySelector('#progress');
 let currentSlug = null;
+let pollTimer = null;
 
 function toast(message) {
   const el = document.querySelector('#toast');
@@ -25,17 +27,55 @@ function el(tag, props = {}, ...children) {
   return node;
 }
 
+function setStatus(message, isError = false) {
+  statusLine.className = isError ? 'form-status error' : 'form-status';
+  statusLine.textContent = message;
+}
+
+function setBusy(busy) {
+  generateButton.disabled = busy;
+}
+
+function showProgress(job) {
+  progressBox.hidden = job.status !== 'running';
+  const percent = Math.min(100, Math.round((job.done / Math.max(job.total, 1)) * 100));
+  document.querySelector('#bar').style.width = `${percent}%`;
+  document.querySelector('#progressText').textContent = `${percent}% | ${job.message}`;
+}
+
+async function loadOptions() {
+  const options = await api('/api/articles/options');
+  const typeSelect = document.querySelector('#typeSelect');
+  typeSelect.replaceChildren(...options.types.map(item => el('option', { value: item.key }, item.label)));
+  typeSelect.value = options.defaultType;
+  const styleSelect = document.querySelector('#styleSelect');
+  styleSelect.replaceChildren(
+    el('option', { value: options.randomStyle }, 'Acak (setiap gambar beda gaya)'),
+    ...options.styles.map(style => el('option', { value: style }, style)));
+  document.querySelector('#wordsInput').max = options.limits.maxWords;
+  document.querySelector('#imageCount').max = options.limits.maxImages;
+}
+
 function renderArticle(article) {
   currentSlug = article.slug;
   document.querySelector('#emptyState').hidden = true;
   document.querySelector('#result').hidden = false;
   document.querySelector('#resultTitle').textContent = article.title;
   document.querySelector('#resultSummary').textContent = article.summary;
-  document.querySelector('#resultPath').textContent = `Folder: ${article.path}`;
+  const resumeBox = document.querySelector('#resumeBox');
+  const complete = document.querySelector('#complete');
+  resumeBox.hidden = article.complete;
+  complete.hidden = !article.complete;
+  if (!article.complete) {
+    document.querySelector('#resumeText').textContent =
+      `Belum selesai: ${article.sectionsDone}/${article.sectionsTotal || '?'} bagian tersimpan. Bagian yang sudah jadi tidak ditulis ulang.`;
+    return;
+  }
+  document.querySelector('#resultPath').textContent =
+    `${article.wordCount.toLocaleString('id-ID')} kata | ${article.referencesCount} rujukan | Folder: ${article.path}`;
   document.querySelector('#mdPreview').textContent = article.markdown;
 
-  const downloads = document.querySelector('#downloads');
-  downloads.replaceChildren(...article.files.map(name =>
+  document.querySelector('#downloads').replaceChildren(...article.files.map(name =>
     el('a', { href: `/api/articles/${article.slug}/files/${name}`, download: name }, `Unduh ${name}`)));
 
   const list = document.querySelector('#imageList');
@@ -53,8 +93,9 @@ function renderArticle(article) {
     const file = el('input', { type: 'file', accept: 'image/png,image/jpeg' });
     file.addEventListener('change', () => upload(image.id, file));
     return el('article', { className: 'image-card' },
-      el('header', {}, el('strong', {}, `${image.id}`), badge),
+      el('header', {}, el('strong', {}, image.id), badge),
       el('div', { className: 'muted small' }, `${image.purpose || '-'} | rasio ${image.aspect}`),
+      el('div', { className: 'muted small' }, `Gaya: ${image.style || '-'}`),
       el('pre', {}, image.prompt),
       el('div', { className: 'actions' }, copy, file));
   }));
@@ -64,14 +105,47 @@ async function upload(imageId, input) {
   const file = input.files[0];
   if (!file || !currentSlug) return;
   try {
-    const article = await api(`/api/articles/${currentSlug}/images/${encodeURIComponent(imageId)}`, {
+    renderArticle(await api(`/api/articles/${currentSlug}/images/${encodeURIComponent(imageId)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: await file.arrayBuffer(),
-    });
-    renderArticle(article);
+    }));
     toast('Gambar terpasang, dokumen dibangun ulang');
   } catch (error) {
     input.value = '';
     toast(error.message);
+  }
+}
+
+function watch(jobId) {
+  clearTimeout(pollTimer);
+  setBusy(true);
+  const tick = async () => {
+    try {
+      const job = await api(`/api/articles/jobs/${encodeURIComponent(jobId)}`);
+      currentSlug = job.slug;
+      showProgress(job);
+      if (job.status === 'running') { pollTimer = setTimeout(tick, 2000); return; }
+      setBusy(false);
+      progressBox.hidden = true;
+      renderArticle(await api(`/api/articles/${job.slug}`));
+      loadHistory();
+      if (job.status === 'done') setStatus('Selesai.');
+      else setStatus(job.error || 'Gagal.', true);
+    } catch (error) {
+      setBusy(false);
+      progressBox.hidden = true;
+      setStatus(error.message, true);
+    }
+  };
+  tick();
+}
+
+async function resume(slug) {
+  try {
+    setStatus('Melanjutkan...');
+    const job = await api(`/api/articles/${encodeURIComponent(slug)}/resume`, { method: 'POST' });
+    watch(job.id);
+  } catch (error) {
+    setStatus(error.message, true);
   }
 }
 
@@ -80,33 +154,37 @@ async function loadHistory() {
   const history = document.querySelector('#history');
   if (!articles.length) { history.replaceChildren(el('li', {}, 'Belum ada.')); return; }
   history.replaceChildren(...articles.map(item => {
-    const open = el('button', { type: 'button' }, 'Buka');
-    open.addEventListener('click', async () => {
-      try { renderArticle(await api(`/api/articles/${item.slug}`)); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    let label = 'Buka';
+    let action = async () => renderArticle(await api(`/api/articles/${item.slug}`));
+    if (!item.complete && item.job) { label = 'Pantau'; action = async () => watch(item.job); }
+    else if (!item.complete) { label = 'Lanjutkan'; action = async () => resume(item.slug); }
+    const button = el('button', { type: 'button' }, label);
+    button.addEventListener('click', async () => {
+      try { await action(); if (label === 'Buka') window.scrollTo({ top: 0, behavior: 'smooth' }); }
       catch (error) { toast(error.message); }
     });
-    return el('li', {}, el('span', {}, item.title), open);
+    return el('li', {}, el('span', {}, item.complete ? item.title : `${item.title} (belum selesai)`), button);
   }));
 }
 
+document.querySelector('#resumeButton').addEventListener('click', () => currentSlug && resume(currentSlug));
+
 form.addEventListener('submit', async event => {
   event.preventDefault();
-  const body = Object.fromEntries(new FormData(form));
-  generateButton.disabled = true;
-  statusLine.className = 'form-status';
-  statusLine.textContent = 'Menulis artikel... jangan tutup halaman ini.';
+  setBusy(true);
+  setStatus('Memulai...');
   try {
-    renderArticle(await api('/api/articles', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    }));
-    statusLine.textContent = 'Selesai.';
+    const job = await api('/api/articles', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.fromEntries(new FormData(form))),
+    });
+    setStatus('Artikel ditulis di latar belakang. Halaman ini boleh ditutup lalu dibuka lagi; lihat Artikel sebelumnya.');
     loadHistory();
+    watch(job.id);
   } catch (error) {
-    statusLine.className = 'form-status error';
-    statusLine.textContent = error.message;
-  } finally {
-    generateButton.disabled = false;
+    setBusy(false);
+    setStatus(error.message, true);
   }
 });
 
-loadHistory().catch(error => toast(error.message));
+loadOptions().then(loadHistory).catch(error => toast(error.message));
