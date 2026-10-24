@@ -84,7 +84,6 @@ Jangan commit API key.
 - Generasi gambar/video (Nano Banana, Veo) belum terpasang. Gateway 9Router belum punya provider gambar, dan MoneyPrinterTurbo belum punya adapter Google native.
 - OpenCreator menjalankan build paket terlebih dahulu sebelum Vite, jadi start pertama lebih lama.
 - Dashboard hanya menjalankan perintah yang tertulis di `tools.json`, tidak menerima perintah dari browser. Biarkan terikat ke `127.0.0.1`.
-- SupoClip tidak bisa jalan tanpa Docker Desktop. Tombol Stop menjalankan `docker compose down` tanpa `-v`, jadi data tetap ada. `docker-compose.yml`-nya diubah sedikit supaya meneruskan `OPENAI_BASE_URL` ke backend dan worker.
 - Font macOS besar (`STHeiti*.ttc`) tidak ikut di repo.
 
 ## Lisensi
