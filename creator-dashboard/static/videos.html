@@ -80,31 +80,32 @@
       </nav>
       <div class="sidebar-note">
         <span class="pulse"></span>
-        <div><strong>Local-first</strong><small>AI 9Router + HyperFrames Renderer</small></div>
+        <div><strong>Opuscar Production</strong><small>9Router Direction + Edge TTS + FFmpeg</small></div>
       </div>
     </aside>
 
     <main>
       <header class="topbar">
         <div>
-          <p class="eyebrow">AI VIDEO STUDIO</p>
-          <h1>Form Pembuat Video Otomatis</h1>
+          <p class="eyebrow">OPUSCAR VIDEO STUDIO</p>
+          <h1>Produksi Video Opuscar Dinamis</h1>
         </div>
       </header>
 
       <section class="section-block drafter-grid">
         <form id="videoForm" class="panel" autocomplete="off">
-          <h2>1. Masukkan Detail Video</h2>
+          <h2 id="formEngineTitle">1. Sutradarai Film Opuscar</h2>
+          <div id="engineNotice" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Opuscar Production Pipeline</strong><br>Scene plan mengikuti topik, narasi, timecode, visual, teks layar, sound cue, durasi, rasio, dan model. Timecode eksplisit dipertahankan; input bebas dibagi proporsional.</div>
           <label>Topik / Judul Video <span class="req">wajib</span>
             <input name="topic" id="topicInput" maxlength="200" required placeholder="Contoh: 3 Tips Sukses Mengatur Waktu, Peluncuran Kopi Organik, AI Video Engine" />
           </label>
 
-          <label>Poin Naskah / Pesan Utama (Opsional)
-            <textarea name="script" id="scriptInput" rows="5" placeholder="Tuliskan poin atau pesan yang ingin ditonjolkan. AI akan otomatis merangkai headline, subline, dan call-to-action visual."></textarea>
+          <label>Narasi dan Arahan Adegan (Opsional)
+            <textarea name="script" id="scriptInput" rows="9" placeholder="Input bebas, atau format eksplisit:&#10;00:00-00:08 Narasi: ...&#10;Visual: ...&#10;Teks layar: ...&#10;SFX: ..."></textarea>
           </label>
 
           <div class="row2">
-            <label>Gaya Visual & Engine
+            <label>Gaya Visual
               <select name="style" id="styleSelect"></select>
             </label>
             <label>Format Rasio Layar
@@ -116,7 +117,7 @@
             <label>Durasi Video (Detik)
               <select name="duration" id="durationSelect"></select>
             </label>
-            <label>Pilihan Model AI (Bebas / 9Router)
+            <label>Model Pengarah Visual (9Router)
               <select name="model" id="modelSelect"></select>
             </label>
           </div>

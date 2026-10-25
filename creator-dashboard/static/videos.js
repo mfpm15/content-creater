@@ -1,5 +1,7 @@
 const elements = {
   form: document.getElementById('videoForm'),
+  engineNotice: document.getElementById('engineNotice'),
+  formEngineTitle: document.getElementById('formEngineTitle'),
   topic: document.getElementById('topicInput'),
   script: document.getElementById('scriptInput'),
   styleSelect: document.getElementById('styleSelect'),
@@ -26,7 +28,7 @@ async function loadOptions() {
     if (!res.ok) throw new Error('Gagal memuat opsi video');
     const data = await res.json();
 
-    elements.styleSelect.innerHTML = data.styles.map(s => 
+    elements.styleSelect.innerHTML = data.styles.map(s =>
       `<option value="${s.id}" ${s.id === data.defaultStyle ? 'selected' : ''}>${s.name} - ${s.description}</option>`
     ).join('');
 
@@ -43,10 +45,16 @@ async function loadOptions() {
         `<option value="${m.id}" ${m.id === data.defaultModel ? 'selected' : ''}>${m.name}</option>`
       ).join('');
     }
+    updateEngineExperience();
   } catch (err) {
     elements.formStatus.textContent = err.message;
     elements.formStatus.className = 'form-status error';
   }
+}
+
+function updateEngineExperience() {
+  elements.formEngineTitle.textContent = '1. Sutradarai Film Opuscar';
+  elements.generateBtn.textContent = 'Sutradarai & Render Film Opuscar (MP4)';
 }
 
 async function loadHistory() {

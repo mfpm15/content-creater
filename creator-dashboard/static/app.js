@@ -46,6 +46,9 @@ function render() {
     };
     const glow = glowColors[tool.color] || 'rgba(124,140,255,.14)';
     const command = tool.exampleCommand ? `<button type="button" data-copy="${escapeHtml(tool.exampleCommand)}">Salin command</button>` : '';
+    const videoFormButton = tool.id === 'lemo-opuscar'
+      ? '<a class="launch" href="/videos.html">Buat dengan Opuscar</a>'
+      : '';
     return `
       <article class="tool-card${featured}" style="--card-glow:${glow}">
         <div class="card-top">
@@ -57,8 +60,9 @@ function render() {
         <p class="tool-description">${escapeHtml(tool.description)}</p>
         <div class="capability-list">${tool.capabilities.slice(0, 5).map(item => `<span>${escapeHtml(item)}</span>`).join('')}</div>
         <div class="card-actions">
+          ${videoFormButton}
           ${tool.type === 'cli' ? command : `<button class="launch" type="button" data-start="${tool.id}" ${canStart ? '' : 'disabled'}>Jalankan</button>`}
-          ${tool.url ? `<a class="${canOpen ? '' : 'disabled'}" href="${escapeHtml(tool.url)}" target="_blank" rel="noopener">Buka</a>` : ''}
+          ${tool.url ? `<a class="${canOpen ? '' : 'disabled'}" href="${escapeHtml(tool.url)}" target="_blank" rel="noopener">Buka Studio</a>` : ''}
           ${tool.type !== 'cli' ? `<button class="stop" type="button" data-stop="${tool.id}" ${canStop ? '' : 'disabled'}>Stop</button>` : ''}
           ${tool.type !== 'cli' ? `<button type="button" data-logs="${tool.id}">Log</button>` : ''}
         </div>
