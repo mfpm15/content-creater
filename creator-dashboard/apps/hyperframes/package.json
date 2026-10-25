@@ -1,0 +1,13 @@
+{
+  "name": "hyperframes-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "hyperframes preview --port 4000",
+    "render": "hyperframes render"
+  },
+  "dependencies": {
+    "hyperframes": "^0.8.195"
+  }
+}

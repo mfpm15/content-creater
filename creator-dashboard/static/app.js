@@ -1,5 +1,5 @@
 const state = { tools: [], filter: 'all', logToolId: null };
-const iconMap = { sparkles: '✦', layers: '▦', clapperboard: '▶', mic: '◉', scissors: '✂', film: '🎬' };
+const iconMap = { sparkles: '✦', layers: '▦', clapperboard: '▶', mic: '◉', scissors: '✂', film: '🎬', palette: '🎨', code: '⚡' };
 const statusLabels = { ready: 'Siap', starting: 'Memulai', stopped: 'Berhenti', cli: 'CLI' };
 
 const grid = document.querySelector('#toolGrid');
@@ -41,7 +41,8 @@ function render() {
       violet: 'rgba(154,124,255,.17)',
       rose: 'rgba(240,105,155,.13)',
       emerald: 'rgba(84,230,165,.13)',
-      cyan: 'rgba(34,211,238,.17)'
+      cyan: 'rgba(34,211,238,.17)',
+      amber: 'rgba(245,158,11,.17)'
     };
     const glow = glowColors[tool.color] || 'rgba(124,140,255,.14)';
     const command = tool.exampleCommand ? `<button type="button" data-copy="${escapeHtml(tool.exampleCommand)}">Salin command</button>` : '';

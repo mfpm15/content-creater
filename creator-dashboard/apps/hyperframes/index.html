@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HyperFrames Demo</title>
+  <style>
+    body {
+      margin: 0;
+      background: #090b18;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: white;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #stage {
+      width: 1920px;
+      height: 1080px;
+      background: radial-gradient(circle at 70% 30%, #4338ca, #1e1b4b 60%, #090b18);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .badge {
+      background: #6366f1;
+      padding: 12px 28px;
+      border-radius: 9999px;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 88px;
+      margin: 0;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #ffffff, #c7d2fe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p {
+      font-size: 34px;
+      color: #94a3b8;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div data-hf-id="hf-97ah" id="stage" data-composition-id="demo" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-9614" id="badge" class="badge clip" data-start="0.5" data-duration="4.5" data-track-index="0">Creator Control Center</div>
+    <h1 data-hf-id="hf-fsu0" id="title" class="clip" data-start="1" data-duration="4" data-track-index="1">HyperFrames Engine</h1>
+    <p data-hf-id="hf-h7wy" id="desc" class="clip" data-start="1.5" data-duration="3.5" data-track-index="2">Write HTML. Render Video. Built for Agents.</p>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      tl.from(".badge", { opacity: 0, scale: 0.7, duration: 0.6, ease: "back.out(1.7)" }, 0.5);
+      tl.from("#title", { opacity: 0, y: 60, duration: 0.8, ease: "power3.out" }, 1.0);
+      tl.from("#desc", { opacity: 0, y: 40, duration: 0.8, ease: "power2.out" }, 1.5);
+      window.__timelines = window.__timelines || {};
+      window.__timelines.demo = tl;
+    </script>
+  </div>
+</body>
+</html>

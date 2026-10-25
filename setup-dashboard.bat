@@ -74,6 +74,24 @@ call corepack pnpm install --frozen-lockfile
 if errorlevel 1 (popd & goto :failed)
 popd
 
+echo Menyiapkan HyperFrames...
+pushd creator-dashboard\apps\hyperframes
+call npm install
+if errorlevel 1 (popd & goto :failed)
+popd
+
+echo Menyiapkan Lemo-Opuscar...
+pushd creator-dashboard\apps\lemo-opuscar
+call npm install
+if errorlevel 1 (popd & goto :failed)
+if not exist .venv\Scripts\python.exe (
+  uv venv --python 3.11 .venv
+  if errorlevel 1 (popd & goto :failed)
+)
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+if errorlevel 1 (popd & goto :failed)
+popd
+
 echo.
 echo ============================================================
 echo Setup dasar selesai.

@@ -181,6 +181,23 @@ class ManagedProcess:
 PROCESSES = {tool["id"]: ManagedProcess(tool) for tool in TOOLS}
 
 
+def sync_tools() -> list[dict[str, Any]]:
+    global TOOLS, TOOLS_BY_ID
+    try:
+        new_tools = load_config()
+        for tool in new_tools:
+            tid = tool["id"]
+            if tid not in PROCESSES:
+                PROCESSES[tid] = ManagedProcess(tool)
+            else:
+                PROCESSES[tid].tool = tool
+        TOOLS = new_tools
+        TOOLS_BY_ID = {tool["id"]: tool for tool in TOOLS}
+    except Exception as exc:
+        print(f"[WARN] Failed to reload tools.json: {exc}")
+    return TOOLS
+
+
 def port_is_open(port: int | None) -> bool:
     if not isinstance(port, int):
         return False
@@ -327,6 +344,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._articles_get(parts)
             return
         if parts == ["api", "tools"]:
+            sync_tools()
             self._json(HTTPStatus.OK, {"tools": [public_tool(tool) for tool in TOOLS]})
             return
         if len(parts) == 4 and parts[:2] == ["api", "tools"] and parts[3] == "logs":
@@ -347,6 +365,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         if len(parts) != 4 or parts[:2] != ["api", "tools"]:
             self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
             return
+        sync_tools()
         tool_id, action = parts[2], parts[3]
         manager = PROCESSES.get(tool_id)
         if manager is None:

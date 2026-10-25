@@ -96,6 +96,73 @@
       ]
     },
     {
+      "id": "hyperframes-studio",
+      "name": "HyperFrames Studio",
+      "shortName": "HyperFrames",
+      "description": "HTML-native video editor & renderer: timeline seekable, GSAP animation, dan katalog blok visual tanpa build step.",
+      "category": "HTML Video Editor",
+      "icon": "code",
+      "color": "emerald",
+      "workingDirectory": "apps/hyperframes",
+      "command": [
+        "node",
+        "node_modules/hyperframes/bin/hyperframes.mjs",
+        "preview",
+        "--port",
+        "4000",
+        "--no-open",
+        "--foreground"
+      ],
+      "url": "http://127.0.0.1:4000",
+      "healthUrl": "http://127.0.0.1:4000",
+      "port": 4000,
+      "type": "web",
+      "requirements": [
+        "Node.js 22+",
+        "FFmpeg 6.0+"
+      ],
+      "capabilities": [
+        "HTML to MP4",
+        "GSAP Timeline",
+        "Live Preview",
+        "Zero Build Step",
+        "Apache 2.0"
+      ]
+    },
+    {
+      "id": "lemo-opuscar",
+      "name": "Lemo-Opuscar Studio",
+      "shortName": "Opuscar",
+      "description": "59 preset gaya film prosedural murni tanpa stok footage. Animasi Canvas/WebGL frame-by-frame + TTS + musik prosedural.",
+      "category": "Film Style Toolbox",
+      "icon": "palette",
+      "color": "rose",
+      "workingDirectory": "apps/lemo-opuscar",
+      "command": [
+        "python",
+        "-m",
+        "http.server",
+        "3500",
+        "--directory",
+        "styleboard"
+      ],
+      "url": "http://127.0.0.1:3500",
+      "healthUrl": "http://127.0.0.1:3500",
+      "port": 3500,
+      "type": "web",
+      "requirements": [
+        "Node.js 20+",
+        "Python 3.11+",
+        "FFmpeg"
+      ],
+      "capabilities": [
+        "59 Film Styles",
+        "Procedural Canvas/WebGL",
+        "Auto Foley & Mixing",
+        "Zero Video AI Cost"
+      ]
+    },
+    {
       "id": "short-video-factory",
       "name": "Short Video Factory",
       "shortName": "Video Factory",
