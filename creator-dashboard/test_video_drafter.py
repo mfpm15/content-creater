@@ -15,7 +15,10 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertIn("styles", opts)
         self.assertIn("aspects", opts)
         self.assertIn("durations", opts)
+        self.assertIn("models", opts)
+        self.assertIn("defaultModel", opts)
         self.assertGreaterEqual(len(opts["styles"]), 4)
+        self.assertGreaterEqual(len(opts["models"]), 2)
 
     def test_clean_json(self):
         sample = '```json\n{"badge": "AI", "headline": "Halo Dunia"}\n```'

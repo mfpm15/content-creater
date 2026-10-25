@@ -81,15 +81,54 @@ DURATIONS = [5, 10, 15]
 JOBS_LOCK = threading.Lock()
 JOBS: dict[str, dict] = {}
 
+DEFAULT_MODELS = [
+    {"id": "ag/gemini-3.8-flash-high", "name": "Gemini 3.8 Flash High (Default - Cepat & Cerdas)"},
+    {"id": "ag/gemini-3.7-flash-high", "name": "Gemini 3.7 Flash High"},
+    {"id": "cc/claude-sonnet-5-5", "name": "Claude Sonnet 5.5 (Detail & Kaya Gaya)"},
+    {"id": "cc/claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (Ringan & Cepat)"},
+    {"id": "ms/GPT-5.6-Quick-Response", "name": "GPT-5.6 Quick Response"},
+    {"id": "ms/GPT-6-Astra", "name": "GPT-6 Astra"},
+    {"id": "if/deepseek-v3.2", "name": "DeepSeek V3.2"},
+    {"id": "if/qwen3-coder-plus", "name": "Qwen 3 Coder Plus"},
+    {"id": "cc/claude-opus-5-5", "name": "Claude Opus 5.5"},
+]
+
+
+def get_available_models() -> list[dict]:
+    try:
+        req = urllib.request.Request(
+            f"{LLM_URL}/models",
+            headers={"Authorization": f"Bearer {LLM_KEY}", "User-Agent": "CreatorDashboard/1.0"},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        items = data.get("data") or []
+        if items:
+            known = {m["id"]: m["name"] for m in DEFAULT_MODELS}
+            res = []
+            for it in items:
+                mid = it.get("id")
+                if not mid:
+                    continue
+                name = known.get(mid, mid)
+                res.append({"id": mid, "name": name})
+            return res
+    except Exception:
+        pass
+    return DEFAULT_MODELS
+
 
 def options() -> dict:
     return {
         "styles": list(STYLES.values()),
         "aspects": [{"id": k, **v} for k, v in ASPECT_RATIOS.items()],
         "durations": DURATIONS,
+        "models": get_available_models(),
         "defaultStyle": "tech_keynote",
         "defaultAspect": "9:16",
         "defaultDuration": 5,
+        "defaultModel": LLM_MODEL,
     }
 
 
@@ -171,6 +210,8 @@ def start_job(payload: dict) -> dict:
 
     script_notes = str(payload.get("script") or "").strip()
 
+    model = str(payload.get("model") or LLM_MODEL).strip()
+
     job_id = uuid.uuid4().hex
     job = {
         "jobId": job_id,
@@ -178,6 +219,7 @@ def start_job(payload: dict) -> dict:
         "style": style_id,
         "aspect": aspect_id,
         "duration": duration,
+        "model": model,
         "script": script_notes,
         "status": "queued",
         "step": "Menyiapkan antrian generator",
@@ -195,7 +237,7 @@ def start_job(payload: dict) -> dict:
     return {"jobId": job_id, "status": "queued"}
 
 
-def _call_9router(prompt: str) -> str:
+def _call_9router(prompt: str, model: str = "") -> str:
     url = f"{LLM_URL}/chat/completions"
     headers = {
         "Authorization": f"Bearer {LLM_KEY}",
@@ -203,7 +245,7 @@ def _call_9router(prompt: str) -> str:
         "User-Agent": "CreatorDashboard-VideoStudio/1.0",
     }
     body = {
-        "model": LLM_MODEL,
+        "model": model or LLM_MODEL,
         "stream": False,
         "response_format": {"type": "json_object"},
         "messages": [
@@ -414,6 +456,7 @@ def _run_job(job_id: str):
     style_key = job["style"]
     aspect_key = job["aspect"]
     duration = job["duration"]
+    model = job.get("model") or LLM_MODEL
     script_prompt = job.get("script") or ""
 
     style_info = STYLES.get(style_key, STYLES["tech_keynote"])
@@ -436,7 +479,7 @@ def _run_job(job_id: str):
             '  "callout": "ajakan aksi atau simpulan akhir (maksimal 6 kata)"\n'
             "}"
         )
-        llm_raw = _call_9router(prompt)
+        llm_raw = _call_9router(prompt, model=model)
         script_data = _clean_json(llm_raw)
 
         # Tahap 2: Rakit HTML HyperFrames

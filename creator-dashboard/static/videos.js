@@ -5,6 +5,7 @@ const elements = {
   styleSelect: document.getElementById('styleSelect'),
   aspectSelect: document.getElementById('aspectSelect'),
   durationSelect: document.getElementById('durationSelect'),
+  modelSelect: document.getElementById('modelSelect'),
   generateBtn: document.getElementById('generateBtn'),
   formStatus: document.getElementById('formStatus'),
   statusContainer: document.getElementById('statusContainer'),
@@ -33,9 +34,15 @@ async function loadOptions() {
       `<option value="${a.id}" ${a.id === data.defaultAspect ? 'selected' : ''}>${a.label}</option>`
     ).join('');
 
-    elements.durationSelect.innerHTML = data.durations.map(d => 
+    elements.durationSelect.innerHTML = data.durations.map(d =>
       `<option value="${d}" ${d === data.defaultDuration ? 'selected' : ''}>${d} Detik</option>`
     ).join('');
+
+    if (data.models && data.models.length) {
+      elements.modelSelect.innerHTML = data.models.map(m =>
+        `<option value="${m.id}" ${m.id === data.defaultModel ? 'selected' : ''}>${m.name}</option>`
+      ).join('');
+    }
   } catch (err) {
     elements.formStatus.textContent = err.message;
     elements.formStatus.className = 'form-status error';
@@ -95,6 +102,7 @@ elements.form.addEventListener('submit', async (e) => {
     style: elements.styleSelect.value,
     aspect: elements.aspectSelect.value,
     duration: parseInt(elements.durationSelect.value, 10),
+    model: elements.modelSelect ? elements.modelSelect.value : '',
   };
 
   if (!payload.topic) {
