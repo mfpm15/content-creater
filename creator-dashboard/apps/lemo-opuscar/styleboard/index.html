@@ -1053,7 +1053,14 @@ const room=document.getElementById('room'), vid=room.querySelector('video'), env
 function screen(card,src,poster){
   env.querySelector('h4').innerHTML=`${card.dataset.en}<small>${card.dataset.cn}</small>`;
   env.querySelector('.f').textContent=`for “${card.dataset.film}”`;
-  vid.poster=poster||''; vid.src=src;
+  let videoSrc = src;
+  if (!videoSrc || videoSrc.startsWith('..')) {
+    const slug = card ? card.dataset.slug : null;
+    videoSrc = slug
+      ? `https://github.com/lemomo-ai/lemo-opuscar/releases/download/films/${slug}.mp4`
+      : 'https://github.com/lemomo-ai/lemo-opuscar/releases/download/films/opuscar98.mp4';
+  }
+  vid.poster=poster||''; vid.src=videoSrc;
   room.classList.add('on'); room.classList.remove('open');
   requestAnimationFrame(()=>requestAnimationFrame(()=>room.classList.add('open')));
   setTimeout(()=>vid.play().catch(()=>{}),650);

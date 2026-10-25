@@ -23,6 +23,7 @@ storage/
 output/
 tmp/
 .hyperframes/
+.thumbnails/
 *.mp4
 *.mp3
 *.wav

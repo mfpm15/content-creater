@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Studio - Creator Control Center</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/articles.css" />
+  <style>
+    .video-preview-box {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #060813;
+      border: 1px solid var(--line);
+      aspect-ratio: 9 / 16;
+      max-height: 520px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 14px 0;
+    }
+    .video-preview-box.landscape {
+      aspect-ratio: 16 / 9;
+    }
+    .video-preview-box video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 99px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #22d3ee);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .history-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .history-card:hover {
+      border-color: var(--accent);
+    }
+    .history-card h4 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: #ffffff;
+    }
+    .history-card p {
+      margin: 0;
+      font-size: 11px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Creator Control Center">
+        <span class="brand-mark">C</span>
+        <span><strong>Creator</strong><small>Control Center</small></span>
+      </a>
+      <nav aria-label="Navigasi utama">
+        <a class="nav-link" href="/"><span>▦</span> Semua Tools</a>
+        <a class="nav-link active" href="/videos.html"><span>🎬</span> Video Studio</a>
+        <a class="nav-link" href="/articles.html"><span>✎</span> Article Drafter</a>
+      </nav>
+      <div class="sidebar-note">
+        <span class="pulse"></span>
+        <div><strong>Local-first</strong><small>AI 9Router + HyperFrames Renderer</small></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">AI VIDEO STUDIO</p>
+          <h1>Form Pembuat Video Otomatis</h1>
+        </div>
+      </header>
+
+      <section class="section-block drafter-grid">
+        <form id="videoForm" class="panel" autocomplete="off">
+          <h2>1. Masukkan Detail Video</h2>
+          <label>Topik / Judul Video <span class="req">wajib</span>
+            <input name="topic" id="topicInput" maxlength="200" required placeholder="Contoh: 3 Tips Sukses Mengatur Waktu, Peluncuran Kopi Organik, AI Video Engine" />
+          </label>
+
+          <label>Poin Naskah / Pesan Utama (Opsional)
+            <textarea name="script" id="scriptInput" rows="5" placeholder="Tuliskan poin atau pesan yang ingin ditonjolkan. AI akan otomatis merangkai headline, subline, dan call-to-action visual."></textarea>
+          </label>
+
+          <div class="row2">
+            <label>Gaya Visual & Engine
+              <select name="style" id="styleSelect"></select>
+            </label>
+            <label>Format Rasio Layar
+              <select name="aspect" id="aspectSelect"></select>
+            </label>
+          </div>
+
+          <div class="row2">
+            <label>Durasi Video (Detik)
+              <select name="duration" id="durationSelect"></select>
+            </label>
+            <label>Mesin AI
+              <select disabled><option>9Router (ag/gemini-3.8-flash-high)</option></select>
+            </label>
+          </div>
+
+          <button id="generateBtn" class="primary-button" type="submit" style="width: 100%; margin-top: 18px; padding: 14px; font-size: 14px;">
+            ⚡ Generate Video Sekarang (MP4)
+          </button>
+          <div id="formStatus" class="form-status"></div>
+        </form>
+
+        <section class="panel">
+          <h2>2. Hasil Video & Pratinjau</h2>
+          <div id="statusContainer" style="display: none; margin-bottom: 16px;">
+            <p id="statusStep" style="font-weight: bold; margin: 0; color: var(--accent);">Menyiapkan render...</p>
+            <div class="progress-track"><div id="progressBar" class="progress-fill"></div></div>
+          </div>
+
+          <div id="videoContainer" class="video-preview-box">
+            <p style="color: var(--muted); font-size: 13px;">Belum ada video yang dipilih atau digenerate.</p>
+          </div>
+
+          <div id="videoActions" style="display: none; gap: 10px; margin-top: 14px;">
+            <a id="downloadBtn" class="primary-button" href="#" download style="flex: 1; text-align: center;">⬇ Unduh Video MP4</a>
+            <a id="inspectHtmlBtn" class="secondary-button" href="#" target="_blank" style="flex: 1; text-align: center;">🔍 Buka Source HTML</a>
+          </div>
+
+          <h3 style="margin-top: 28px;">Daftar Video yang Pernah Dibuat</h3>
+          <div id="historyList">
+            <p class="empty">Memuat daftar video...</p>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/videos.js"></script>
+</body>
+</html>

@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 import article_drafter
+import video_drafter
 
 ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent.resolve()
@@ -338,8 +339,64 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             self._article_error(exc)
 
+    def _videos_get(self, parts: list[str]) -> None:
+        try:
+            if parts == ["api", "videos"]:
+                self._json(HTTPStatus.OK, {"videos": video_drafter.list_videos()})
+            elif parts == ["api", "videos", "options"]:
+                self._json(HTTPStatus.OK, video_drafter.options())
+            elif len(parts) == 4 and parts[2] == "jobs":
+                self._json(HTTPStatus.OK, video_drafter.job_status(unquote(parts[3])))
+            elif len(parts) == 3:
+                self._json(HTTPStatus.OK, video_drafter.get_video(unquote(parts[2])))
+            elif len(parts) == 4:
+                slug, filename = unquote(parts[2]), unquote(parts[3])
+                data, content_type = video_drafter.read_video_file(slug, filename)
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(data)))
+                if content_type == "video/mp4":
+                    self.send_header("Accept-Ranges", "bytes")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
+        except KeyError as exc:
+            self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except FileNotFoundError as exc:
+            self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except Exception as exc:
+            self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def _videos_post(self, parts: list[str]) -> None:
+        try:
+            if parts == ["api", "videos"]:
+                raw = self._read_body(200_000)
+                if raw is None:
+                    return
+                self._json(HTTPStatus.ACCEPTED, video_drafter.start_job(json.loads(raw or b"{}")))
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
+        except json.JSONDecodeError:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "Body bukan JSON valid"})
+        except ValueError as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except Exception as exc:
+            self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
+    def do_HEAD(self) -> None:
+        parts = self._route_parts()
+        if parts[:2] in (["api", "videos"], ["api", "articles"]):
+            self.do_GET()
+            return
+        super().do_HEAD()
+
     def do_GET(self) -> None:
         parts = self._route_parts()
+        if parts[:2] == ["api", "videos"]:
+            self._videos_get(parts)
+            return
         if parts[:2] == ["api", "articles"]:
             self._articles_get(parts)
             return
@@ -359,6 +416,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parts = self._route_parts()
+        if parts[:2] == ["api", "videos"]:
+            self._videos_post(parts)
+            return
         if parts[:2] == ["api", "articles"]:
             self._articles_post(parts)
             return

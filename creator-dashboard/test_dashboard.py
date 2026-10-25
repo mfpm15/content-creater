@@ -10,7 +10,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent
-BASE_URL = "http://127.0.0.1:3210"
+TEST_PORT = "3219"
+BASE_URL = f"http://127.0.0.1:{TEST_PORT}"
 
 
 def fetch(path: str) -> tuple[int, bytes, str]:
@@ -22,7 +23,7 @@ def fetch(path: str) -> tuple[int, bytes, str]:
 def main() -> int:
     environment = os.environ.copy()
     environment["CREATOR_DASHBOARD_HOST"] = "127.0.0.1"
-    environment["CREATOR_DASHBOARD_PORT"] = "3210"
+    environment["CREATOR_DASHBOARD_PORT"] = TEST_PORT
     environment["CREATOR_DASHBOARD_NO_BROWSER"] = "1"
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "server.py")],
