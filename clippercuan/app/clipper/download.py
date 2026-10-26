@@ -38,7 +38,8 @@ def _cookies_browser() -> str:
     return value if value in {"chrome", "edge", "firefox", "brave", "safari", "chromium", "opera", "vivaldi"} else ""
 
 
-def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = lambda p, m: None) -> tuple[Path, str]:
+def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = lambda p, m: None,
+          max_h: int = 1440) -> tuple[Path, str]:
     """Kembalikan (path video, judul sumber)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     if not is_url(source):
@@ -67,9 +68,9 @@ def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = l
 
     opts = {
         "outtmpl": str(out_dir / "source.%(ext)s"),
-        # maks 1080p, gabung jadi mp4 agar cepat dipotong
-        "format": "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b",
-        "merge_output_format": "mp4",
+        # resolusi terbaik ≤ max_h (portrait tajam butuh sumber > 1080p); digabung ke mkv agar VP9/AV1 + Opus aman
+        "format": video_format(max_h), "format_sort": FORMAT_SORT,
+        "merge_output_format": "mkv",
         "ffmpeg_location": FFMPEG,
         "noplaylist": True,
         "quiet": True,
@@ -89,7 +90,24 @@ def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = l
 
 
 # ------------------------------------------------------------------ mode hemat disk (lite)
-VIDEO_FORMAT = "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b"
+def video_format(max_h: int) -> str:
+    """Resolusi terbaik ≤ max_h, utamakan SDR (HDR butuh tonemap). 4K YouTube hanya tersedia sebagai VP9/AV1."""
+    return (f"bv*[height<={max_h}][dynamic_range=SDR]+ba/bv*[height<={max_h}]+ba/"
+            f"b[height<={max_h}]/b")
+
+
+FORMAT_SORT = ["res", "fps", "vcodec:vp9", "acodec:opus"]   # resolusi dulu; VP9 lebih ringan di-decode daripada AV1
+
+
+def source_height(cfg: dict | None, lite: bool) -> int:
+    raw = str(((cfg or {}).get("quality") or {}).get("source", "auto"))
+    if raw.isdigit():
+        return int(raw)
+    out = int(str(((cfg or {}).get("quality") or {}).get("output", "1080")) or 1080)
+    return 2160 if lite or out >= 1440 else 1440
+
+
+VIDEO_FORMAT = video_format(2160)
 _STREAMS: dict[str, tuple[float, dict]] = {}
 
 
@@ -98,14 +116,15 @@ def _ydl_opts(**extra) -> dict:
             "retries": 5, **_youtube_js_opts(), **extra}
 
 
-def resolve_streams(source: str, max_age: float = 1800) -> dict:
+def resolve_streams(source: str, max_age: float = 1800, max_h: int = 2160) -> dict:
     """URL stream langsung (video + audio) tanpa mengunduh. Di-cache karena URL YouTube berlaku beberapa jam."""
-    hit = _STREAMS.get(source)
+    key = f"{max_h}|{source}"
+    hit = _STREAMS.get(key)
     if hit and time.time() - hit[0] < max_age:
         return hit[1]
     import yt_dlp
 
-    with yt_dlp.YoutubeDL(_ydl_opts(format=VIDEO_FORMAT)) as ydl:
+    with yt_dlp.YoutubeDL(_ydl_opts(format=video_format(max_h), format_sort=FORMAT_SORT)) as ydl:
         info = ydl.extract_info(source.strip(), download=False)
     fmts = info.get("requested_formats") or [info]
     video = next((f for f in fmts if f.get("vcodec") not in (None, "none")), fmts[0])
@@ -116,7 +135,7 @@ def resolve_streams(source: str, max_age: float = 1800) -> dict:
     data = {"title": info.get("title") or "Video", "duration": float(info.get("duration") or 0),
             "width": int(video.get("width") or info.get("width") or 1920), "height": int(video.get("height") or info.get("height") or 1080),
             "fps": float(video.get("fps") or info.get("fps") or 30), "video": pick(video), "audio": pick(audio) if audio else None}
-    _STREAMS[source] = (time.time(), data)
+    _STREAMS[key] = (time.time(), data)
     return data
 
 
@@ -142,24 +161,24 @@ def fetch_audio(source: str, out_dir: Path, progress: Callable[[float, str], Non
     cmd = [FFMPEG, "-hide_banner", "-nostdin", "-loglevel", "error", "-y", *_input(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "64k", str(out)]
     p = subprocess.run(cmd, capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if p.returncode != 0:
-        _STREAMS.pop(source, None)
+        _STREAMS.clear()
         raise RuntimeError("Gagal mengambil audio: " + p.stderr.decode("utf-8", "replace")[-600:])
     progress(1.0, "Audio siap")
     return out, meta
 
 
-def fetch_segment(source: str, start: float, end: float, dst: Path) -> Path:
-    """Unduh & potong presisi hanya rentang [start, end] (re-encode cepat) untuk dirender."""
-    meta = resolve_streams(source)
+def fetch_segment(source: str, start: float, end: float, dst: Path, max_h: int = 2160) -> Path:
+    """Unduh & potong presisi hanya rentang [start, end] untuk dirender (encode antara hampir lossless)."""
+    meta = resolve_streams(source, max_h=max_h)
     cmd = [FFMPEG, "-hide_banner", "-nostdin", "-loglevel", "error", "-y", *_input(meta["video"], start, end)]
     if meta["audio"]:
         cmd += [*_input(meta["audio"], start, end), "-map", "0:v:0", "-map", "1:a:0"]
     else:
         cmd += ["-map", "0:v:0", "-map", "0:a:0?"]
-    cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "16", "-c:a", "aac", "-b:a", "192k", str(dst)]
+    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "10", "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", str(dst)]
     p = subprocess.run(cmd, capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if p.returncode != 0:
-        _STREAMS.pop(source, None)  # URL kedaluwarsa → ambil ulang di percobaan berikutnya
+        _STREAMS.clear()  # URL kedaluwarsa → ambil ulang di percobaan berikutnya
         raise RuntimeError("Gagal mengambil potongan video: " + p.stderr.decode("utf-8", "replace")[-600:])
     return dst
 

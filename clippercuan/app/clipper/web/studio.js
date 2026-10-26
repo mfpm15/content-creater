@@ -107,7 +107,7 @@ let RECIPES = null;
 const getRecipes = async () => RECIPES || (RECIPES = (await api('/api/recipes')).recipes);
 const statusLabel = { draft_candidate: 'Kandidat', selected: 'Terpilih', queued: 'Antre', rendering: 'Render…', done: 'Siap', error: 'Gagal' };
 const score10 = c => Math.max(0, Math.min(10, Math.round((c.score || 0) / 10)));
-const isHot = c => (c.score || 0) >= 75;
+const isHot = c => c.hot ?? (c.score || 0) >= 75;
 
 /* ================= STUDIO PROYEK ================= */
 async function pageProject(pid) {
@@ -231,9 +231,9 @@ async function pageProject(pid) {
     }
     const thumb = c.status === 'done' && c.thumb ? `/files/${P.id}/${c.thumb}?v=${c.version}` : `/api/projects/${P.id}/frame?t=${(c.start + 1).toFixed(1)}`;
     const im = $('img', el); if (im.dataset.src !== thumb) { im.dataset.src = thumb; im.src = thumb; }
-    $('.no', el).textContent = c.rank ? String(c.rank).padStart(2, '0') : '··';
+    $('.no', el).textContent = c.rank ? '#' + String(c.rank).padStart(2, '0') : '··';
     $('.ck input', el).checked = !!c.selected;
-    $('.sc', el).textContent = c.manual ? 'manual' : `${score10(c)}/10`; $('.sc', el).classList.toggle('hot', isHot(c));
+    $('.sc', el).textContent = c.manual ? 'manual' : `${isHot(c) ? '🔥 ' : ''}${score10(c)}/10`; $('.sc', el).classList.toggle('hot', isHot(c));
     $('.du', el).textContent = fmt(c.duration || (c.end - c.start));
     $('.stt', el).textContent = statusLabel[c.status] || c.status || ''; $('.stt', el).dataset.s = c.status || '';
     $('.tl', el).textContent = c.title || c.id;
@@ -293,7 +293,8 @@ async function pageProject(pid) {
         <div class="pn-row"><label class="check"><input type="checkbox" id="pUp"> HURUF BESAR</label><label class="check"><input type="checkbox" id="pPop"> Animasi pop</label><label class="check"><input type="checkbox" id="pOn"> Tampilkan</label></div></div>
       <div class="pn-sec"><h4>Judul pembuka</h4><div class="seg wrap" id="pTtl"><button data-v="duo">Duo glow</button><button data-v="bar">Bar</button><button data-v="outline">Outline</button><button data-v="neon">Neon</button><button data-v="clean">Clean</button><button data-v="off">Tanpa</button></div>
         <label>Tampil (detik, 0 = sepanjang klip)<input type="number" class="in" id="pTd" min="0" max="120"></label></div>
-      <div class="pn-sec"><h4>Format proyek</h4><div class="seg wrap" id="pLay"><button data-v="portrait">9:16</button><button data-v="square">1:1</button><button data-v="blur">Blur</button><button data-v="split">Split gaming</button><button data-v="landscape">16:9</button></div></div>`;
+      <div class="pn-sec"><h4>Format proyek</h4><div class="seg wrap" id="pLay"><button data-v="portrait">9:16</button><button data-v="square">1:1</button><button data-v="blur">Blur</button><button data-v="split">Split gaming</button><button data-v="landscape">16:9</button></div>
+        <div class="pn-row"><span>Kualitas hasil</span><div class="seg sm" id="pQ"><button data-v="1080">1080p</button><button data-v="1440">1440p</button><button data-v="2160">4K</button></div></div></div>`;
     const sync = () => {
       const c = S.caption;
       chipGroup($('#pStyle', box), c.style === 'box' ? 'clean' : c.style, v => { c.style = v; markDirty(); sync(); });
@@ -301,6 +302,7 @@ async function pageProject(pid) {
       chipGroup($('#pFx', box), c.effect || 'none', v => { c.effect = v; markDirty(); sync(); });
       chipGroup($('#pTtl', box), S.title.enabled ? S.title.preset : 'off', v => { S.title.enabled = v !== 'off'; if (v !== 'off') S.title.preset = v; markDirty(); });
       chipGroup($('#pLay', box), S.layout, v => { S.layout = v; markDirty(); showPreview(); });
+      chipGroup($('#pQ', box), String((S.quality || {}).output || '1080'), v => { S.quality = { ...(S.quality || {}), output: v }; markDirty(); });
       $$('[data-font]', box).forEach(b => b.classList.toggle('on', b.dataset.font === c.font));
       $('#pCol', box).value = c.color; $('#pHl', box).value = c.highlight; $('#pWpl', box).value = c.words_per_line; $('#pAcc', box).value = c.accent_font || 'Instrument Serif Italic';
       const y = c.y_pct ?? { bottom: 76, middle: 50, top: 20 }[c.position || 'bottom']; $('#pY', box).value = y; $('#pYv', box).textContent = Math.round(y) + '%';
@@ -366,6 +368,7 @@ async function pageProject(pid) {
     const bd = c.breakdown || {}, labels = { hook: 'Hook', novelty: 'Novelty', emotion_humor: 'Emosi', standalone_clarity: 'Clarity', payoff: 'Payoff', quotability: 'Quotability', visual_activity: 'Visual', information_density: 'Density', clean_ending: 'Ending' };
     const post = c.post || {};
     box.innerHTML = `<div class="pn-sec"><div class="clip-head"><span class="sc ${isHot(c) ? 'hot' : ''}">${c.manual ? 'manual' : score10(c) + '/10'}</span><b>#${esc(String(c.rank || '–'))} · ${esc(statusLabel[c.status] || c.status)}</b><span class="muted">${fmt(c.start)}–${fmt(c.end)} · ${Math.round(c.end - c.start)} dtk</span></div>
+        ${c.resolution ? `<p class="ready-line"><small>HASIL</small> <b>${esc(c.resolution)}</b> <span class="muted">· ${esc(c.encoder || '')}${c.upscale > 1.3 ? ` · diperbesar ${c.upscale}×` : ''}</span></p>` : ''}
         <p class="ready-line"><small>VIRAL READINESS</small> <b>${c.readiness ?? c.score ?? 0}/100</b> <span class="muted">· alat review, bukan jaminan viral · confidence ${Math.round((c.confidence ?? .5) * 100)}%</span></p>
         ${[...(c.warnings || []), ...(c.render_warnings || [])].length ? `<p class="warn">${esc([...(c.warnings || []), ...(c.render_warnings || [])].join(' · '))}</p>` : ''}
         ${c.error ? `<p class="err">${esc(c.error.slice(-400))}</p>` : ''}

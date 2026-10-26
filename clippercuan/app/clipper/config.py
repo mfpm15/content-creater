@@ -42,7 +42,7 @@ DEFAULTS: dict = {
     "min_score": 45,             # render otomatis melewati kandidat di bawah skor ini (minimal 1 klip tetap dibuat)
     "storage": "full",           # full | lite (link: hanya audio + potongan klip yang diunduh)
     "content_profile": "auto",  # auto | podcast | tech_review | mobile_legends
-    "candidate_count": 10,       # kandidat dibuat sebelum render
+    "candidate_count": 15,       # kandidat dibuat & diranking (seperti "Detected clips")
     "auto_render": False,        # kandidat harus dipilih sebelum batch render
     "diversity": 0.30,           # bobot MMR untuk variasi semantik/scene/speaker
     "max_overlap": 0.35,
@@ -50,7 +50,7 @@ DEFAULTS: dict = {
     "translate_en": False,       # caption diterjemahkan ke Inggris (Whisper translate)
     "model": "small",            # tiny | base | small | medium | large-v3
     "transcriber": "auto",       # auto | youtube | api | local  (auto: YouTube → API cloud → Whisper lokal)
-    "clip_count": "auto",        # jumlah render otomatis; "auto" = ±1 per 7,5 menit video (1 jam ≈ 8), 3–10
+    "clip_count": "auto",        # jumlah render otomatis; "auto" = ±1 per 3 menit video, 3–10 (≥30 menit = 10)
     "duration_preset": "auto",  # auto | 15-25 | 25-40 | 40-60 | custom
     "min_sec": 15,
     "max_sec": 60,
@@ -96,6 +96,12 @@ DEFAULTS: dict = {
     "cta": {"enabled": False, "text": "Follow untuk part berikutnya!", "duration": 3},
     "music": {"enabled": False, "file": "", "volume": 0.15, "duck": True},
     "audio": {"normalize": True, "target_lufs": -16.0, "true_peak": -1.5},
+    "quality": {
+        "output": "1080",        # 1080 | 1440 | 2160 (4K) — sisi pendek video hasil
+        "source": "auto",        # tinggi maks sumber: auto (hemat: 2160, penuh: 1440) | 1080 | 1440 | 2160
+        "encoder": "auto",       # auto (GPU NVIDIA/Intel/Apple/AMD bila ada, cadangan CPU) | cpu
+        "sharpen": True,         # penajaman ringan bila sumber harus diperbesar
+    },
     "composition": {"subtle_punch_in": True, "max_zoom": 1.035, "scene_aware": True},
     "watermark": {
         "enabled": False,

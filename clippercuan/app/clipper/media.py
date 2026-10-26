@@ -33,6 +33,7 @@ class Probe:
     height: int
     fps: float
     has_audio: bool
+    hdr: bool = False
 
 
 def probe(path: str | Path) -> Probe:
@@ -51,7 +52,59 @@ def probe(path: str | Path) -> Probe:
     rot = re.search(r"rotate\s*:\s*(-?\d+)|rotation of (-?\d+)", err)
     if rot and abs(int(rot[1] or rot[2])) in (90, 270):
         w, h = h, w
-    return Probe(dur, w, h, float(f[1]) if f else 30.0, "Audio:" in err)
+    vline = next((ln for ln in err.splitlines() if "Video:" in ln), "")
+    hdr = any(k in vline for k in ("smpte2084", "arib-std-b67", "bt2020"))
+    return Probe(dur, w, h, float(f[1]) if f else 30.0, "Audio:" in err, hdr)
+
+
+_ENCODERS: list[str] | None = None
+_HW_BROKEN: set[str] = set()
+HW_ORDER = ("h264_nvenc", "h264_qsv", "h264_videotoolbox", "h264_amf")
+
+
+def encoders() -> list[str]:
+    global _ENCODERS
+    if _ENCODERS is None:
+        try:
+            p = subprocess.run([FFMPEG, "-hide_banner", "-encoders"], capture_output=True, text=True, timeout=20, creationflags=_NO_WINDOW)
+            _ENCODERS = [e for e in HW_ORDER if f" {e} " in p.stdout]
+        except (OSError, subprocess.TimeoutExpired):
+            _ENCODERS = []
+    return [e for e in _ENCODERS if e not in _HW_BROKEN]
+
+
+def video_codec_args(height: int, encoder: str = "auto", fast: bool = False) -> tuple[str, list[str]]:
+    """Argumen encode H.264 berkualitas tinggi. Hardware (NVIDIA/Intel/Apple/AMD) bila ada, cadangan libx264."""
+    hw = encoders()[0] if encoder == "auto" and encoders() else (encoder if encoder in encoders() else None)
+    br = "45M" if height >= 3000 else "24M" if height >= 2000 else "14M"   # untuk encoder berbasis bitrate
+    if hw == "h264_nvenc":
+        return hw, ["-c:v", hw, "-preset", "p5", "-tune", "hq", "-rc", "vbr", "-cq", "19", "-b:v", "0", "-maxrate", br, "-bufsize", br, "-profile:v", "high"]
+    if hw == "h264_qsv":
+        return hw, ["-c:v", hw, "-preset", "slower", "-global_quality", "20", "-profile:v", "high"]
+    if hw == "h264_videotoolbox":
+        return hw, ["-c:v", hw, "-b:v", br, "-maxrate", br, "-profile:v", "high", "-allow_sw", "1"]
+    if hw == "h264_amf":
+        return hw, ["-c:v", hw, "-quality", "quality", "-rc", "cqp", "-qp_i", "18", "-qp_p", "20", "-profile:v", "high"]
+    preset = "veryfast" if fast else ("faster" if height >= 3000 else "medium")
+    return "libx264", ["-c:v", "libx264", "-preset", preset, "-crf", "18", "-profile:v", "high", "-x264-params", "aq-mode=3"]
+
+
+_FILTERS: str | None = None
+
+
+def has_filter(name: str) -> bool:
+    global _FILTERS
+    if _FILTERS is None:
+        try:
+            _FILTERS = subprocess.run([FFMPEG, "-hide_banner", "-filters"], capture_output=True, text=True, timeout=20,
+                                      creationflags=_NO_WINDOW).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            _FILTERS = ""
+    return f" {name} " in _FILTERS
+
+
+def mark_hw_broken(name: str) -> None:
+    _HW_BROKEN.add(name)
 
 
 def extract_audio(src: Path, dst: Path) -> Path:

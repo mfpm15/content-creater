@@ -161,7 +161,7 @@ def _pipeline(pid: str) -> None:
     np_ = __import__("numpy")
     if lite:  # hemat disk: video penuh tidak pernah diunduh; potongan klip diambil saat render
         _progress(pid, 0.0, 0.18)(0.1, "Membaca info video (mode hemat)…")
-        meta = download.resolve_streams(p["source"])
+        meta = download.resolve_streams(p["source"], max_h=download.source_height(cfg, True))
         title = meta["title"]
         src = None
         pr = media.Probe(meta["duration"], meta["width"], meta["height"], meta["fps"], True)
@@ -188,7 +188,7 @@ def _pipeline(pid: str) -> None:
         update(pid, download_saved=("Subtitle YouTube dipakai: tidak ada audio/video penuh yang diunduh"
                                     if not wav.exists() else "Hanya audio yang diunduh"))
     else:
-        src, title = download.fetch(p["source"], work, _progress(pid, 0.0, 0.18))
+        src, title = download.fetch(p["source"], work, _progress(pid, 0.0, 0.18), max_h=download.source_height(cfg, False))
         pr = media.probe(src)
         # file lokal milik pengguna direferensikan dengan path absolut (tidak disalin)
         update(pid, title=title, media={"file": src.name if src.parent == work else str(src), "duration": pr.duration,
@@ -261,7 +261,7 @@ def clip_target(cfg: dict, duration: float) -> int:
     """Jumlah klip yang dirender otomatis. "auto"/0: ±1 klip per 7,5 menit (video 1 jam ≈ 8), 3–10 klip."""
     raw = cfg.get("clip_count", "auto")
     if raw in (None, "", "auto", 0, "0"):
-        return int(max(3, min(10, round((duration or 0) / 450))))
+        return int(max(3, min(10, round((duration or 0) / 180))))
     return max(1, min(30, int(raw)))
 
 
@@ -425,7 +425,7 @@ def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.P
         if p["media"].get("remote"):  # mode hemat: ambil potongan klip saja, render, lalu hapus
             s0 = max(0.0, float(clip["start"]) - 1.0)
             e0 = min(float(p["media"]["duration"] or 1e9), float(clip["end"]) + 1.0)
-            seg = download.fetch_segment(p["source"], s0, e0, work / f"{cid}.src.mp4")
+            seg = download.fetch_segment(p["source"], s0, e0, work / f"{cid}.src.mkv", max_h=download.source_height(cfg, True))
             pr = media.probe(seg)
             clip = {**clip, "start": float(clip["start"]) - s0, "end": float(clip["end"]) - s0}
             words = [{**w, "s": w["s"] - s0, "e": w["e"] - s0} for w in words]
@@ -512,7 +512,7 @@ def delete_clip(pid: str, cid: str) -> dict:
         p = load(pid)
         p["clips"] = [c for c in p["clips"] if c["id"] != cid]
         save(p)
-    for ext in (".mp4", ".jpg", ".ass", ".srt"):
+    for ext in (".mp4", ".jpg", ".ass", ".srt", ".src.mkv"):
         (pdir(pid) / f"{cid}{ext}").unlink(missing_ok=True)
     return p
 
@@ -526,11 +526,11 @@ def zip_project(pid: str) -> Path:
     out = d / "export.zip"
     with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as z:
         lines = []
-        for i, c in enumerate(sorted(p["clips"], key=lambda c: -c.get("score", 0)), 1):
+        for i, c in enumerate(sorted(p["clips"], key=lambda c: (c.get("rank") or 999, -c.get("score", 0))), 1):
             if c.get("status") != "done" or not c.get("file"):
                 continue
             safe = "".join(ch for ch in (c.get("title") or c["id"]) if ch.isalnum() or ch in " -_").strip()[:50] or c["id"]
-            base = f"{i:02d} - {safe}"
+            base = f"{int(c.get('rank') or i):02d} - {safe}"
             z.write(d / c["file"], base + ".mp4")
             if c.get("srt") and (d / c["srt"]).exists():
                 z.write(d / c["srt"], base + ".srt")

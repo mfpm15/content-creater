@@ -150,9 +150,14 @@ async function pageNew(override) {
   let autoRender = override || 'auto_render' in last ? cfg.auto_render !== false : true, clipCount = String(cfg.clip_count ?? 'auto');
   if (clipCount === '0' || clipCount === '') clipCount = 'auto';
   $('#auto_render').checked = autoRender;
-  const autoTxt = () => { $('#autoHint').textContent = !$('#auto_render').checked ? 'Mati: kandidat menunggu kamu pilih di studio sebelum dirender.' : clipCount === 'auto' ? 'Otomatis: ±1 klip per 7,5 menit video (video 1 jam ≈ 8 klip, 3–10), kandidat yang skornya terlalu lemah dilewati.' : `${clipCount} klip terbaik langsung dirender.`; };
+  const autoTxt = () => { $('#autoHint').textContent = !$('#auto_render').checked ? 'Mati: kandidat menunggu kamu pilih di studio sebelum dirender.' : clipCount === 'auto' ? 'Otomatis: 15 kandidat diranking, lalu klip terbaik dirender (±1 per 3 menit video, 3–10; video ≥ 30 menit = 10 klip). Kandidat yang skornya terlalu lemah dilewati.' : `${clipCount} klip terbaik langsung dirender.`; };
   $('#auto_render').addEventListener('change', autoTxt);
   chipGroup($('#clipCount'), clipCount, v => { clipCount = v; autoTxt(); }); autoTxt();
+  const Q = { output: '1080', source: 'auto', encoder: 'auto', sharpen: true, ...(cfg.quality || {}) };
+  const qTxt = () => { $('#qHint').textContent = (Q.output === '2160' ? '4K (2160×3840): file ±3× lebih besar & render ±3× lebih lama. ' : Q.output === '1440' ? '1440p (1440×2560): lebih tajam di HP besar, YouTube memproses dengan codec lebih baik. ' : '1080p (1080×1920): standar Shorts/TikTok/Reels. ')
+    + (Q.source === 'auto' ? 'Sumber otomatis: resolusi terbaik sampai 4K (mode hemat) atau 1440p (unduh penuh) — portrait dari video landscape butuh sumber besar agar tidak burik.' : Q.source === '1080' ? 'Sumber 1080p: crop portrait akan diperbesar ±1,8× (kurang tajam).' : `Sumber maks ${Q.source === '2160' ? '4K' : '1440p'}.`)
+    + ' GPU dipakai otomatis bila ada.'; };
+  chipGroup($('#qOut'), String(Q.output), v => { Q.output = v; qTxt(); }); chipGroup($('#qSrc'), String(Q.source), v => { Q.source = v; qTxt(); }); qTxt();
   getRecipes().then(rs => {
     const box = $('#recipes'); if (!box) return;
     box.innerHTML = Object.values(rs).map(r => `<button type="button" data-r="${esc(r.id)}" class="${r.id === recipeId ? 'on' : ''}"><span class="rb">${esc(r.badge || '')}</span><b>${esc(r.label)}</b><small>${esc(r.desc)}</small></button>`).join('') + `<button type="button" data-r="" class="${recipeId ? '' : 'on'}"><span class="rb">Manual</span><b>Atur sendiri</b><small>Pakai pengaturan di bawah (Advanced) tanpa resep.</small></button>`;
@@ -212,7 +217,7 @@ async function pageNew(override) {
       split: { face: [pos[0], pos[1], fs, fs], game: [0, 0, 1, 1], face_ratio: +$('#faceRatio').value / 100 },
       caption: { ...cfg.caption, enabled: $('#cap_enabled').checked, style: capStyle, box: $('#cap_box').checked, effect: $('#cap_glow').checked ? 'glow' : 'none', font: $('#cap_font').value, size: +$('#cap_size').value, color: $('#cap_color').value, highlight: $('#cap_highlight').value, uppercase: $('#cap_upper').checked, words_per_line: +$('#cap_wpl').value, position: $('#cap_position').value, y_pct: posTouched ? null : cfg.caption.y_pct, animation: $('#cap_pop').checked ? 'pop' : 'none' },
       title: { ...cfg.title, enabled: $('#ttl_enabled').checked, preset: ttlPreset, duration: +$('#ttl_duration').value },
-      recipe: recipeId, storage: srcMode === 'link' && $('#storage_lite').checked ? 'lite' : 'full', crop: cfg.crop,
+      quality: { ...Q }, recipe: recipeId, storage: srcMode === 'link' && $('#storage_lite').checked ? 'lite' : 'full', crop: cfg.crop,
       watermark: { enabled: $('#wm_enabled').checked, text: $('#wm_text').value, image: wmImage, position: wmPos, opacity: +$('#wm_opacity').value / 100, size: cfg.watermark.size },
       emoji: { enabled: $('#emoji_on').checked, size: +$('#emoji_size').value / 100 },
       progress_bar: { enabled: $('#pb_on').checked, color: $('#pb_color').value, position: $('#pb_pos').value, height: cfg.progress_bar.height },
@@ -402,6 +407,7 @@ async function pageSystem() {
   $('#sys').innerHTML = `<dl class="kv">
     <dt>Sistem operasi</dt><dd>${esc(s.os)}</dd><dt>Python</dt><dd>${esc(s.python)}</dd>
     <dt>FFmpeg</dt><dd>${ok(!s.ffmpeg.error)} ${esc(s.ffmpeg.version || s.ffmpeg.error)}<br><span class="muted">${esc(s.ffmpeg.path)}</span></dd>
+    <dt>Encoder video</dt><dd>${s.encoders?.length ? '<span class="ok">✓</span> GPU: ' + esc(s.encoders.join(', ')) + ' (dipakai otomatis, cadangan CPU)' : 'CPU (libx264) — kualitas sama, render 4K lebih lama'}</dd>
     <dt>Caption (libass)</dt><dd>${ok(s.ffmpeg.libass)} ${s.ffmpeg.libass ? 'tersedia' : 'TIDAK tersedia — caption tidak akan muncul'}</dd>
     <dt>GPU NVIDIA (CUDA)</dt><dd>${s.gpu_cuda ? '<span class="ok">✓</span> ' + s.gpu_cuda + ' GPU — transkripsi dipercepat' : 'tidak ada — memakai CPU (normal)'}</dd>
     <dt>Model Whisper terunduh</dt><dd>${s.models.length ? esc(s.models.join(', ')) : 'belum ada (diunduh otomatis saat pertama dipakai)'}</dd>

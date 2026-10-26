@@ -5,6 +5,20 @@ from pathlib import Path
 
 from . import captions, effects, facetrack
 from .config import FONTS_DIR, SIZES
+
+QUALITY = {"1080": 1.0, "1440": 4 / 3, "2160": 2.0}   # sisi pendek output: 1080p, 1440p (2K), 2160p (4K)
+
+
+def out_size(layout: str, cfg: dict) -> tuple[int, int]:
+    """Ukuran output sesuai pilihan kualitas (portrait 4K = 2160×3840)."""
+    k = QUALITY.get(str((cfg.get("quality") or {}).get("output", "1080")), 1.0)
+    w, h = SIZES[layout]
+    return _even(w * k), _even(h * k)
+
+
+_TONEMAP = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,"
+            "zscale=t=bt709:m=bt709:r=tv,format=yuv420p,")
+from . import media
 from .media import Probe, grab_frame, run
 
 
@@ -49,10 +63,45 @@ def remap(t: float, plan: list[tuple[float, float]]) -> float:
     return acc
 
 
+def upscale_factor(layout: str, pr: Probe, cfg: dict) -> float:
+    """Seberapa besar area sumber diperbesar ke output (>1,3 = mulai terlihat lembek/"burik")."""
+    Wt, Ht = out_size(layout, cfg)
+    W, H = pr.width, pr.height
+    if layout in ("portrait", "square"):
+        zoom = max(1.0, min(3.0, float((cfg.get("crop") or {}).get("zoom", 1) or 1)))
+        ch = H / zoom if W / H > Wt / Ht else (W / zoom) / (Wt / Ht)
+        return Ht / max(ch, 1)
+    if layout == "split":
+        return Wt / max(W * float((cfg.get("split") or {}).get("game", [0, 0, 1, 1])[2]), 1)
+    return min(Wt / W, Ht / H) if layout in ("blur", "landscape") else 1.0
+
+
+def _quality_warning(up: float, pr: Probe, size: tuple[int, int]) -> list[str]:
+    if up <= 1.3:
+        return []
+    if pr.height >= 2160:  # 16:9 → 9:16: tinggi crop = tinggi sumber, jadi output 4K portrait selalu diperbesar
+        return [f"Output {size[1]}p portrait dari sumber {pr.height}p diperbesar {up:.1f}×; 1080p/1440p memberi detail per piksel terbaik"]
+    return [f"Sumber {pr.height}p diperbesar {up:.1f}× — pakai sumber 1440p/4K (Pengaturan kualitas) agar lebih tajam"]
+
+
+def _sharp(factor: float) -> str:
+    """Penajaman ringan setelah upscale agar tidak lembek (tanpa artefak halo)."""
+    if factor <= 1.15:
+        return ""
+    amount = min(0.9, 0.35 + (factor - 1.15) * 0.4)
+    return f",unsharp=5:5:{amount:.2f}:5:5:0"
+
+
 def framing_filter(layout: str, pr: Probe, cfg: dict, keys: list | None, inp: str = "0:v") -> str:
     """Filtergraph dari [inp] ke [fr]."""
-    Wt, Ht = SIZES[layout]
+    Wt, Ht = out_size(layout, cfg)
     W, H = pr.width, pr.height
+    sh = _sharp(upscale_factor(layout, pr, cfg)) if (cfg.get("quality") or {}).get("sharpen", True) else ""
+    if pr.hdr and media.has_filter("zscale") and media.has_filter("tonemap"):  # sumber HDR (mis. YouTube 4K HDR) → SDR agar warna tidak pucat
+        tm = f"[{inp}]{_TONEMAP.rstrip(',')}[sdr];"
+        inp = "sdr"
+    else:
+        tm = ""
     if layout in ("portrait", "square"):
         a = Wt / Ht
         cr = cfg.get("crop") or {}
@@ -64,14 +113,14 @@ def framing_filter(layout: str, pr: Probe, cfg: dict, keys: list | None, inp: st
             cw = _even(ch * a)
             x = facetrack.x_expr(keys, W, cw, hold) if keys else f"{(W - cw) / 2:.1f}"
             y = f"{(H - ch) * cy:.1f}"
-            return f"[{inp}]crop=w={cw}:h={ch}:x='{x}':y={y},scale={Wt}:{Ht}:flags=lanczos,setsar=1[fr]"
+            return tm + f"[{inp}]crop=w={cw}:h={ch}:x='{x}':y={y},scale={Wt}:{Ht}:flags=lanczos{sh},setsar=1[fr]"
         cw = _even(W / zoom)
         ch = _even(cw / a)
-        return f"[{inp}]crop=w={cw}:h={ch}:x={(W - cw) / 2:.1f}:y={(H - ch) * cy:.1f},scale={Wt}:{Ht}:flags=lanczos,setsar=1[fr]"
+        return tm + f"[{inp}]crop=w={cw}:h={ch}:x={(W - cw) / 2:.1f}:y={(H - ch) * cy:.1f},scale={Wt}:{Ht}:flags=lanczos{sh},setsar=1[fr]"
     if layout == "blur":
-        return (f"[{inp}]split[a][b];[a]scale={Wt}:{Ht}:force_original_aspect_ratio=increase,crop={Wt}:{Ht},"
-                f"boxblur=24:3,eq=brightness=-0.07:saturation=1.2[bg];"
-                f"[b]scale={Wt}:{Ht}:force_original_aspect_ratio=decrease:flags=lanczos[fg];"
+        return tm + (f"[{inp}]split[a][b];[a]scale={Wt // 4}:{Ht // 4}:force_original_aspect_ratio=increase,crop={Wt // 4}:{Ht // 4},"
+                f"boxblur=10:2,scale={Wt}:{Ht},eq=brightness=-0.07:saturation=1.2[bg];"
+                f"[b]scale={Wt}:{Ht}:force_original_aspect_ratio=decrease:flags=lanczos{sh}[fg];"
                 f"[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1[fr]")
     if layout == "split":
         sp = cfg["split"]
@@ -83,12 +132,12 @@ def framing_filter(layout: str, pr: Probe, cfg: dict, keys: list | None, inp: st
             w, h = max(min(w, 1 - x), 0.05), max(min(h, 1 - y), 0.05)
             return f"crop={_even(W * w)}:{_even(H * h)}:{int(W * x)}:{int(H * y)}"
 
-        return (f"[{inp}]split[a][b];[a]{rect(sp['face'])},scale={Wt}:{hf}:force_original_aspect_ratio=increase,crop={Wt}:{hf}[top];"
-                f"[b]{rect(sp['game'])},scale={Wt}:{hg}:force_original_aspect_ratio=increase,crop={Wt}:{hg}[bot];"
+        return tm + (f"[{inp}]split[a][b];[a]{rect(sp['face'])},scale={Wt}:{hf}:force_original_aspect_ratio=increase:flags=lanczos,crop={Wt}:{hf}{sh}[top];"
+                f"[b]{rect(sp['game'])},scale={Wt}:{hg}:force_original_aspect_ratio=increase:flags=lanczos,crop={Wt}:{hg}{sh}[bot];"
                 f"[top][bot]vstack,setsar=1[fr]")
     # landscape
-    return (f"[{inp}]scale={Wt}:{Ht}:force_original_aspect_ratio=decrease:flags=lanczos,"
-            f"pad={Wt}:{Ht}:(ow-iw)/2:(oh-ih)/2,setsar=1[fr]")
+    return tm + (f"[{inp}]scale={Wt}:{Ht}:force_original_aspect_ratio=decrease:flags=lanczos{sh},"
+                 f"pad={Wt}:{Ht}:(ow-iw)/2:(oh-ih)/2,setsar=1[fr]")
 
 
 def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: list[dict]) -> dict:
@@ -97,10 +146,10 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     start, end = float(clip["start"]), float(clip["end"])
     dur = max(end - start, 0.5)
     layout = cfg["layout"]
-    size = SIZES[layout]
+    size = out_size(layout, cfg)
 
     keys = clip.get("crop_keys")
-    if layout in ("portrait", "square") and cfg.get("smart_crop") and not keys and pr.width / pr.height > size[0] / size[1]:
+    if layout in ("portrait", "square") and cfg.get("smart_crop") and not keys and pr.width / pr.height > SIZES[layout][0] / SIZES[layout][1]:
         keys = facetrack.track(src, start, end, pr.width, pr.height)
     cw = clip_words(words, start, end) if clip.get("words") is None else clip["words"]
 
@@ -213,17 +262,29 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
         args += opts
     args += ["-filter_complex", graph, "-map", f"[{last}]"]
     if audio_map:
-        args += ["-map", audio_map, "-c:a", "aac", "-b:a", "160k", "-ar", "48000"]
+        args += ["-map", audio_map, "-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
     else:
         args += ["-an"]
-    args += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
-             "-r", f"{min(pr.fps, 60):.3f}", "-movflags", "+faststart", "-t", f"{out_dur:.3f}", tmp.name]
-    run(args, cwd=work)
+    enc, vargs = media.video_codec_args(size[1], str((cfg.get("quality") or {}).get("encoder", "auto")))
+    tail = ["-pix_fmt", "yuv420p", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
+            "-r", f"{min(pr.fps, 60):.3f}", "-movflags", "+faststart", "-t", f"{out_dur:.3f}", tmp.name]
+    try:
+        run(args + vargs + tail, cwd=work)
+    except media.FFmpegError:
+        if enc == "libx264":
+            raise
+        media.mark_hw_broken(enc)                       # encoder hardware gagal → ulangi dengan CPU
+        enc, vargs = media.video_codec_args(size[1], "cpu")
+        run(args + vargs + tail, cwd=work)
     tmp.replace(out)
-    grab_frame(out, min(1.0, out_dur / 2), work / f"{cid}.jpg", width=360)
-    crop_confidence = 0.0 if not keys else min(1.0, max(.35, len(keys) / max(out_dur / 4, 1)))
+    grab_frame(out, min(1.0, out_dur / 2), work / f"{cid}.jpg", width=540)
+    up = upscale_factor(layout, pr, cfg)
+    smart = layout in ("portrait", "square") and cfg.get("smart_crop") and pr.width / pr.height > SIZES[layout][0] / SIZES[layout][1]
+    crop_confidence = (0.0 if not keys else min(1.0, max(.35, len(keys) / max(out_dur / 4, 1)))) if smart else 1.0
     return {"file": out.name, "thumb": f"{cid}.jpg", "srt": f"{cid}.srt", "crop_keys": keys, "words": cw,
             "duration": round(out_dur, 2), "cut_saved": round(dur - out_dur, 2), "emojis": [e["code"] for e in emojis],
             "caption_cues": len(captions.chunk_words(sub_words, int(cfg["caption"].get("words_per_line", 3)))),
             "crop_confidence": round(crop_confidence, 2),
-            "render_warnings": (["Crop confidence rendah"] if layout in ("portrait", "square") and crop_confidence < .5 else [])}
+            "resolution": f"{size[0]}x{size[1]}", "encoder": enc, "upscale": round(up, 2),
+            "render_warnings": (["Crop confidence rendah — cek framing di Crop studio"] if smart and crop_confidence < .5 else [])
+            + _quality_warning(up, pr, size)}

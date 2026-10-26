@@ -620,6 +620,7 @@ def system():
         r = sp.run([FFMPEG, "-hide_banner", "-version"], capture_output=True, text=True, timeout=15, creationflags=media._NO_WINDOW)
         f = sp.run([FFMPEG, "-hide_banner", "-filters"], capture_output=True, text=True, timeout=15, creationflags=media._NO_WINDOW)
         out["ffmpeg"] = {"path": FFMPEG, "version": r.stdout.split("\n")[0], "libass": " ass " in f.stdout}
+        out["encoders"] = media.encoders()
     except Exception as e:  # noqa: BLE001
         out["ffmpeg"] = {"path": FFMPEG, "error": str(e)}
     try:

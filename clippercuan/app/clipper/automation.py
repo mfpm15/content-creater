@@ -33,10 +33,10 @@ def summary(p: dict) -> dict:
 
     d = project.pdir(p["id"])
     clips = []
-    for c in sorted(p.get("clips", []), key=lambda c: -(c.get("score") or 0)):
+    for c in sorted(p.get("clips", []), key=lambda c: (c.get("rank") or 999, -(c.get("score") or 0))):
         post = c.get("post") or {}
         clips.append({
-            "id": c["id"], "status": c.get("status"), "score": c.get("score"), "title": c.get("title"),
+            "id": c["id"], "rank": c.get("rank"), "hot": bool(c.get("hot")), "status": c.get("status"), "score": c.get("score"), "title": c.get("title"),
             "start": c.get("start"), "end": c.get("end"), "duration": c.get("duration"),
             "reason": c.get("reason"), "caption": post.get("caption"), "hashtags": post.get("hashtags", []),
             "video_path": str(d / c["file"]) if c.get("file") else None,
@@ -79,10 +79,10 @@ def auto_export(p: dict) -> str | None:
     out.mkdir(parents=True, exist_ok=True)
     d = project.pdir(p["id"])
     lines = []
-    for i, c in enumerate(sorted(p["clips"], key=lambda c: -(c.get("score") or 0)), 1):
+    for i, c in enumerate(sorted(p["clips"], key=lambda c: (c.get("rank") or 999, -(c.get("score") or 0))), 1):
         if c.get("status") != "done" or not c.get("file"):
             continue
-        base = f"{i:02d} - " + ("".join(ch for ch in (c.get("title") or c["id"]) if ch.isalnum() or ch in " -_").strip()[:50] or c["id"])
+        base = f"{int(c.get('rank') or i):02d} - " + ("".join(ch for ch in (c.get("title") or c["id"]) if ch.isalnum() or ch in " -_").strip()[:50] or c["id"])
         shutil.copy2(d / c["file"], out / f"{base}.mp4")
         if c.get("srt") and (d / c["srt"]).exists():
             shutil.copy2(d / c["srt"], out / f"{base}.srt")

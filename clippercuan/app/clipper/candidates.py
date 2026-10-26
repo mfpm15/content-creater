@@ -181,15 +181,26 @@ def rerank(items: list[dict], profile_name: str, diversity: float = 0.3, max_ove
         if not keep and chosen["overlap_percentage"] > max_overlap * 100:
             continue
         selected.append(chosen)
+    # urutan akhir = ranking skor (pin tetap di atas); MMR di atas hanya menyaring duplikat/tumpang tindih
+    selected.sort(key=lambda x: (not x["pinned"], -x["score"], x["start"]))
+    unique, dupes = [], []
+    for item in selected:   # klip yang isinya hampir sama dengan klip di atasnya diturunkan ke bawah
+        (dupes if not item["pinned"] and any(similarity(item, u) >= 0.6 for u in unique) else unique).append(item)
+    selected = unique + dupes
+    n_hot = max(1, round(len(selected) * 0.4))
     for rank, item in enumerate(selected, 1):
         item["rank"] = rank
+        item["hot"] = rank <= n_hot and item["score"] >= 60   # 🔥 = 40% teratas dengan skor layak
     return selected
 
 
 def rankings(items: list[dict]) -> dict:
     result = {}
     for goal, key in GOALS.items():
-        result[goal] = [x["id"] for x in sorted(items, key=lambda x: (-float(x.get(key, x.get("score_breakdown", {}).get(key, 0))), x["rank"], x["id"]))]
+        if goal == "best_overall":  # urutan utama = nomor rank (#01, #02, …)
+            result[goal] = [x["id"] for x in sorted(items, key=lambda x: (x.get("rank") or 999, -float(x.get("score") or 0), x["id"]))]
+            continue
+        result[goal] = [x["id"] for x in sorted(items, key=lambda x: (-float(x.get(key, x.get("score_breakdown", {}).get(key, 0)) or 0), x.get("rank") or 999, x["id"]))]
     return result
 
 

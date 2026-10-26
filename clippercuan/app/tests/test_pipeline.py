@@ -133,7 +133,7 @@ def test_lite_mode_never_stores_full_video(monkeypatch):
     assert p["status"] == "done", (p["message"], p.get("error"), [c.get("error") for c in p["clips"]])
     assert p["media"]["remote"] and p["media"]["file"] is None
     files = {f.name for f in project.pdir(p["id"]).iterdir()}
-    assert not any(n.startswith("source.") or n.endswith(".src.mp4") or n == "audio-source.m4a" for n in files), files
+    assert not any(n.startswith("source.") or ".src." in n or n == "audio-source.m4a" for n in files), files
     done = [c for c in p["clips"] if c["status"] == "done"]
     assert done and (project.pdir(p["id"]) / done[0]["file"]).stat().st_size > 5000
 
@@ -177,8 +177,8 @@ def test_studio_endpoints_recipes_settings_words_clips():
 
 
 def test_auto_clip_target_and_quality_gate():
-    assert project.clip_target({"clip_count": "auto"}, 3600) == 8           # video 1 jam ≈ 8 klip
-    assert project.clip_target({"clip_count": 0}, 600) == 3                 # minimal 3
+    assert project.clip_target({"clip_count": "auto"}, 3600) == 10          # video 1 jam = 10 klip
+    assert project.clip_target({"clip_count": 0}, 300) == 3                 # minimal 3
     assert project.clip_target({"clip_count": "auto"}, 6 * 3600) == 10      # maksimal 10
     assert project.clip_target({"clip_count": 5}, 3600) == 5
     ranked = [{"id": "a", "score": 80}, {"id": "b", "score": 30}, {"id": "c", "score": 60, "banned": True}, {"id": "d", "score": 50}]
