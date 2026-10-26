@@ -109,12 +109,23 @@ def delete(pid: str) -> None:
 
 
 # ---------------------------------------------------------------- pembuatan
+def _with_recipe(settings: dict) -> dict:
+    """Resep gaya jadi dasar; pengaturan eksplisit dari pengguna tetap menang."""
+    from .recipes import RECIPES
+
+    base = DEFAULTS
+    recipe = RECIPES.get(settings.get("recipe") or "")
+    if recipe:
+        base = deep_merge(DEFAULTS, recipe["settings"])
+    return deep_merge(base, settings)
+
+
 def create(source: str, settings: dict | None = None) -> dict:
     pid = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
     p = {
         "id": pid, "schema_version": 3, "source": source, "title": "Memproses…", "status": "queued", "progress": 0.0,
         "message": "Menunggu antrean", "created": time.time(), "updated": time.time(), "owner": os.getpid(),
-        "settings": deep_merge(DEFAULTS, settings), "clips": [], "candidates": [], "rankings": {},
+        "settings": _with_recipe(settings or {}), "clips": [], "candidates": [], "rankings": {},
         "production": {"status": "draft_candidate", "planned_date": "", "notes": "", "platform": ""}, "error": None,
     }
     save(p)
@@ -145,21 +156,36 @@ def _pipeline(pid: str) -> None:
     work = pdir(pid)
     update(pid, status="running", message="Menyiapkan video…")
 
-    src, title = download.fetch(p["source"], work, _progress(pid, 0.0, 0.18))
-    _cleanup_upload(p["source"], src)
-    pr = media.probe(src)
-    update(pid, title=title, media={"file": src.name, "duration": pr.duration, "width": pr.width, "height": pr.height, "fps": pr.fps})
+    lite = cfg.get("storage") == "lite" and download.is_url(p["source"])
+    if lite:  # hemat disk: hanya audio; potongan video diambil saat render
+        src, meta = download.fetch_audio(p["source"], work, _progress(pid, 0.0, 0.18))
+        title = meta["title"]
+        pr = media.Probe(meta["duration"] or media.probe(src).duration, meta["width"], meta["height"], meta["fps"], True)
+        update(pid, title=title, media={"file": None, "remote": True, "duration": pr.duration, "width": pr.width,
+                                        "height": pr.height, "fps": pr.fps})
+    else:
+        src, title = download.fetch(p["source"], work, _progress(pid, 0.0, 0.18))
+        pr = media.probe(src)
+        # file lokal milik pengguna direferensikan dengan path absolut (tidak disalin)
+        update(pid, title=title, media={"file": src.name if src.parent == work else str(src), "duration": pr.duration,
+                                        "width": pr.width, "height": pr.height, "fps": pr.fps})
 
     wav = work / "audio.wav"
     if pr.has_audio:
         _progress(pid, 0.18, 0.2)(0, "Mengekstrak audio…")
         media.extract_audio(src, wav)
+        if lite:
+            src.unlink(missing_ok=True)
         tr = _transcript(pid, p["source"], cfg, work, wav, pr.duration)
         energy = media.audio_energy(wav)
     else:
         tr, energy = {"language": None, "words": [], "segments": []}, __import__("numpy").zeros(1)
 
-    _progress(pid, 0.62, 0.65)(0, "Membuat dan meranking kandidat…")
+    visual = None
+    if not lite:
+        _progress(pid, 0.62, 0.65)(0, "Membaca aktivitas visual (scene & gerak)…")
+        visual = media.visual_activity(src, pr.duration)
+    _progress(pid, 0.62, 0.65)(0.2, "Membuat dan meranking kandidat…")
     count = max(1, min(30, int(cfg.get("candidate_count", cfg.get("clip_count", 10)))))
     preset = cfg.get("duration_preset", "custom" if (cfg.get("min_sec"), cfg.get("max_sec")) != (15, 60) else "auto")
     if preset == "custom":
@@ -178,13 +204,13 @@ def _pipeline(pid: str) -> None:
         model = llm.cfg()["model_moments"]
         _progress(pid, 0.62, 0.65)(0.3, f"AI ({model}) memilih momen terbaik…")
         try:
-            moments = _llm_moments(tr, energy, pr.duration, count, mn, mx)
+            moments = _llm_moments(tr, energy, pr.duration, count, mn, mx, visual)
             engine = model
         except Exception as e:  # noqa: BLE001 — selalu ada cadangan lokal
             print(f"[llm] gagal, pakai skor lokal: {e}")
             update(pid, llm_warning=f"AI tidak tersedia ({str(e)[:200]}). Dipakai skor lokal.")
     if not moments:
-        moments = highlights.find_moments(tr, energy, pr.duration, count, mn, mx)
+        moments = highlights.find_moments(tr, energy, pr.duration, count, mn, mx, visual=visual)
     update(pid, engine=engine)
     lang = tr.get("language")
     prepared = []
@@ -249,10 +275,10 @@ def _transcript(pid: str, source: str, cfg: dict, work: Path, wav: Path, duratio
     return tr
 
 
-def _llm_moments(tr: dict, energy, duration: float, count: int, mn: float, mx: float) -> list[dict]:
+def _llm_moments(tr: dict, energy, duration: float, count: int, mn: float, mx: float, visual=None) -> list[dict]:
     """Ambil ±30 kandidat beragam dari skor lokal, biarkan LLM memilih & memberi judul."""
     segs = tr["segments"]
-    pool = highlights.non_overlapping(highlights.score_candidates(tr, energy, mn, mx), 30, max_overlap=0.5)
+    pool = highlights.non_overlapping(highlights.score_candidates(tr, energy, mn, mx, visual=visual), 30, max_overlap=0.5)
     pool.sort(key=lambda c: c["s"])
     picks = llm.pick_moments([{"id": i + 1, "start": c["s"], "end": c["e"], "text": c["text"]} for i, c in enumerate(pool)],
                              count, tr.get("language"))
@@ -272,7 +298,7 @@ def _llm_moments(tr: dict, energy, duration: float, count: int, mn: float, mx: f
                                 breakdown=meta[id(c)].get("breakdown") or c.get("breakdown", {}),
                                 readiness=meta[id(c)]["score"]) for c in chosen]
     if len(out) < count:  # model memilih terlalu sedikit → lengkapi dari skor lokal
-        extra = highlights.non_overlapping(highlights.score_candidates(tr, energy, mn, mx), count, taken=chosen)[len(chosen):]
+        extra = highlights.non_overlapping(highlights.score_candidates(tr, energy, mn, mx, visual=visual), count, taken=chosen)[len(chosen):]
         out += [highlights.to_moment(c, segs, duration, 70) for c in extra]
     out.sort(key=lambda m: m["score"], reverse=True)
     return out
@@ -281,20 +307,33 @@ def _llm_moments(tr: dict, energy, duration: float, count: int, mn: float, mx: f
 def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.Probe | None = None) -> None:
     p = load(pid)
     work = pdir(pid)
-    src = work / p["media"]["file"]
-    pr = pr or media.probe(src)
+    remote = p["media"].get("remote")
+    src = None if remote else work / p["media"]["file"]
+    pr = pr or (None if remote else media.probe(src))
     if words is None:
         tf = work / "transcript.json"
         words = json.loads(tf.read_text("utf-8"))["words"] if tf.exists() else []
     clip = next(c for c in p["clips"] if c["id"] == cid)
     cfg = deep_merge(p["settings"], clip.get("overrides"))
     _set_clip(pid, cid, status="rendering")
+    seg = None
     try:
+        if p["media"].get("remote"):  # mode hemat: ambil potongan klip saja, render, lalu hapus
+            s0 = max(0.0, float(clip["start"]) - 1.0)
+            e0 = min(float(p["media"]["duration"] or 1e9), float(clip["end"]) + 1.0)
+            seg = download.fetch_segment(p["source"], s0, e0, work / f"{cid}.src.mp4")
+            pr = media.probe(seg)
+            clip = {**clip, "start": float(clip["start"]) - s0, "end": float(clip["end"]) - s0}
+            words = [{**w, "s": w["s"] - s0, "e": w["e"] - s0} for w in words]
+            src = seg
         res = render.render_clip(work, src, pr, clip, cfg, words)
         _set_clip(pid, cid, status="done", error=None, version=int(time.time()), **res)
     except Exception as e:
         _set_clip(pid, cid, status="error", error=str(e)[-1500:])
         raise
+    finally:
+        if seg is not None:
+            seg.unlink(missing_ok=True)
 
 
 def _set_clip(pid: str, cid: str, **fields) -> dict:
@@ -308,20 +347,8 @@ def _set_clip(pid: str, cid: str, **fields) -> dict:
     raise KeyError(cid)
 
 
-def _cleanup_upload(source: str, copied: Path) -> None:
-    """File unggahan sudah disalin ke folder proyek → hapus salinan sementara (hemat disk)."""
-    from .config import UPLOADS_DIR
-
-    try:
-        f = Path(source)
-        if f.parent.resolve() == UPLOADS_DIR.resolve() and copied.exists() and f.exists():
-            f.unlink()
-    except OSError:
-        pass
-
-
 # ---------------------------------------------------------------- edit klip
-EDITABLE = {"title", "start", "end", "words", "crop_keys", "overrides", "post"}
+EDITABLE = {"title", "start", "end", "words", "crop_keys", "overrides", "post", "selected"}
 
 
 def edit_clip(pid: str, cid: str, changes: dict, rerender: bool = True) -> dict:
@@ -518,6 +545,15 @@ def delete_template(name: str) -> dict:
     return t
 
 
+def update_settings(pid: str, settings: dict) -> dict:
+    with _LOCK:
+        p = load(pid)
+        p["settings"] = deep_merge(p["settings"], settings)
+        p["updated"] = time.time()
+        save(p)
+        return p
+
+
 def rerender_all(pid: str, settings: dict) -> dict:
     with _LOCK:
         p = load(pid)
@@ -699,7 +735,8 @@ def safe_update(pid: str, **f) -> None:
 def _friendly(e: Exception) -> str:
     s = str(e)
     if "Sign in to confirm" in s or "bot" in s.lower():
-        return "YouTube meminta verifikasi. Coba lagi nanti atau unduh videonya lalu pakai mode File."
+        return ("YouTube meminta verifikasi. Buka Pengaturan → Unduhan, pilih browser yang sudah login YouTube "
+                "(cookies), lalu klik Ulangi. Atau unduh videonya lalu pakai mode File.")
     if "Unsupported URL" in s:
         return "Link tidak didukung. Pakai link YouTube/TikTok/Instagram atau unggah file."
     if "unavailable" in s or "Private video" in s or "removed" in s:

@@ -91,8 +91,11 @@ def test_ui_assets_workflow_contract_and_no_credentials():
     assert "text/html" in html.headers["content-type"]
     assert "text/css" in css.headers["content-type"]
     assert "javascript" in js.headers["content-type"]
-    for marker in (b'id="srcTabs"', b'id="url"', b'id="file"', b'id="start"', b'id="localFallback"', b'class="workflow-steps"', b'id="uiMode"', b'id="durationPreset"', b'id="capPreset"', b'id="pReadiness"'):
+    for marker in (b'id="srcTabs"', b'id="url"', b'id="file"', b'id="start"', b'id="startTop"', b'id="localFallback"', b'id="recipes"',
+                   b'id="storage_lite"', b'id="uiMode"', b'id="durationPreset"', b'id="capStyle"', b'src="studio.js"'):
         assert marker in html.content
+    studio = client.get("/studio.js")
+    assert studio.status_code == 200 and b"DETECTED CLIPS" in studio.content and b"VIRAL READINESS" in studio.content
     assert b"/api/projects" in js.content and b"source, settings" in js.content
     assert b"api_key" not in html.content.lower()
-    assert b"VIRAL READINESS" in html.content and b"duration_preset" in js.content
+    assert b"duration_preset" in js.content

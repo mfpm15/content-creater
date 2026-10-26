@@ -13,7 +13,13 @@ FONT_PRESETS = {
     "Arial Black": ("Arial Black", 0),
     "Impact": ("Impact", 0),
     "Georgia Italic": ("Georgia", 1),
+    "Barlow Condensed": ("Barlow Condensed ExtraBold", 0),
+    "Instrument Serif": ("Instrument Serif", 0),
+    "Instrument Serif Italic": ("Instrument Serif", 1),
+    "Pinyon Script": ("Pinyon Script", 0),
 }
+# Font aksen untuk gaya "Subtract & font": kata kunci memakai font berbeda (serif miring/script).
+ACCENT_FONTS = ("Instrument Serif Italic", "Pinyon Script", "Georgia Italic", "Bangers", "Anton")
 
 
 def _ass_color(hex_color: str, alpha: float = 1.0) -> str:
@@ -23,6 +29,13 @@ def _ass_color(hex_color: str, alpha: float = 1.0) -> str:
     r, g, b = h[0:2], h[2:4], h[4:6]
     a = f"{int(round((1 - alpha) * 255)):02X}"
     return f"&H{a}{b}{g}{r}".upper()
+
+
+def _text_on(hex_color: str) -> str:
+    """Warna teks yang terbaca di atas kotak berwarna (hitam untuk kotak terang)."""
+    h = (hex_color or "#000000").lstrip("#")[:6].ljust(6, "0")
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return "&H00000000&" if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 else "&H00FFFFFF&"
 
 
 def _ts(t: float) -> str:
@@ -40,6 +53,9 @@ def _word_tags(w: dict) -> str:
     """Gaya per kata dari editor: {"color": "#hex", "scale": 1.3}."""
     st = w.get("style") or {}
     tags = ""
+    if st.get("font"):
+        name, ital = FONT_PRESETS.get(st["font"], (st["font"], 0))
+        tags += rf"\fn{name}\i{ital}"
     if st.get("color"):
         tags += r"\c" + _ass_color(st["color"])
     sc = st.get("scale")
@@ -47,6 +63,38 @@ def _word_tags(w: dict) -> str:
         v = int(float(sc) * 100)
         tags += rf"\fscx{v}\fscy{v}"
     return tags
+
+
+def _keyword_index(line: list[dict]) -> int | None:
+    """Satu kata paling 'berbobot' per baris (pemicu/emosi > angka > kata panjang); None bila tak ada."""
+    from .highlights import EMO_WORDS, HOOK_WORDS, STOP
+
+    best, best_s = None, 0.0
+    for i, w in enumerate(line):
+        t = "".join(ch for ch in w["w"].lower() if ch.isalnum())
+        if not t:
+            continue
+        sc = 3.0 if t in HOOK_WORDS or t in EMO_WORDS else 2.0 if any(ch.isdigit() for ch in t) else (
+            1.0 + len(t) / 20 if len(t) >= 6 and t not in STOP else 0.0)
+        if (w.get("style") or {}).get("emphasis"):
+            sc = 10.0
+        if sc > best_s:
+            best, best_s = i, sc
+    return best
+
+
+def _title_lines(title: str) -> tuple[str, str]:
+    """Pecah judul jadi baris pengantar + baris punchline (preset Duo)."""
+    t = title.strip()
+    if "?" in t[:-1]:
+        a, b = t.split("?", 1)
+        if b.strip():
+            return a.strip() + "?", b.strip()
+    words = t.split()
+    if len(words) < 3:
+        return "", t
+    k = max(1, round(len(words) / 3))
+    return " ".join(words[:-k]), " ".join(words[-k:])
 
 
 def chunk_words(words: list[dict], per_line: int, max_chars: int = 24) -> list[list[dict]]:
@@ -85,52 +133,105 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
     # ---- caption
     if cap["enabled"] and words:
         style = cap["style"]
-        if style in {"karaoke", "box"} and timing_mode(words) != "word":
+        word_timing = timing_mode(words) == "word"
+        box_on = (style == "box" or bool(cap.get("box"))) and word_timing  # kotak mengikuti kata aktif
+        if style in {"karaoke", "box"} and not word_timing:
             style = "clean"  # phrase timing tidak boleh membuat highlight kata palsu
         up = (lambda s: s.upper()) if cap.get("uppercase") else (lambda s: s)
         pop = cap.get("animation") == "pop"
+        glow = cap.get("effect") == "glow"
+        glow_col = _ass_color(cap.get("glow_color") or cap["highlight"])
+        pos = ""
+        if cap.get("y_pct") not in (None, ""):
+            y = int(H * max(.08, min(.92, float(cap["y_pct"]) / 100)))
+            pos = rf"\an5\pos({W // 2},{y})"
+        acc_font, acc_italic = FONT_PRESETS.get(cap.get("accent_font") or "Instrument Serif Italic", ("Instrument Serif", 1))
+        keyword = style == "keyword"
+        box_text = _text_on(cap["highlight"])
+
+        def head(extra: str = "") -> str:
+            return "{" + pos + extra + "}" if (pos or extra) else ""
+
+        def glow_layer(start, end, text_plain):
+            if glow:  # lapisan bawah: outline kabur berwarna = efek glow
+                add(0, start, end, "Cap", head(rf"\bord{max(int(6 * scale), 3)}\blur{max(int(6 * scale), 3)}\3c{glow_col}\3a&H50&\1a&HFF&\shad0") + text_plain)
+
         if style == "wbw":
             for i, w in enumerate(words):
                 end = words[i + 1]["s"] if i + 1 < len(words) and words[i + 1]["s"] - w["e"] < 0.4 else w["e"]
                 if i + 1 < len(words):
                     end = min(end, words[i + 1]["s"])
-                anim = r"{\fscx92\fscy92\t(0,120,\fscx104\fscy104)\t(120,220,\fscx100\fscy100)}" if pop else ""
-                add(1, w["s"], end, "Cap", anim + r"{\c" + hl + "}" + _esc(up(w["w"])))
+                anim = r"\fscx92\fscy92\t(0,120,\fscx104\fscy104)\t(120,220,\fscx100\fscy100)" if pop else ""
+                t = _esc(up(w["w"]))
+                glow_layer(w["s"], end, t)
+                add(1, w["s"], end, "Cap", head(anim + r"\c" + hl) + t)
         else:
             lines = chunk_words(words, int(cap.get("words_per_line", 3)), int(cap.get("max_chars", 24)))
             for li, line in enumerate(lines):
                 l_end = line[-1]["e"] + 0.15
                 if li + 1 < len(lines):  # jangan sampai bertumpuk dengan baris berikutnya
                     l_end = min(l_end, lines[li + 1][0]["s"])
-                if style == "clean":
-                    add(1, line[0]["s"], l_end, "Cap", _esc(up(" ".join(w["w"] for w in line))))
+                kw = _keyword_index(line) if keyword else None
+
+                def word_text(j: int, x: dict, active: bool) -> str:
+                    t = _esc(up(x["w"]))
+                    own = _word_tags(x)
+                    tags = own
+                    if j == kw:  # kata kunci: font aksen, miring, warna sorotan, sedikit lebih besar
+                        tags += rf"\fn{acc_font}\i{acc_italic}\c{hl}\fscx118\fscy118"
+                    if active and box_on:
+                        tags += r"\c" + box_text + r"\bord0\shad0"
+                    elif active and style == "karaoke":
+                        tags += r"\c" + hl
+                    return ("{" + tags + "}" + t + r"{\r}") if tags else t
+
+                per_word = box_on or style == "karaoke"
+                if not per_word:
+                    plain = " ".join(_esc(up(x["w"])) for x in line)
+                    glow_layer(line[0]["s"], l_end, plain)
+                    anim = r"\fad(80,0)" if pop else ""
+                    add(1, line[0]["s"], l_end, "Cap", head(anim) + " ".join(word_text(j, x, False) for j, x in enumerate(line)))
                     continue
                 for k, w in enumerate(line):
-                    s = w["s"] if k else line[0]["s"]
-                    e = line[k + 1]["s"] if k + 1 < len(line) else l_end
+                    s0 = w["s"] if k else line[0]["s"]
+                    e0 = line[k + 1]["s"] if k + 1 < len(line) else l_end
                     grow = r"\t(0,120,\fscx104\fscy104)\t(120,220,\fscx100\fscy100)" if pop else ""
-                    text_parts, box_parts = [], []
-                    for j, x in enumerate(line):
-                        t = _esc(up(x["w"]))
-                        own = _word_tags(x)
-                        if j == k:
-                            col = "&H00000000&" if style == "box" else hl
-                            text_parts.append("{" + own + r"\c" + col + (r"\bord0\shad0" if style == "box" else "") + grow + "}" + t + r"{\r}")
-                            box_parts.append("{" + own + r"\1a&HFF&\3a&H00&\4a&HFF&" + grow + "}" + t)
-                        else:
-                            text_parts.append(("{" + own + "}" if own else "") + t + (r"{\r}" if own else ""))
-                            box_parts.append("{" + own + r"\1a&HFF&\3a&HFF&\4a&HFF&}" + t)
-                    if style == "box":  # lapis bawah: kotak solid hanya di kata aktif
-                        add(0, s, e, "CapBox", " ".join(box_parts))
-                    add(1, s, e, "Cap", " ".join(text_parts))
+                    if box_on:  # lapis bawah: kotak solid hanya di kata aktif
+                        box_parts = []
+                        for j, x in enumerate(line):
+                            t = _esc(up(x["w"]))
+                            kwt = rf"\fn{acc_font}\i{acc_italic}\fscx118\fscy118" if j == kw else ""
+                            vis = r"\1a&HFF&\3a&H00&\4a&HFF&" + grow if j == k else r"\1a&HFF&\3a&HFF&\4a&HFF&"
+                            box_parts.append("{" + _word_tags(x) + kwt + vis + "}" + t)
+                        add(0, s0, e0, "CapBox", head() + " ".join(box_parts))
+                    else:
+                        glow_layer(s0, e0, " ".join(_esc(up(x["w"])) for x in line))
+                    add(1, s0, e0, "Cap", head() + " ".join(word_text(j, x, j == k) for j, x in enumerate(line)))
 
     # ---- judul pembuka
     if ttl["enabled"] and title.strip():
         preset = ttl.get("preset", "bar")
         t_end = duration if not ttl.get("duration") else min(float(ttl["duration"]), duration)
+        if preset == "duo":  # baris pengantar putih miring + punchline besar berwarna, keduanya bercahaya
+            first, second = _title_lines(title)
+            acc = _ass_color(ttl.get("accent") or "#3DE0A0")
+            gl = _ass_color(ttl.get("glow") or "#C6FF3D")
+            y1 = int(H * 0.12)
+            sharp = rf"\shad0\bord{max(int(3 * scale), 2)}\3c&H00101010&"
+            glow = rf"\1a&HFF&\shad0\bord{max(int(8 * scale), 4)}\blur{max(int(8 * scale), 4)}\3a&H40&"
+            if first:
+                base = rf"\an8\pos({W // 2},{y1})\fad(200,0)\i1\fscx115\fscy115"
+                add(2, 0, t_end, "TitleClean", "{" + base + glow + rf"\3c{gl}" + "}" + _esc(first))
+                add(3, 0, t_end, "TitleClean", "{" + base + sharp + "}" + _esc(first))
+            lines1 = 1 + len(first) // 24 if first else 0
+            y2 = y1 + int(tfs * 1.2 * lines1)
+            base = rf"\an8\pos({W // 2},{y2})\fad(250,0)\i1\fscx150\fscy150"
+            add(2, 0, t_end, "TitleClean", "{" + base + glow + rf"\3c{acc}" + "}" + _esc(second))
+            add(3, 0, t_end, "TitleClean", "{" + base + sharp + rf"\c{acc}" + "}" + _esc(second))
+            t_end = -1  # sudah ditambahkan
         style = {"bar": "TitleBar", "outline": "TitleOutline", "neon": "TitleNeon", "clean": "TitleClean"}.get(preset, "TitleBar")
         fx = r"{\fad(200,0)\frz-2}" if preset == "bar" else r"{\fad(200,0)\blur3}" if preset == "neon" else r"{\fad(200,0)}"
-        add(2, 0, t_end, style, fx + _esc(title.upper() if preset != "clean" else title))
+        add(2, 0, t_end, style, fx + _esc(title.upper() if preset != "clean" else title))  # t_end<0 → dilewati add()
         if preset == "neon":  # lapisan teks tajam di atas glow
             add(3, 0, t_end, style, r"{\fad(200,0)\bord0}" + _esc(title.upper()))
 

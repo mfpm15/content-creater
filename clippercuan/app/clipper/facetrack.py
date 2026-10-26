@@ -189,8 +189,12 @@ def smooth(xs: list[float | None], src_w: int, src_h: int) -> list[list[float]]:
     return [[round(t, 2), round(x, 4)] for t, x in keys]
 
 
-def x_expr(keys: list[list[float]], src_w: int, crop_w: int) -> str:
-    """Ekspresi ffmpeg piecewise-linear untuk posisi x crop (pixel), dibatasi tepi frame."""
+def x_expr(keys: list[list[float]], src_w: int, crop_w: int, hold: bool = False) -> str:
+    """Ekspresi ffmpeg posisi x crop (pixel), dibatasi tepi frame.
+
+    hold=False: piecewise-linear (kamera bergeser halus). hold=True: tiap keyframe menahan framing sampai keyframe
+    berikutnya (tanpa drifting) — dipakai untuk keyframe manual dari Crop studio.
+    """
     def px(cx):
         return max(0.0, min(src_w - crop_w, cx * src_w - crop_w / 2))
 
@@ -198,6 +202,6 @@ def x_expr(keys: list[list[float]], src_w: int, crop_w: int) -> str:
     expr = f"{px(keys[-1][1]):.1f}"
     for (t0, x0), (t1, x1) in reversed(list(zip(keys, keys[1:]))):
         a, b = px(x0), px(x1)
-        seg = f"{a:.1f}+({b - a:.1f})*(t-{t0:.2f})/{max(t1 - t0, 0.01):.2f}"
+        seg = f"{a:.1f}" if hold else f"{a:.1f}+({b - a:.1f})*(t-{t0:.2f})/{max(t1 - t0, 0.01):.2f}"
         expr = f"if(lt(t,{t1:.2f}),{seg},{expr})"
     return f"if(lt(t,{keys[0][0]:.2f}),{px(keys[0][1]):.1f},{expr})"

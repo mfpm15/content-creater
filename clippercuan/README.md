@@ -25,21 +25,24 @@ Hasil tersimpan di folder `~/ClipperCuan/projects/` (tombol **Buka folder** di a
 ## Fitur
 | Fitur | Keterangan |
 |---|---|
-| Sumber video | Link YouTube/TikTok/Instagram/dll (yt-dlp, maks 1080p) atau file lokal (drag & drop) |
+| Studio | Satu layar seperti aplikasi desktop: preview 9:16 dengan caption & judul tampil langsung, panel Instant style / Clip setting / Branding, deretan *Detected clips* (skor x/10, filter Hot/Terpilih/Rendered), bilah render |
+| Resep gaya viral | 7 resep satu klik: Podcast Box merah, Podcast Hormozi, Quote glow, Review tech, Mobile Legends hype split, Edukasi word-by-word, Campaign clipping (`--recipe` di CLI, `recipe` di MCP) |
+| Hemat disk | Link: hanya audio yang diunduh, potongan klip diambil saat render lalu dihapus (`--lite`). File lokal tidak diduplikasi |
+| Sumber video | Link YouTube/TikTok/Instagram/dll (yt-dlp, maks 1080p) atau file lokal (drag & drop); cookies browser bila YouTube minta verifikasi |
 | Subtitle otomatis | Mode Otomatis: subtitle YouTube → API cloud (Groq/OpenAI/9router) → Whisper lokal; timestamp per kata, 14+ bahasa, opsi terjemah ke Inggris |
-| Cari momen | Skor hook (pertanyaan/angka/kata pemicu), kata emosional, energi audio, tempo bicara, kalimat utuh |
-| Judul pembuka | Otomatis dari kalimat paling kuat; preset Bar / Outline / Neon / Clean |
-| Caption | Box highlight, Word by word, Karaoke, Clean · 8 font · warna · ukuran · posisi · animasi pop |
+| Cari momen | Skor hook (pertanyaan/angka/kata pemicu), kata emosional, energi audio, **aktivitas visual (scene & gerak dari keyframe)**, tempo bicara, kalimat utuh |
+| Judul pembuka | Otomatis dari kalimat paling kuat; preset Duo glow (2 baris) / Bar / Outline / Neon / Clean; pilihan judul alternatif per klip |
+| Caption | Plain, Karaoke, Word by word, **Subtract & font** (kata kunci serif/script miring) · Box highlight ON/OFF · efek Glow · 12 font · posisi vertikal bebas · animasi pop |
 | Format | Portrait 9:16, Square 1:1, Blur background, Split gaming (facecam + gameplay), Landscape |
-| Smart crop | Ikuti wajah otomatis + editor keyframe manual (geser kotak, timeline) |
+| Smart crop | Ikuti wajah otomatis + **Crop studio**: keyframe yang menahan framing, zoom/resize crop, posisi vertikal, 9:16/1:1, live output, Apply to all |
 | Watermark | Teks atau logo PNG, posisi & transparansi |
-| Editor klip | Ubah judul, potong ulang (mulai/selesai), ejaan + warna & ukuran per kata, ganti format per klip, hapus klip |
+| Editor klip | Ubah judul, potong ulang (±0,5 dtk), **editor caption layar penuh** (ejaan, font/warna/ukuran per kata, kata kunci, pilih semua), format per klip, pin/ban/hapus |
 | Klip manual | Pilih sendiri potongan dari video (putar, tandai mulai/selesai) |
 | Potong jeda hening | Jump cut otomatis berbasis timestamp kata — caption & crop ikut menyesuaikan |
 | Split gaming visual | Seret & ubah ukuran kotak FACECAM / GAMEPLAY di atas frame video |
 | Ekspor | MP4 per klip, subtitle .SRT, **Download semua (ZIP)** + file caption posting |
 | Paket posting | Caption + hashtag otomatis per klip (bisa diedit, tombol Salin) |
-| Galeri & riwayat | Preview, urut skor/waktu, render ulang, ubah gaya semua klip, cari & hapus proyek, status antrean |
+| Galeri & riwayat | Riwayat proyek + **Galeri klip** lintas proyek (hover untuk putar), cari & hapus, status antrean |
 | Template gaya | Simpan & pakai ulang kombinasi format/caption/judul/watermark |
 | Batch | Banyak link sekaligus (satu per baris) → diproses berurutan |
 | Emoji otomatis | Emoji muncul saat kata kunci diucapkan (uang 💰, rahasia 🤫, kaget 😱 — 50 emoji, ID/EN) |
@@ -92,4 +95,4 @@ site/                landing page (opsional, untuk jualan)
 
 ## Lisensi komponen
 Whisper (MIT), faster-whisper (MIT), yt-dlp (Unlicense), FFmpeg (LGPL/GPL via imageio-ffmpeg), OpenCV (Apache-2.0),
-font di `app/clipper/fonts` (SIL OFL), emoji Twemoji (CC-BY 4.0), detektor wajah YuNet (MIT), MCP Python SDK (MIT). Pastikan Anda punya hak atas video yang Anda klip.
+font di `app/clipper/fonts` (SIL OFL: Anton, Bebas Neue, Poppins, Bangers, Montserrat, Barlow Condensed, Instrument Serif, Pinyon Script), emoji Twemoji (CC-BY 4.0), detektor wajah YuNet (MIT), MCP Python SDK (MIT). Pastikan Anda punya hak atas video yang Anda klip.

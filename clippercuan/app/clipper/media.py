@@ -77,3 +77,28 @@ def audio_energy(wav: Path, hop: float = 0.5) -> np.ndarray:
 def grab_frame(src: Path, t: float, dst: Path, width: int = 960) -> Path:
     run(["-y", "-ss", f"{max(t, 0):.3f}", "-i", str(src), "-frames:v", "1", "-vf", f"scale={width}:-2", "-q:v", "4", str(dst)])
     return dst
+
+
+def visual_activity(src: Path, duration: float, hop: float = 0.5) -> np.ndarray | None:
+    """Aktivitas visual 0..1 per `hop` detik dari selisih antar-keyframe (cepat: hanya keyframe yang di-decode).
+
+    Menangkap pergantian scene, gerak besar, dan aksi gameplay. None bila gagal / terlalu sedikit keyframe.
+    """
+    w, h = 64, 36
+    try:
+        p = subprocess.run([FFMPEG, "-hide_banner", "-nostdin", "-skip_frame", "nokey", "-i", str(src), "-an",
+                            "-vf", f"scale={w}:{h},format=gray,showinfo", "-fps_mode", "passthrough", "-f", "rawvideo", "-"],
+                           capture_output=True, creationflags=_NO_WINDOW, timeout=max(120, duration / 4))
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    ts = [float(x) for x in re.findall(r"pts_time:(-?[\d.]+)", p.stderr.decode("utf-8", "replace"))]
+    n = min(len(p.stdout) // (w * h), len(ts))
+    if n < 3:
+        return None
+    frames = np.frombuffer(p.stdout[: n * w * h], dtype=np.uint8).reshape(n, h, w).astype(np.float32)
+    diff = np.abs(np.diff(frames, axis=0)).mean(axis=(1, 2))           # perubahan antar keyframe
+    mid = (np.array(ts[1:n]) + np.array(ts[: n - 1])) / 2
+    grid = np.arange(0, max(duration, hop), hop) + hop / 2
+    vals = np.interp(grid, mid, diff)
+    lo, hi = np.percentile(vals, 5), np.percentile(vals, 95)
+    return np.clip((vals - lo) / max(hi - lo, 1e-6), 0, 1)

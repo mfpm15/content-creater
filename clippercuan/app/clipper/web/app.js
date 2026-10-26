@@ -42,6 +42,7 @@ async function route() {
   const h = location.hash.replace(/^#\/?/, '') || 'new';
   const [page, id] = h.split('/');
   $$('.side nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === page || (page === 'p' && a.dataset.nav === 'history')));
+  document.body.classList.toggle('studio-mode', page === 'p' && !!id);
   if (!INFO) { [INFO, SETTINGS, HEALTH] = await Promise.all([api('/api/info'), api('/api/settings'), api('/api/health')]); $('#sideFoot').textContent = 'Data lokal siap'; paintAiHealth(); }
   if (page === 'p' && id) return pageProject(id);
   const pages = { history: pageHistory, captions: pageCaptions, settings: pageSettings, templates: pageTemplates, system: pageSystem, help: pageHelp, agent: pageAgent };
@@ -49,7 +50,7 @@ async function route() {
 }
 addEventListener('hashchange', route);
 // lencana "sedang diproses" di menu Riwayat
-async function badge() { try { const l = await api('/api/projects'); const n = l.filter(p => ['queued', 'running'].includes(p.status)).length; const b = $('#runBadge'); b.hidden = !n; b.textContent = n; } catch {} }
+async function badge() { try { const l = await api('/api/projects'); const n = l.filter(p => ['queued', 'running', 'rendering'].includes(p.status)).length; const b = $('#runBadge'); b.hidden = !n; b.textContent = n; } catch {} }
 setInterval(badge, 4000); badge();
 
 /* ================= PROYEK BARU ================= */
@@ -122,25 +123,38 @@ async function pageNew(override) {
 
   // caption
   const cap = cfg.caption;
-  let capPreset = cap.preset || 'bold-viral';
   $('#cap_font').innerHTML = INFO.fonts.map(f => `<option>${esc(f)}</option>`).join('');
-  let capStyle = cap.style;
+  let capStyle = cap.style === 'box' ? 'clean' : cap.style;
   const capCard = $('#capCard');
   $('#cap_enabled').checked = cap.enabled; capCard.classList.toggle('off', !cap.enabled);
   $('#cap_enabled').onchange = e => capCard.classList.toggle('off', !e.target.checked);
   $('#cap_font').value = cap.font; $('#cap_position').value = cap.position; $('#cap_color').value = cap.color; $('#cap_highlight').value = cap.highlight;
   $('#cap_wpl').value = cap.words_per_line; $('#cap_size').value = cap.size; $('#cap_upper').checked = cap.uppercase; $('#cap_pop').checked = cap.animation === 'pop';
+  $('#cap_box').checked = cap.style === 'box' || !!cap.box; $('#cap_glow').checked = cap.effect === 'glow';
   const pv = () => {
-    const p = $('#capPreview'), hl = $('#cap_highlight').value, col = $('#cap_color').value;
-    p.style.textTransform = $('#cap_upper').checked ? 'uppercase' : 'none';
-    p.style.fontFamily = $('#cap_font').value.includes('Georgia') ? 'Georgia,serif' : 'inherit';
-    p.style.fontSize = (+$('#cap_size').value / 82 * 22) + 'px';
-    $$('.pv-w', p).forEach(w => { const on = w.classList.contains('on'); w.style.color = on ? (capStyle === 'box' ? '#000' : hl) : col; w.style.background = on && capStyle === 'box' ? hl : 'transparent'; w.hidden = capStyle === 'wbw' && !on; });
+    const p = $('#capPreview'), c = { ...cap, enabled: true, style: capStyle, box: $('#cap_box').checked, effect: $('#cap_glow').checked ? 'glow' : 'none', font: $('#cap_font').value,
+      color: $('#cap_color').value, highlight: $('#cap_highlight').value, uppercase: $('#cap_upper').checked, words_per_line: 3 };
+    p.style.fontFamily = ffam(c.font); p.style.color = c.color; p.style.fontSize = (+$('#cap_size').value / 82 * 24) + 'px';
+    p.classList.toggle('glow', c.effect === 'glow'); p.style.setProperty('--glow', c.highlight);
+    p.innerHTML = captionHTML({ ...c, style: c.style === 'wbw' ? 'clean' : c.style }, [{ w: 'Ini', s: 0, e: .3 }, { w: 'momen', s: .3, e: .7 }, { w: 'penting', s: .7, e: 1 }], .4);
   };
   chipGroup($('#capStyle'), capStyle, v => { capStyle = v; pv(); });
-  const useCapPreset = v => { capPreset = v; const presets = { clean: ['clean', false, false, 4], 'bold-viral': ['box', true, true, 3], minimal: ['clean', false, false, 3], karaoke: ['karaoke', false, true, 4] }; const p = presets[v]; capStyle = p[0]; $('#cap_upper').checked = p[1]; $('#cap_pop').checked = p[2]; $('#cap_wpl').value = p[3]; chipGroup($('#capStyle'), capStyle, x => { capStyle = x; pv(); }); pv(); };
-  chipGroup($('#capPreset'), capPreset, useCapPreset);
-  ['cap_color', 'cap_highlight', 'cap_upper', 'cap_font', 'cap_size'].forEach(k => $('#' + k).addEventListener('input', pv)); pv();
+  ['cap_color', 'cap_highlight', 'cap_upper', 'cap_font', 'cap_size', 'cap_box', 'cap_glow'].forEach(k => $('#' + k).addEventListener('input', pv)); pv();
+
+  let posTouched = false; $('#cap_position').addEventListener('change', () => posTouched = true);
+  $('#storage_lite').checked = cfg.storage === 'lite';
+  let recipeId = cfg.recipe || '';
+  getRecipes().then(rs => {
+    const box = $('#recipes'); if (!box) return;
+    box.innerHTML = Object.values(rs).map(r => `<button type="button" data-r="${esc(r.id)}" class="${r.id === recipeId ? 'on' : ''}"><span class="rb">${esc(r.badge || '')}</span><b>${esc(r.label)}</b><small>${esc(r.desc)}</small></button>`).join('') + `<button type="button" data-r="" class="${recipeId ? '' : 'on'}"><span class="rb">Manual</span><b>Atur sendiri</b><small>Pakai pengaturan di bawah tanpa resep.</small></button>`;
+    $$('[data-r]', box).forEach(b => b.onclick = () => {
+      try { sessionStorage.setItem('draftUrl', $('#url').value); } catch {}
+      const r = rs[b.dataset.r], now = collect();
+      pageNew(r ? merge(now, { ...r.settings, recipe: r.id }) : { ...now, recipe: '' });
+      if (r) toast(`Resep "${r.label}" dipakai`);
+    });
+  }).catch(() => { $('#recipes').innerHTML = '<span class="muted">Resep tidak bisa dimuat.</span>'; });
+  try { const d = sessionStorage.getItem('draftUrl'); if (d) { $('#url').value = d; $('#url').oninput(); sessionStorage.removeItem('draftUrl'); } } catch {}
 
   // judul & watermark
   let ttlPreset = cfg.title.preset, wmPos = cfg.watermark.position, wmImage = '';
@@ -187,8 +201,9 @@ async function pageNew(override) {
       clip_count: +$('#clip_count').value, duration_preset: durationPreset, min_sec: +$('#min_sec').value, max_sec: +$('#max_sec').value, language: $('#language').value, model: $('#model').value, transcriber: $('#transcriber').value,
       translate_en: $('#translate_en').checked, cut_silence: $('#cut_silence').checked, use_llm: $('#use_llm').checked, layout, smart_crop: $('#smart_crop').checked,
       split: { face: [pos[0], pos[1], fs, fs], game: [0, 0, 1, 1], face_ratio: +$('#faceRatio').value / 100 },
-      caption: { enabled: $('#cap_enabled').checked, preset: capPreset, style: capStyle, font: $('#cap_font').value, size: +$('#cap_size').value, color: $('#cap_color').value, highlight: $('#cap_highlight').value, uppercase: $('#cap_upper').checked, words_per_line: +$('#cap_wpl').value, position: $('#cap_position').value, safe_area: .12, max_chars: 24, animation: $('#cap_pop').checked ? 'pop' : 'none' },
-      title: { enabled: $('#ttl_enabled').checked, preset: ttlPreset, duration: +$('#ttl_duration').value, size: cfg.title.size },
+      caption: { ...cfg.caption, enabled: $('#cap_enabled').checked, style: capStyle, box: $('#cap_box').checked, effect: $('#cap_glow').checked ? 'glow' : 'none', font: $('#cap_font').value, size: +$('#cap_size').value, color: $('#cap_color').value, highlight: $('#cap_highlight').value, uppercase: $('#cap_upper').checked, words_per_line: +$('#cap_wpl').value, position: $('#cap_position').value, y_pct: posTouched ? null : cfg.caption.y_pct, animation: $('#cap_pop').checked ? 'pop' : 'none' },
+      title: { ...cfg.title, enabled: $('#ttl_enabled').checked, preset: ttlPreset, duration: +$('#ttl_duration').value },
+      recipe: recipeId, storage: srcMode === 'link' && $('#storage_lite').checked ? 'lite' : 'full', crop: cfg.crop,
       watermark: { enabled: $('#wm_enabled').checked, text: $('#wm_text').value, image: wmImage, position: wmPos, opacity: +$('#wm_opacity').value / 100, size: cfg.watermark.size },
       emoji: { enabled: $('#emoji_on').checked, size: +$('#emoji_size').value / 100 },
       progress_bar: { enabled: $('#pb_on').checked, color: $('#pb_color').value, position: $('#pb_pos').value, height: cfg.progress_bar.height },
@@ -197,6 +212,7 @@ async function pageNew(override) {
     };
   }
 
+  $('#startTop').onclick = $('#startTop2').onclick = () => $('#start').click();
   $('#start').onclick = async () => {
     let sources = [];
     if (srcMode === 'link') { sources = links(); if (!sources.length || sources.some(s => !/^https?:\/\//i.test(s))) return toast('Tempel link video yang valid (diawali https://), satu per baris', true); }
@@ -212,213 +228,12 @@ async function pageNew(override) {
       for (const source of sources) last = await api('/api/projects', { method: 'POST', body: { source, settings } });
       location.hash = sources.length > 1 ? '#/history' : '#/p/' + last.id;
       if (sources.length > 1) toast(`${sources.length} proyek masuk antrean`);
-    } catch (e) { toast(e.message, true); start.disabled = false; start.classList.remove('is-loading'); start.querySelector('span').textContent = 'Generate Candidates'; }
-  };
-}
-
-/* ================= PROYEK ================= */
-async function pageProject(pid) {
-  view.replaceChildren(tpl('tpl-project'));
-  const cards = new Map();
-  let P = null, prevStatus = null, eta = { t: 0, p: 0 };
-  $('#pFolder').onclick = () => api(`/api/projects/${pid}/open-folder`, { method: 'POST' }).then(r => toast('Folder: ' + r.path)).catch(e => toast(e.message, true));
-  $('#pCancel').onclick = () => api(`/api/projects/${pid}/cancel`, { method: 'POST' }).then(() => toast('Membatalkan…'));
-  $('#pRetry').onclick = () => api(`/api/projects/${pid}/retry`, { method: 'POST' }).then(load);
-  $('#pStyleAll').onclick = () => styleDialog(P, load);
-  $('#pAdd').onclick = () => addClipDialog(P, load);
-  $('#pSplit').onclick = () => splitDialog(P, load);
-  $('#pZip').href = `/api/projects/${pid}/zip`;
-  $('#pManifest').href = `/api/projects/${pid}/candidates/manifest`;
-  $('#pSort').value = store.get('sort', 'score');
-  $('#pSort').onchange = e => { store.set('sort', e.target.value); order(); };
-  $('#pGoal').onchange = order; $('#pSearch').oninput = order;
-  $('#pTop3').onclick = () => api(`/api/projects/${pid}/candidates/top/3`, { method: 'POST' }).then(load).catch(e => toast(e.message, true));
-  $('#pTop5').onclick = () => api(`/api/projects/${pid}/candidates/top/5`, { method: 'POST' }).then(load).catch(e => toast(e.message, true));
-  $('#pRenderSelected').onclick = () => api(`/api/projects/${pid}/batch-render`, { method: 'POST', body: { ids: [] } }).then(load).catch(e => toast(e.message, true));
-  $('#pRerank').onclick = () => api(`/api/projects/${pid}/rerank`, { method: 'POST', body: { settings: {} } }).then(load).catch(e => toast(e.message, true));
-  const order = () => {
-    if (!P) return;
-    const key = $('#pSort').value, goal = $('#pGoal').value, q = $('#pSearch').value.toLowerCase();
-    const goalIds = P.rankings?.[goal] || [];
-    [...(P.candidates || P.clips)].filter(c => !q || `${c.title} ${c.transcript_excerpt || c.text} ${c.topic_cluster}`.toLowerCase().includes(q))
-      .sort((a, b) => key === 'time' ? a.start - b.start : key === 'duration' ? b.duration - a.duration : key === 'cluster' ? String(a.topic_cluster).localeCompare(String(b.topic_cluster)) : goalIds.indexOf(a.id) - goalIds.indexOf(b.id))
-      .forEach(c => cards.get(c.id) && $('#pClips').append(cards.get(c.id).el));
-  };
-
-  async function load() {
-    try { P = await api('/api/projects/' + pid); } catch (e) { view.innerHTML = `<section class="page"><div class="empty">${esc(e.message)}</div></section>`; clearInterval(pollT); return; }
-    $('#pTitle').textContent = P.title; $('#pSource').textContent = P.source.includes('uploads') ? 'File unggahan' : P.source;
-    const st = $('#pStatus'); st.className = 'card status ' + P.status;
-    let etaTxt = '';
-    if (P.status === 'running' && P.progress > 0.02) {
-      const now = Date.now();
-      if (!eta.t) eta = { t: now, p: P.progress };
-      else if (P.progress > eta.p + 0.01) { const rate = (P.progress - eta.p) / (now - eta.t); const left = (1 - P.progress) / rate / 1000; if (isFinite(left)) etaTxt = ` · sisa ±${fmt(left)}`; }
-    }
-    $('#pMsg').textContent = P.message; $('#pPct').textContent = Math.round(P.progress * 100) + '%' + etaTxt; $('#pBar').style.width = P.progress * 100 + '%';
-    $('#pCancel').hidden = !['queued', 'running'].includes(P.status);
-    $('#pRetry').hidden = !['error', 'cancelled'].includes(P.status);
-    const warn = [P.asr_warning, P.llm_warning].filter(Boolean).join(' · ');
-    $('#pWarn').hidden = !warn; $('#pWarn').textContent = warn;
-    $('#pErr').hidden = !P.error; if (P.error) $('#pErr pre').textContent = P.error;
-    P.clips = P.candidates || P.clips || [];
-    $('#pTools').hidden = !P.clips.length;
-    const empty = $('.result-empty', $('#pClips')); if (empty) empty.hidden = !!P.clips.length;
-    $('#pSplit').hidden = P.settings.layout !== 'split' || !P.media;
-    $('#pZip').toggleAttribute('disabled', !P.clips.some(c => c.status === 'done'));
-    if (P.media) $('#pMeta').textContent = `${P.clips.length} klip · sumber ${fmt(P.media.duration)} · ${P.media.width}×${P.media.height}` + (P.language ? ` · bahasa: ${P.language}` : '') + (P.transcript_source ? ` · subtitle: ${({ 'youtube-manual': 'YouTube (manual)', 'youtube-auto': 'YouTube (otomatis)', api: 'API cloud', 'whisper-lokal': 'Whisper lokal' })[P.transcript_source] || P.transcript_source}` : '') + (P.engine ? ` · pemilih: ${P.engine}` : '') + (P.duration_estimate ? ` · durasi ${P.duration_estimate.min}–${P.duration_estimate.max} dtk: ${P.duration_estimate.reason}` : '');
-    const ready = P.viral_readiness ?? (P.clips.length ? Math.round(P.clips.reduce((a, c) => a + (c.readiness || c.score || 0), 0) / P.clips.length) : null);
-    $('#pReadiness').hidden = ready == null; if (ready != null) { $('#pReadyScore').textContent = ready + '/100'; $('#pReadyBreakdown').textContent = ready >= 75 ? 'Siap direview untuk publikasi' : ready >= 55 ? 'Perlu review hook, ending, dan framing' : 'Perlu revisi sebelum publikasi'; }
-    const ids = new Set(P.clips.map(c => c.id));
-    for (const [id, card] of cards) if (!ids.has(id)) { card.el.remove(); cards.delete(id); }
-    let added = false;
-    for (const c of P.clips) { if (!cards.has(c.id)) { const n = clipCard(P, c, load); cards.set(c.id, n); $('#pClips').append(n.el); added = true; } cards.get(c.id).update(P, c); }
-    if (added) order();
-    if (prevStatus && prevStatus !== 'done' && P.status === 'done') notify('ClipperCuan', `${P.title}: ${P.clips.length} klip siap`);
-    prevStatus = P.status;
-    const busy = ['queued', 'running'].includes(P.status) || P.clips.some(c => ['queued', 'rendering'].includes(c.status));
-    clearInterval(pollT); if (busy) pollT = setInterval(load, 1500);
-  }
-  await load();
-}
-
-function clipCard(P0, c0, reload) {
-  const el = tpl('tpl-clip').firstElementChild;
-  const vid = $('video', el);
-  let C = c0, P = P0, ver = null, dirty = false, postDirty = false;
-  ['.c-title', '.c-start', '.c-end'].forEach(s => $(s, el).addEventListener('input', () => dirty = true));
-  $('.c-select', el).onchange = e => api(`/api/projects/${P.id}/candidates/${C.id}/action`, { method: 'POST', body: { action: 'selected', value: e.target.checked } }).then(reload).catch(err => toast(err.message, true));
-  $('.c-pin', el).onclick = () => api(`/api/projects/${P.id}/candidates/${C.id}/action`, { method: 'POST', body: { action: 'pinned', value: !C.pinned } }).then(reload).catch(err => toast(err.message, true));
-  $('.c-ban', el).onclick = () => api(`/api/projects/${P.id}/candidates/${C.id}/action`, { method: 'POST', body: { action: 'banned', value: !C.banned } }).then(reload).catch(err => toast(err.message, true));
-  $('.c-post', el).addEventListener('input', () => postDirty = true);
-  $('.c-ai', el).hidden = !llmOn(); $('.c-postai', el).hidden = !llmOn();
-  $('.c-ai', el).onclick = async () => {
-    const b = $('.c-ai', el); b.disabled = true;
-    try { const r = await api(`/api/projects/${P.id}/clips/${C.id}/ai?kind=titles`, { method: 'POST' }); const box = $('.ai-list', el); box.hidden = false; box.replaceChildren(...r.titles.map(t => { const x = document.createElement('button'); x.type = 'button'; x.textContent = t; x.onclick = () => { $('.c-title', el).value = t; dirty = true; box.hidden = true; }; return x; })); }
-    catch (e) { toast(e.message, true); } finally { b.disabled = false; }
-  };
-  const patch = async (changes, rerender = true) => {
-    try { await api(`/api/projects/${P.id}/clips/${C.id}`, { method: 'PATCH', body: { changes, rerender } }); dirty = false; toast(rerender ? 'Render ulang dimulai' : 'Tersimpan'); reload(); }
-    catch (e) { toast(e.message, true); }
-  };
-  const postText = () => { const p = C.post || {}; return [p.caption, (p.hashtags || []).join(' ')].filter(Boolean).join('\n\n'); };
-  $('.c-copy', el).onclick = async () => { try { await navigator.clipboard.writeText($('.c-post', el).value); toast('Caption disalin'); } catch { $('.c-post', el).select(); document.execCommand('copy'); toast('Caption disalin'); } };
-  $('.c-postsave', el).onclick = () => { const v = $('.c-post', el).value; const tags = v.match(/#[\p{L}\p{N}_]+/gu) || []; const caption = v.replace(/#[\p{L}\p{N}_]+/gu, '').trim(); postDirty = false; patch({ post: { caption, hashtags: tags } }, false); };
-  $('.c-postai', el).onclick = async () => {
-    const b = $('.c-postai', el); b.disabled = true;
-    try { const r = await api(`/api/projects/${P.id}/clips/${C.id}/ai?kind=post`, { method: 'POST' }); $('.c-post', el).value = [r.caption, r.hashtags.join(' ')].join('\n\n'); postDirty = true; }
-    catch (e) { toast(e.message, true); } finally { b.disabled = false; }
-  };
-  $('.c-save', el).onclick = () => {
-    const ch = { title: $('.c-title', el).value };
-    const s = +$('.c-start', el).value, e = +$('.c-end', el).value;
-    if (s !== C.start || e !== C.end) { if (e - s < 1) return toast('Durasi minimal 1 detik', true); ch.start = s; ch.end = e; }
-    patch(ch);
-  };
-  $('.c-del', el).onclick = async () => { if (!confirm(`Hapus ${C.id.replace('clip_', 'klip ')}?`)) return; try { await api(`/api/projects/${P.id}/clips/${C.id}`, { method: 'DELETE' }); toast('Klip dihapus'); reload(); } catch (e) { toast(e.message, true); } };
-  $('.c-layout', el).onchange = e => patch({ overrides: { layout: e.target.value || P.settings.layout } });
-  $('.c-words', el).onclick = () => wordsDialog(C, words => patch({ words }));
-  $('.c-crop', el).onclick = () => cropDialog(P, C, keys => patch({ crop_keys: keys }));
-  return {
-    el,
-    update(p, c) {
-      P = p; C = c;
-      $('.cid', el).textContent = c.title || c.id;
-      $('.c-select', el).checked = !!c.selected; $('.c-pin', el).textContent = c.pinned ? 'Unpin' : 'Pin'; $('.c-ban', el).textContent = c.banned ? 'Unban' : 'Ban';
-      $('.rank', el).textContent = `#${c.rank || '–'}`; $('.profile', el).textContent = c.profile || P.content_profile || 'auto';
-      $('.cluster', el).textContent = c.topic_cluster || 'umum'; $('.overlap', el).textContent = `Overlap ${c.overlap_percentage || 0}%`;
-      el.classList.toggle('selected', !!c.selected); el.classList.toggle('banned', !!c.banned);
-      $('.score', el).textContent = c.score ? '★ ' + c.score : 'manual';
-      $('.ready-score', el).textContent = `Readiness ${c.readiness ?? c.score ?? 0}/100`;
-      $('.confidence', el).textContent = `Confidence ${Math.round((c.confidence ?? .5) * 100)}%`;
-      const warnings = [...(c.warnings || []), ...(c.render_warnings || [])]; $('.clip-warnings', el).hidden = !warnings.length; $('.clip-warnings', el).textContent = warnings.join(' · ');
-      const labels = { hook: 'Hook', novelty: 'Novelty', emotional_shift: 'Emosi', clarity: 'Clarity', payoff: 'Payoff', quotability: 'Quotability', visual_action: 'Visual', information_density: 'Density', clean_ending: 'Ending' };
-      $('.score-grid', el).innerHTML = Object.entries(c.breakdown || {}).filter(([, v]) => typeof v === 'number').map(([k, v]) => `<span><b>${esc(labels[k] || k)}</b><i style="--v:${Math.max(0, Math.min(100, v))}%"></i><em>${v}</em></span>`).join('') || '<span class="muted">Breakdown belum tersedia untuk proyek lama.</span>';
-      $('.dur', el).innerHTML = `${fmt(c.start)}–${fmt(c.end)} · ${Math.round(c.duration || c.end - c.start)} dtk` + (c.cut_saved > 0.3 ? ` <span class="tag-cut">−${c.cut_saved.toFixed(1)} dtk jeda</span>` : '');
-      if (!dirty && document.activeElement?.closest('.clip') !== el) { $('.c-title', el).value = c.title || ''; $('.c-start', el).value = c.start; $('.c-end', el).value = c.end; }
-      if (!postDirty) $('.c-post', el).value = postText();
-      $('.reason', el).textContent = c.reason ? 'Kenapa dipilih: ' + c.reason : '';
-      const busy = ['queued', 'rendering'].includes(c.status);
-      $('.busy', el).hidden = !busy; $('.busy b', el).textContent = c.status === 'queued' ? 'Antre…' : 'Merender…';
-      $('.err', el).hidden = c.status !== 'error'; $('.err', el).textContent = c.error || 'Render gagal';
-      const lay = (c.overrides && c.overrides.layout) || P.settings.layout;
-      $('.c-layout', el).value = c.overrides && c.overrides.layout ? c.overrides.layout : '';
-      $('.c-crop', el).hidden = !['portrait', 'square'].includes(lay);
-      const ok = c.status === 'done' && c.file;
-      ['.c-dl', '.c-srt', '.c-words', '.c-crop'].forEach(s => $(s, el).toggleAttribute('disabled', !ok));
-      if (ok && c.version !== ver) {
-        ver = c.version;
-        const u = `/files/${P.id}/${c.file}?v=${c.version}`, name = (c.title || c.id).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60);
-        vid.src = u; vid.poster = `/files/${P.id}/${c.thumb}?v=${c.version}`;
-        $('.c-dl', el).href = u; $('.c-dl', el).download = name + '.mp4';
-        $('.c-srt', el).href = `/files/${P.id}/${c.srt || c.id + '.srt'}?v=${c.version}`; $('.c-srt', el).download = name + '.srt';
-      }
-    },
+    } catch (e) { toast(e.message, true); start.disabled = false; start.classList.remove('is-loading'); start.querySelector('span').textContent = '▶ Run pipeline'; }
   };
 }
 
 /* ---------------- dialog umum ---------------- */
 function openDlg(build) { const d = $('#dlg'), b = $('#dlgBody'); b.replaceChildren(); build(b, () => d.close()); d.showModal(); }
-
-/* edit kata caption + gaya per kata */
-function wordsDialog(C, onSave) {
-  const words = (C.words || []).map(w => ({ ...w, style: { ...(w.style || {}) } }));
-  openDlg((b, close) => {
-    b.innerHTML = `<h2>Edit caption</h2><p class="muted">Ketik untuk memperbaiki ejaan (kosongkan = hapus kata). Klik kata lalu tekan <kbd>Alt</kbd>+klik / <kbd>Ctrl</kbd>+klik untuk memilih beberapa, lalu beri warna atau ukuran khusus.</p>
-      <div class="wtools"><span class="muted" id="wSel">0 kata dipilih</span>
-        <input type="color" id="wCol" value="#3ddc97" title="Warna kata"><button class="btn ghost sm" id="wApplyCol">Beri warna</button>
-        <label class="inline" style="margin:0">Ukuran <input type="range" id="wSc" min="80" max="180" value="130" style="width:120px"></label><button class="btn ghost sm" id="wApplySc">Beri ukuran</button>
-        <button class="btn ghost sm" id="wClear">Hapus gaya</button></div>
-      <div class="words"></div><div class="acts"><button class="btn" id="wSave">Simpan &amp; render</button></div>`;
-    const box = $('.words', b), sel = new Set();
-    const paint = (i, inp) => { const st = words[i].style; inp.style.color = st.color || ''; inp.style.fontWeight = st.scale > 1.05 ? 800 : ''; inp.classList.toggle('sel', sel.has(i)); };
-    words.forEach((w, i) => {
-      const inp = document.createElement('input'); inp.value = w.w; inp.title = `${w.s.toFixed(2)}–${w.e.toFixed(2)} dtk`;
-      inp.oninput = () => words[i].w = inp.value.trim();
-      inp.onclick = e => { if (!(e.altKey || e.ctrlKey || e.metaKey)) sel.clear(); sel.has(i) && (e.altKey || e.ctrlKey || e.metaKey) ? sel.delete(i) : sel.add(i); $$('input', box).forEach((x, j) => paint(j, x)); $('#wSel', b).textContent = `${sel.size} kata dipilih`; };
-      paint(i, inp); box.append(inp);
-    });
-    if (!words.length) box.innerHTML = '<p class="muted">Klip ini tidak punya kata terdeteksi.</p>';
-    const apply = patch => { if (!sel.size) return toast('Pilih kata dulu', true); sel.forEach(i => Object.assign(words[i].style, patch)); $$('input', box).forEach((x, j) => paint(j, x)); };
-    $('#wApplyCol', b).onclick = () => apply({ color: $('#wCol', b).value });
-    $('#wApplySc', b).onclick = () => apply({ scale: +$('#wSc', b).value / 100 });
-    $('#wClear', b).onclick = () => { sel.forEach(i => words[i].style = {}); $$('input', box).forEach((x, j) => paint(j, x)); };
-    $('#wSave', b).onclick = () => { onSave(words.filter(w => w.w).map(w => (Object.keys(w.style).length ? w : (({ style, ...r }) => r)(w)))); close(); };
-  });
-}
-
-/* smart crop keyframe */
-function cropDialog(P, C, onSave) {
-  const m = P.media, lay = (C.overrides && C.overrides.layout) || P.settings.layout;
-  const wFrac = Math.min(m.height * (lay === 'square' ? 1 : 9 / 16) / m.width, 1);
-  const dur = C.end - C.start;
-  let keys = (C.crop_keys && C.crop_keys.length ? C.crop_keys : [[0, 0.5]]).map(k => [...k]);
-  let t = 0;
-  openDlg((b, close) => {
-    b.innerHTML = `<h2>Atur crop &amp; keyframe</h2><p class="muted">Geser kotak kuning untuk memilih area. Klik timeline untuk pindah waktu, lalu "Simpan keyframe". Klik kanan keyframe untuk menghapus. Tombol panah <kbd>←</kbd><kbd>→</kbd> menggeser kotak.</p>
-      <div class="crop-wrap"><img alt="Frame video"><div class="crop-box" tabindex="0"></div></div>
-      <div class="tl"><div class="ph"></div></div><div class="muted" id="cT"></div>
-      <div class="acts" style="margin-top:12px"><button class="btn ghost" id="kAdd">◆ Simpan keyframe di sini</button><button class="btn ghost" id="kAuto">Auto (ikuti wajah)</button><button class="btn ghost" id="kCenter">Reset ke tengah</button><button class="btn" id="kSave">Simpan &amp; render</button></div>`;
-    const img = $('img', b), box = $('.crop-box', b), wrap = $('.crop-wrap', b), tl = $('.tl', b);
-    box.style.width = wFrac * 100 + '%';
-    const interp = tt => { const s = [...keys].sort((a, b) => a[0] - b[0]); if (tt <= s[0][0]) return s[0][1]; for (let i = 0; i < s.length - 1; i++) if (tt <= s[i + 1][0]) { const k = (tt - s[i][0]) / ((s[i + 1][0] - s[i][0]) || 1); return s[i][1] + (s[i + 1][1] - s[i][1]) * k; } return s.at(-1)[1]; };
-    let cx = interp(0);
-    const place = () => { cx = Math.max(wFrac / 2, Math.min(1 - wFrac / 2, cx)); box.style.left = (cx - wFrac / 2) * 100 + '%'; };
-    const draw = () => { $$('.kf', tl).forEach(n => n.remove()); keys.forEach((k, i) => { const d = document.createElement('button'); d.type = 'button'; d.className = 'kf' + (Math.abs(k[0] - t) < .3 ? ' cur' : ''); d.style.left = (k[0] / dur * 100) + '%'; d.title = `${k[0].toFixed(1)} dtk`; d.onclick = e => { e.stopPropagation(); seek(k[0]); }; d.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); if (keys.length > 1) { keys.splice(i, 1); draw(); } }; tl.append(d); }); $('.ph', tl).style.left = (t / dur * 100) + '%'; $('#cT', b).textContent = `Waktu: ${t.toFixed(1)} / ${dur.toFixed(1)} dtk · ${keys.length} keyframe`; };
-    const seek = tt => { t = Math.max(0, Math.min(dur, Math.round(tt * 2) / 2)); img.src = `/api/projects/${P.id}/frame?t=${(C.start + t).toFixed(1)}`; cx = interp(t); place(); draw(); };
-    tl.onclick = e => { const r = tl.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * dur); };
-    let drag = null;
-    box.onpointerdown = e => { box.setPointerCapture(e.pointerId); drag = { x: e.clientX, cx }; };
-    box.onpointermove = e => { if (!drag) return; cx = drag.cx + (e.clientX - drag.x) / wrap.clientWidth; place(); };
-    box.onpointerup = () => drag = null;
-    box.onkeydown = e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { cx += (e.key === 'ArrowLeft' ? -0.01 : 0.01); place(); e.preventDefault(); } };
-    $('#kAdd', b).onclick = () => { const ex = keys.find(k => Math.abs(k[0] - t) < .3); if (ex) ex[1] = cx; else keys.push([t, cx]); keys.sort((a, b) => a[0] - b[0]); draw(); toast('Keyframe disimpan'); };
-    $('#kCenter', b).onclick = () => { keys = [[0, 0.5]]; seek(t); };
-    $('#kAuto', b).onclick = () => { onSave(null); close(); };
-    $('#kSave', b).onclick = () => { onSave(keys.map(k => [+k[0].toFixed(2), +k[1].toFixed(4)])); close(); };
-    seek(0);
-  });
-}
 
 /* editor area split gaming (facecam + gameplay) */
 function splitDialog(P, reload) {
@@ -463,7 +278,8 @@ function addClipDialog(P, reload) {
       <label>Judul (opsional)<input class="in" id="aT" maxlength="80"></label></div>
       <div class="acts"><button class="btn" id="aGo">Buat klip</button></div>`;
     const v = $('video', b);
-    v.src = `/api/projects/${P.id}/source`;
+    if (P.media?.remote) { v.replaceWith(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Mode hemat disk: video penuh tidak disimpan, jadi isi waktu mulai/selesai secara manual (lihat waktu di YouTube).' })); }
+    else v.src = `/api/projects/${P.id}/source`;
     const parse = s => { s = String(s).trim(); if (!s) return NaN; const p = s.split(':').map(Number); return p.reduce((a, x) => a * 60 + x, 0); };
     $('#aSn', b).onclick = () => $('#aS', b).value = v.currentTime.toFixed(1);
     $('#aEn', b).onclick = () => $('#aE', b).value = v.currentTime.toFixed(1);
@@ -471,38 +287,6 @@ function addClipDialog(P, reload) {
       const s = parse($('#aS', b).value), e = parse($('#aE', b).value);
       if (!(e > s)) return toast('Waktu selesai harus lebih besar dari mulai', true);
       try { await api(`/api/projects/${P.id}/clips`, { method: 'POST', body: { start: s, end: e, title: $('#aT', b).value } }); close(); toast('Klip manual dibuat'); reload(); } catch (err) { toast(err.message, true); }
-    };
-  });
-}
-
-/* gaya semua klip */
-function styleDialog(P, reload) {
-  const s = P.settings;
-  openDlg((b, close) => {
-    b.innerHTML = `<h2>Ubah gaya semua klip</h2><p class="muted">Semua klip dirender ulang dengan gaya ini. Judul &amp; potongan yang sudah kamu edit tetap dipertahankan.</p>
-      <div class="row2"><label>Format<select class="in" id="sLay"><option value="portrait">Portrait</option><option value="square">Square</option><option value="blur">Blur</option><option value="split">Split gaming</option><option value="landscape">Landscape</option></select></label>
-      <label>Gaya caption<select class="in" id="sCap"><option value="box">Box highlight</option><option value="wbw">Word by word</option><option value="karaoke">Karaoke</option><option value="clean">Clean</option></select></label></div>
-      <div class="row2"><label>Font<select class="in" id="sFont">${INFO.fonts.map(f => `<option>${esc(f)}</option>`).join('')}</select></label>
-      <label>Preset judul<select class="in" id="sTtl"><option value="bar">Bar</option><option value="outline">Outline</option><option value="neon">Neon</option><option value="clean">Clean</option></select></label></div>
-      <div class="row3"><label>Warna teks<input type="color" class="in color" id="sCol"></label><label>Warna sorotan<input type="color" class="in color" id="sHl"></label><label>Ukuran<input type="number" class="in" id="sSize" min="40" max="140"></label></div>
-      <label class="check"><input type="checkbox" id="sCapOn"> Tampilkan caption</label><label class="check"><input type="checkbox" id="sTtlOn"> Tampilkan judul</label>
-      <label class="check"><input type="checkbox" id="sCut"> Potong jeda hening</label>
-      <label class="check"><input type="checkbox" id="sEmo"> Emoji otomatis</label><label class="check"><input type="checkbox" id="sPb"> Progress bar</label>
-      <label class="check"><input type="checkbox" id="sCta"> Ajakan di akhir: <input class="in" id="sCtaT" style="max-width:260px"></label>
-      <label class="check"><input type="checkbox" id="sMu"> Musik latar (${esc((s.music.file || '').split(/[\\/]/).pop() || 'pilih di Proyek baru')})</label>
-      <label class="check"><input type="checkbox" id="sWmOn"> Watermark teks: <input class="in" id="sWm" style="max-width:220px"></label>
-      <div class="acts"><button class="btn" id="sGo">Render ulang semua</button></div>`;
-    $('#sLay', b).value = s.layout; $('#sCap', b).value = s.caption.style; $('#sFont', b).value = s.caption.font; $('#sTtl', b).value = s.title.preset;
-    $('#sCol', b).value = s.caption.color; $('#sHl', b).value = s.caption.highlight; $('#sSize', b).value = s.caption.size;
-    $('#sCapOn', b).checked = s.caption.enabled; $('#sTtlOn', b).checked = s.title.enabled; $('#sCut', b).checked = !!s.cut_silence;
-    $('#sEmo', b).checked = !!s.emoji?.enabled; $('#sPb', b).checked = !!s.progress_bar?.enabled; $('#sCta', b).checked = !!s.cta?.enabled; $('#sCtaT', b).value = s.cta?.text || '';
-    $('#sMu', b).checked = !!s.music?.enabled; $('#sMu', b).disabled = !s.music?.file; $('#sWmOn', b).checked = s.watermark.enabled; $('#sWm', b).value = s.watermark.text;
-    $('#sGo', b).onclick = async () => {
-      const ns = { cut_silence: $('#sCut', b).checked, emoji: { enabled: $('#sEmo', b).checked }, progress_bar: { enabled: $('#sPb', b).checked },
-        cta: { enabled: $('#sCta', b).checked, text: $('#sCtaT', b).value }, music: { enabled: $('#sMu', b).checked && !!s.music?.file }, caption: { style: $('#sCap', b).value, font: $('#sFont', b).value, color: $('#sCol', b).value, highlight: $('#sHl', b).value, size: +$('#sSize', b).value, enabled: $('#sCapOn', b).checked },
-        title: { preset: $('#sTtl', b).value, enabled: $('#sTtlOn', b).checked }, watermark: { enabled: $('#sWmOn', b).checked, text: $('#sWm', b).value } };
-      if ($('#sLay', b).value !== s.layout) ns.layout = $('#sLay', b).value;
-      try { await api(`/api/projects/${P.id}/rerender`, { method: 'POST', body: { settings: ns } }); close(); toast('Render ulang semua klip…'); reload(); } catch (e) { toast(e.message, true); }
     };
   });
 }
@@ -537,11 +321,30 @@ async function loadCaptionWorkspace(pid) {
 
 /* ================= RIWAYAT ================= */
 async function pageHistory() {
-  view.innerHTML = '<section class="page"><header class="page-h proj-h"><div><h1>Riwayat</h1><p>Semua proyek yang pernah kamu buat.</p></div><input class="in" id="hq" placeholder="Cari judul…" style="max-width:260px"></header><div class="hist" id="hl"></div></section>';
+  view.innerHTML = '<section class="page"><header class="page-h proj-h"><div><h1>Riwayat</h1><p>Semua proyek dan semua klip hasil render, dalam satu galeri.</p></div><div class="acts"><div class="seg" id="hTab"><button data-v="p" class="on">Proyek</button><button data-v="c">Galeri klip</button></div><input class="in" id="hq" placeholder="Cari judul…" style="max-width:260px"></div></header><div class="hist" id="hl"></div></section>';
   let list = await api('/api/projects');
   const hl = $('#hl');
-  const label = { done: 'selesai', running: 'diproses', queued: 'antre', error: 'gagal', cancelled: 'dibatalkan' };
+  const label = { done: 'selesai', running: 'diproses', queued: 'antre', error: 'gagal', cancelled: 'dibatalkan', candidates_ready: 'kandidat siap', rendering: 'render' };
+  let tab = 'p', clips = null;
+  const drawClips = async () => {
+    clips = clips || await api('/api/clips').catch(() => []);
+    const q = $('#hq').value.toLowerCase(), items = clips.filter(c => `${c.title} ${c.project_title}`.toLowerCase().includes(q));
+    hl.className = 'gal';
+    if (!items.length) { hl.innerHTML = '<div class="empty">Belum ada klip yang dirender.</div>'; return; }
+    hl.replaceChildren(...items.map(c => {
+      const a = document.createElement('a'); a.className = 'gcard'; a.href = '#/p/' + c.project_id;
+      a.innerHTML = `<video muted loop playsinline preload="none"></video><span class="sc">${Math.round((c.score || 0) / 10)}/10</span><span class="du">${fmt(c.duration)}</span><b></b><small></small>`;
+      const v = $('video', a); v.poster = `/files/${c.project_id}/${c.thumb}?v=${c.version}`;
+      a.onmouseenter = () => { if (!v.src) v.src = `/files/${c.project_id}/${c.file}?v=${c.version}`; v.play().catch(() => {}); };
+      a.onmouseleave = () => v.pause();
+      $('b', a).textContent = c.title || c.id; $('small', a).textContent = c.project_title || '';
+      return a;
+    }));
+  };
+  chipGroup($('#hTab'), tab, v => { tab = v; draw(); });
   const draw = () => {
+    if (tab === 'c') return drawClips();
+    hl.className = 'hist';
     const q = $('#hq').value.toLowerCase();
     const items = list.filter(p => (p.title || '').toLowerCase().includes(q));
     if (!items.length) { hl.innerHTML = '<div class="empty">Belum ada proyek. <a href="#/new" style="color:var(--acc)">Buat proyek baru →</a></div>'; return; }
@@ -661,9 +464,14 @@ async function pageSettings() {
       <p class="hint">Subtitle dibuat di server cloud, bukan di laptop — cocok untuk laptop pas-pasan. Format OpenAI <code>/audio/transcriptions</code>: Groq (gratis/murah, sangat cepat), OpenAI, atau 9router bila mendukung audio.</p>
       <div class="row3"><label>Base URL<input class="in" id="aUrl" placeholder="https://api.groq.com/openai/v1"></label><label>API key<input class="in" id="aKey" type="password" placeholder="gsk_…"></label><label>Model<input class="in" id="aModel" placeholder="whisper-large-v3"></label></div>
       <div class="acts"><button class="btn ghost" id="aTest">Tes koneksi</button><button class="btn" id="aSaveAsr">Simpan</button><span class="muted" id="aMsg"></span></div></div>
+    <div class="card"><h3>Unduhan video</h3>
+      <p class="hint">Jika YouTube meminta verifikasi ("Sign in to confirm you're not a bot"), pilih browser di laptop ini yang sudah login YouTube. Cookies dibaca langsung oleh yt-dlp, tidak disimpan di aplikasi.</p>
+      <div class="inrow"><select class="in" id="dCk"><option value="">Tidak memakai cookies</option><option value="chrome">Chrome</option><option value="edge">Edge</option><option value="firefox">Firefox</option><option value="brave">Brave</option><option value="safari">Safari</option><option value="opera">Opera</option></select><button class="btn" id="dSave">Simpan</button></div></div>
     <div class="card"><h3>Default proyek</h3><p class="muted">Pengaturan proyek terakhir otomatis dipakai lagi. <button class="btn ghost sm" id="rst">Kembalikan ke bawaan</button></p></div>
     <div class="card"><h3>Info</h3><p class="muted">Versi ${esc(INFO.version)}<br>Folder data &amp; hasil: <b>${esc(INFO.data_dir)}</b></p></div></section>`;
   $('#lOn').checked = L.enabled; $('#lUrl').value = L.base_url; $('#lKey').value = L.api_key; $('#lM1').value = L.model_moments; $('#lM2').value = L.model_titles; $('#lTemp').value = Math.round(L.temperature * 100);
+  $('#dCk').value = SETTINGS.download?.cookies_browser || '';
+  $('#dSave').onclick = async () => { SETTINGS = await api('/api/settings', { method: 'POST', body: { settings: { download: { cookies_browser: $('#dCk').value } } } }); toast('Pengaturan unduhan disimpan'); };
   const A = SETTINGS.asr;
   $('#aUrl').value = A.base_url; $('#aKey').value = A.api_key; $('#aModel').value = A.model;
   const asrForm = () => ({ asr: { base_url: $('#aUrl').value.trim(), api_key: $('#aKey').value, model: $('#aModel').value.trim() } });
@@ -683,4 +491,4 @@ async function pageSettings() {
   };
 }
 
-route().catch(e => { view.innerHTML = `<section class="page"><div class="empty">Gagal memuat: ${esc(e.message)}</div></section>`; });
+addEventListener('DOMContentLoaded', () => route().catch(e => { view.innerHTML = `<section class="page"><div class="empty">Gagal memuat: ${esc(e.message)}</div></section>`; }));

@@ -38,15 +38,25 @@ def cli(args) -> None:
     from . import automation, project
 
     settings: dict = {}
+    if args.recipe:
+        from .recipes import RECIPES
+
+        if args.recipe not in RECIPES:
+            sys.exit(f"Resep '{args.recipe}' tidak ada. Tersedia: {', '.join(RECIPES)}")
+        settings["recipe"] = args.recipe
     if args.template:
         tpl = project.list_templates()
         if args.template not in tpl:
             sys.exit(f"Template '{args.template}' tidak ada. Tersedia: {', '.join(tpl) or '(kosong)'}")
         settings.update(tpl[args.template])
-    settings.update({"auto_render": True, "clip_count": args.clips, "layout": args.layout, "language": args.lang, "model": args.model,
-                     "min_sec": args.min, "max_sec": args.max})
+    given = {"layout": args.layout, "language": args.lang, "model": args.model, "min_sec": args.min, "max_sec": args.max}
+    settings.update({"auto_render": True, "clip_count": args.clips, **{k: v for k, v in given.items() if v is not None}})
+    if args.min is not None or args.max is not None:
+        settings["duration_preset"] = "custom"
     if args.caption:
         settings.setdefault("caption", {})["style"] = args.caption
+    if args.lite:
+        settings["storage"] = "lite"
     if args.cut_silence:
         settings["cut_silence"] = True
     if args.subtitle:
@@ -103,13 +113,15 @@ def main() -> None:
     c = sub.add_parser("cli", help="proses tanpa UI")
     c.add_argument("source", help="link video atau path file")
     c.add_argument("--clips", type=int, default=6)
-    c.add_argument("--layout", default="portrait", choices=["portrait", "square", "blur", "split", "landscape"])
-    c.add_argument("--lang", default="auto")
-    c.add_argument("--model", default="small")
+    c.add_argument("--layout", default=None, choices=["portrait", "square", "blur", "split", "landscape"])
+    c.add_argument("--lang", default=None)
+    c.add_argument("--model", default=None)
     c.add_argument("--caption", choices=["box", "wbw", "karaoke", "clean"])
-    c.add_argument("--min", type=float, default=20)
-    c.add_argument("--max", type=float, default=60)
+    c.add_argument("--min", type=float, default=None)
+    c.add_argument("--max", type=float, default=None)
     c.add_argument("--template", help="nama template gaya yang tersimpan")
+    c.add_argument("--recipe", help="resep gaya viral, mis. podcast-box, podcast-hormozi, ml-hype (lihat /api/recipes)")
+    c.add_argument("--lite", action="store_true", help="hemat disk: link tidak diunduh penuh, hanya audio + potongan klip")
     c.add_argument("--cut-silence", action="store_true", help="potong jeda hening")
     c.add_argument("--subtitle", choices=["auto", "youtube", "api", "local"], help="sumber subtitle (bawaan: auto)")
     c.add_argument("--emoji", action="store_true", help="emoji otomatis")

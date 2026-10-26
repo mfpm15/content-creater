@@ -100,3 +100,77 @@ def test_pipeline_renders_and_finishes(monkeypatch):
     p = project.load(p["id"])
     again = next(c for c in p["clips"] if c["id"] == rendered[0]["id"])
     assert again["status"] == "done" and again["file"] == rendered[0]["file"]
+
+
+def _wait_done(pid: str, limit: float = 240) -> dict:
+    end = time.time() + limit
+    while time.time() < end:
+        p = project.load(pid)
+        if p["status"] in ("done", "error", "cancelled"):
+            return p
+        time.sleep(.5)
+    return project.load(pid)
+
+
+@pytest.mark.skipif(not (shutil.which(FFMPEG) or Path(FFMPEG).exists()), reason="ffmpeg tidak tersedia")
+def test_lite_mode_never_stores_full_video(monkeypatch):
+    from clipper import download
+
+    tmp = Path(tempfile.mkdtemp())
+    v, a = tmp / "v.mp4", tmp / "a.m4a"   # stream terpisah seperti DASH YouTube
+    subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=24:d=70",
+                    "-an", "-c:v", "libx264", str(v)], check=True)
+    subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=f=300:d=70", "-c:a", "aac", str(a)], check=True)
+    meta = {"title": "Video online", "duration": 70.0, "width": 640, "height": 360, "fps": 24.0,
+            "video": {"url": str(v), "headers": {}}, "audio": {"url": str(a), "headers": {}}}
+    monkeypatch.setattr(download, "resolve_streams", lambda *a, **k: meta)
+    monkeypatch.setattr(transcribe, "transcribe", lambda *a, **k: fake_transcript())
+    project.start_worker()
+    p = project.create("https://example.com/watch?v=1", {"storage": "lite", "clip_count": 1, "candidate_count": 3, "min_sec": 8,
+                                                          "max_sec": 15, "duration_preset": "custom", "auto_render": True,
+                                                          "smart_crop": False, "transcriber": "local"})
+    p = _wait_done(p["id"])
+    assert p["status"] == "done", (p["message"], p.get("error"), [c.get("error") for c in p["clips"]])
+    assert p["media"]["remote"] and p["media"]["file"] is None
+    files = {f.name for f in project.pdir(p["id"]).iterdir()}
+    assert not any(n.startswith("source.") or n.endswith(".src.mp4") or n == "audio-source.m4a" for n in files), files
+    done = [c for c in p["clips"] if c["status"] == "done"]
+    assert done and (project.pdir(p["id"]) / done[0]["file"]).stat().st_size > 5000
+
+
+def test_recipe_is_base_and_user_settings_win():
+    s = project._with_recipe({"recipe": "podcast-hormozi", "caption": {"highlight": "#00FF00"}})
+    assert s["caption"]["style"] == "keyword" and s["caption"]["words_per_line"] == 2
+    assert s["caption"]["highlight"] == "#00FF00"
+
+
+def test_caption_styles_box_toggle_keyword_glow_and_duo_title():
+    from clipper import captions
+    from clipper.config import DEFAULTS, deep_merge
+
+    words = [{"w": w, "s": i * .4, "e": i * .4 + .35} for i, w in enumerate("kenapa bisnis bisa bangkrut".split())]
+    cfg = deep_merge(DEFAULTS, {"caption": {"style": "keyword", "box": True, "effect": "glow", "y_pct": 60, "highlight": "#FFC933"},
+                                "title": {"preset": "duo"}})
+    ass = captions.build_ass(words, "Kenapa bisnis bangkrut? Ini sebabnya", cfg, (1080, 1920), 3)
+    assert "CapBox" in ass and r"\blur" in ass and r"\pos(540,1152)" in ass
+    assert r"\fnInstrument Serif" in ass                    # kata kunci memakai font aksen
+    assert "&H00000000&" in ass                              # teks gelap di atas kotak kuning terang
+    assert "Ini sebabnya" in ass and "Kenapa bisnis bangkrut?" in ass
+
+
+def test_studio_endpoints_recipes_settings_words_clips():
+    from fastapi.testclient import TestClient
+
+    from clipper.server import app
+
+    with TestClient(app) as c:
+        r = c.get("/api/recipes").json()
+        assert {"podcast-box", "podcast-hormozi", "ml-hype", "clipping-campaign"} <= set(r["recipes"])
+        assert c.get("/fonts/BarlowCondensed-ExtraBold.ttf").status_code == 200
+        assert c.get("/api/projects", headers={"host": "evil.example"}).status_code == 403
+        p = project.create("/nonexistent.mp4", {})          # proyek kosong cukup untuk uji endpoint pengaturan
+        project.cancel(p["id"])
+        out = c.post(f"/api/projects/{p['id']}/settings", json={"settings": {"caption": {"style": "keyword"}}}).json()
+        assert out["settings"]["caption"]["style"] == "keyword" and out["settings"]["caption"]["font"]
+        assert c.get(f"/api/projects/{p['id']}/words?start=0&end=5").json() == {"words": []}
+        assert isinstance(c.get("/api/clips").json(), list)

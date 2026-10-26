@@ -32,3 +32,37 @@ Hasil: 42 tes lulus (6 baru, termasuk uji render end-to-end dengan FFmpeg).
 4. `build-desktop` perlu dicoba nyata di Windows/macOS (belum bisa dijalankan dari sini); `creator-dashboard/tools.json` memakai perintah `cmd` khusus Windows.
 5. Validasi nilai `settings` (layout/posisi tidak valid masih menyebabkan KeyError saat render).
 6. Ruff gaya (B904, B905, S-rules) masih banyak; tidak mengubah perilaku, sengaja tidak disentuh.
+
+---
+
+# Bagian 2 — Penyempurnaan studio, gaya viral, hemat disk (26 Oktober 2026)
+
+## Bug baru yang ditemukan & diperbaiki
+| Tingkat | Temuan | Perbaikan |
+|---|---|---|
+| **Kritis** | Halaman proyek crash total (`Cannot access 'order' before initialization`) — kandidat & hasil klip tidak bisa dibuka dari UI | Halaman proyek ditulis ulang sebagai Studio (`web/studio.js`) |
+| Sedang | Tombol Pin/Ban ganda di tiap kartu klip | Hilang bersama kartu lama |
+| Sedang | Kode bahasa Jawa `jv` tidak dikenal Whisper | `jw` |
+| Sedang | File lokal disalin penuh ke folder proyek (disk ×2) | File pengguna direferensikan langsung; unggahan dipindah |
+| Kecil | Bilah "Generate" melayang menutupi konten; label status `candidates_ready`/`rendering` tidak ada di Riwayat | Diperbaiki |
+
+## Yang ditambahkan
+- **Studio** setara alur referensi: preview 9:16 dengan caption/judul/watermark/progress tampil langsung (font yang sama dengan render), panel Instant style / Clip setting / Branding, filmstrip *Detected clips*, bilah render. Satu layar penuh di desktop, rapi di HP (tanpa scroll horizontal).
+- **Resep gaya viral** (`clipper/recipes.py`, `/api/recipes`, `--recipe`, MCP `recipe`/`list_recipes`).
+- **Caption**: gaya Subtract & font (kata kunci font aksen), Box highlight sebagai toggle, efek Glow, posisi vertikal bebas, teks otomatis gelap di atas box terang, font per kata. **Judul Duo** dua baris bercahaya. Font OFL baru: Barlow Condensed, Instrument Serif, Pinyon Script.
+- **Crop studio**: keyframe menahan framing (tanpa drifting), zoom/resize crop, posisi vertikal, 9:16/1:1, live output, Apply to all.
+- **Hemat disk** (`storage: lite`): audio saja untuk transkripsi; potongan klip diunduh presisi saat render lalu dihapus. Diuji dengan stream terpisah video/audio (seperti DASH YouTube).
+- **Sinyal visual**: selisih antar-keyframe (±25 dtk untuk video 1 jam) mengisi dimensi "visual activity" — penting untuk profil Mobile Legends.
+- **Cookies browser** untuk YouTube yang meminta verifikasi; pesan error mengarahkan ke pengaturan ini.
+
+## Verifikasi
+- 46 tes otomatis lulus (termasuk mode hemat end-to-end, endpoint studio, gaya caption, resep).
+- Alur UI nyata dengan Playwright: unggah → resep Hormozi → Run pipeline → Pilih top 3 → Render → selesai, tanpa error JS; sapuan semua halaman tanpa error.
+- **Belum bisa diuji dari lingkungan ini**: unduhan YouTube sungguhan (IP data center diblokir YouTube), model Whisper asli, paket Windows/macOS.
+
+## Catatan riset gaya viral
+Pola yang diterapkan berasal dari observasi produk referensi dan panduan kreator: caption huruf campuran dengan box per kata,
+kata kunci berfont aksen, judul hook dua baris, 2–3 kata per layar untuk tempo cepat; hindari efek usang seperti shake per kata.
+Angka peningkatan retensi dari blog vendor (mis. "+40–80%") tidak terverifikasi independen — gunakan A/B di akun sendiri.
+Untuk campaign clipping: aturan (watermark, hashtag, disclosure, larangan repost) berbeda per brief, jadi resep Campaign hanya titik awal.
+Sumber: https://socialvisuals.pro/ · https://captions.ai/help/guides/engagement/caption-styles-by-platform · https://blitzcutai.com/blog/tiktok-caption-trends-2026 · https://openclip.app/guides/whop-clipping-guide

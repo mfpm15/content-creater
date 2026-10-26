@@ -85,7 +85,7 @@ def _clean_end(segs: list[dict], words: list[dict], j: int, punctuated: bool) ->
 
 
 def _candidate_breakdown(first: str, full: str, last: str, pace: float, energy_s: float, conf: float,
-                         clean_end: bool | None = None) -> dict:
+                         clean_end: bool | None = None, visual_s: float | None = None) -> dict:
     toks = _tokens(full)
     hook = round(_hook_score(first) * 100)
     novelty = min(100, round(len(set(toks)) / max(len(toks), 1) * 150))
@@ -93,7 +93,7 @@ def _candidate_breakdown(first: str, full: str, last: str, pace: float, energy_s
     clarity = max(0, 100 - (25 if re.match(r"^(dan|tapi|jadi|terus|ini|itu)\b", first.strip(), re.I) else 0))
     payoff = 100 if (_ends_sentence(last) if clean_end is None else clean_end) else 25
     quotability = min(100, round(_hook_score(full) * 70 + (20 if len(toks) <= 35 else 0)))
-    visual = min(100, round(energy_s * 75 + 15))
+    visual = min(100, round(energy_s * 75 + 15) if visual_s is None else round(100 * (0.7 * visual_s + 0.3 * energy_s)))
     density = max(0, min(100, round(100 - abs(pace - 2.5) * 28)))
     ending = payoff
     penalties = {
@@ -120,7 +120,8 @@ def readiness(breakdown: dict) -> tuple[int, list[str]]:
     return max(0, min(100, round(score))), warnings
 
 
-def score_candidates(tr: dict, energy: np.ndarray, min_sec: float = 20, max_sec: float = 60, hop: float = 0.5) -> list[dict]:
+def score_candidates(tr: dict, energy: np.ndarray, min_sec: float = 20, max_sec: float = 60, hop: float = 0.5,
+                     visual: np.ndarray | None = None) -> list[dict]:
     """Semua jendela kandidat (dari batas kalimat) beserta skor lokal, urut terbaik."""
     segs, words = tr["segments"], tr["words"]
     punctuated = _is_punctuated(segs)
@@ -143,10 +144,14 @@ def score_candidates(tr: dict, energy: np.ndarray, min_sec: float = 20, max_sec:
             if en.size == 0:
                 en = np.zeros(1)
             energy_s = float(en.mean() * 0.6 + np.percentile(en, 90) * 0.4)
+            visual_s = None
+            if visual is not None and visual.size:
+                vw = visual[e0:e1]
+                visual_s = float(vw.mean() * 0.5 + np.percentile(vw, 90) * 0.5) if vw.size else None
             conf = float(np.mean([words[k]["p"] for k in range(first["words"][0], segs[j]["words"][-1] + 1)]))
             ideal = 1 - min(abs(length - (min_sec + max_sec) / 2) / max_sec, 1) * 0.3
             breakdown = _candidate_breakdown(first["text"], full, segs[j]["text"], pace, energy_s, conf,
-                                             _clean_end(segs, words, j, punctuated))
+                                             _clean_end(segs, words, j, punctuated), visual_s)
             ready, warnings = readiness(breakdown)
             score = ready / 100 * ideal
             cands.append({"s": start, "e": end, "seg0": i, "seg1": j, "score": score, "text": full,
@@ -238,10 +243,10 @@ def to_moment(c: dict, segs: list[dict], duration: float, score: int, title: str
 
 
 def find_moments(tr: dict, energy: np.ndarray, duration: float, count: int = 6,
-                 min_sec: float = 20, max_sec: float = 60, hop: float = 0.5) -> list[dict]:
+                 min_sec: float = 20, max_sec: float = 60, hop: float = 0.5, visual: np.ndarray | None = None) -> list[dict]:
     if not tr["segments"]:
         return _fallback(duration, count, min_sec, max_sec)
-    chosen = non_overlapping(score_candidates(tr, energy, min_sec, max_sec, hop), count)
+    chosen = non_overlapping(score_candidates(tr, energy, min_sec, max_sec, hop, visual), count)
     top = max(c["score"] for c in chosen) or 1
     out = [to_moment(c, tr["segments"], duration, round(60 + 39 * c["score"] / top)) for c in chosen]
     out.sort(key=lambda m: m["score"], reverse=True)

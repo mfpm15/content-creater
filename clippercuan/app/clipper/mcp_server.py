@@ -92,8 +92,9 @@ def _wait(pid: str, timeout_sec: int) -> dict:
 
 # ------------------------------------------------------------------ tools
 @mcp.tool()
-def create_clips(source: str, clip_count: int = 6, layout: str = "portrait", template: str = "",
-                 language: str = "auto", min_sec: int = 20, max_sec: int = 60, caption_style: str = "",
+def create_clips(source: str, clip_count: int = 6, layout: str = "", template: str = "", recipe: str = "",
+                 language: str = "auto", min_sec: int | None = None, max_sec: int | None = None, caption_style: str = "",
+                 lite: bool = False,
                  cut_silence: bool | None = None, emoji: bool | None = None, transcriber: str = "",
                  extra_settings: dict | None = None,
                  wait: bool = False, timeout_sec: int = 3600) -> dict:
@@ -102,7 +103,9 @@ def create_clips(source: str, clip_count: int = 6, layout: str = "portrait", tem
     source: link (YouTube/TikTok/IG/…) atau path file video lokal di komputer ini.
     layout: portrait | square | blur | split | landscape.
     template: nama template gaya yang tersimpan (lihat list_templates); pengaturan lain menimpanya.
-    caption_style: box | wbw | karaoke | clean (kosong = ikut template/bawaan).
+    recipe: resep gaya viral bawaan (lihat list_recipes), mis. podcast-box, podcast-hormozi, tech-review, ml-hype.
+    lite: hemat disk untuk link — video penuh tidak disimpan, hanya audio + potongan klip yang diunduh.
+    caption_style: box | wbw | karaoke | clean | keyword (kosong = ikut resep/template/bawaan).
     transcriber: auto | youtube | api | local — sumber subtitle (auto: YouTube → API cloud → Whisper lokal).
     extra_settings: pengaturan lanjutan (mis. {"title": {"preset": "neon"}, "music": {"enabled": true, "file": "..."}}).
     wait: true = tunggu sampai semua klip selesai lalu kembalikan hasil (path file video, caption, hashtag).
@@ -114,7 +117,15 @@ def create_clips(source: str, clip_count: int = 6, layout: str = "portrait", tem
         if template not in tpls:
             raise RuntimeError(f"Template '{template}' tidak ada. Tersedia: {', '.join(tpls) or '(kosong)'}")
         settings.update(tpls[template])
-    settings.update({"auto_render": True, "clip_count": clip_count, "layout": layout, "language": language, "min_sec": min_sec, "max_sec": max_sec})
+    if recipe:
+        settings["recipe"] = recipe
+    if lite:
+        settings["storage"] = "lite"
+    settings.update({"auto_render": True, "clip_count": clip_count, "language": language})
+    if layout:
+        settings["layout"] = layout
+    if min_sec is not None or max_sec is not None:
+        settings.update(duration_preset="custom", min_sec=min_sec or 15, max_sec=max_sec or 60)
     if caption_style:
         settings.setdefault("caption", {})["style"] = caption_style
     if cut_silence is not None:
@@ -214,6 +225,14 @@ def list_templates() -> dict:
     """Template gaya yang tersimpan (nama → pengaturan)."""
     _ensure_server()
     return _call("GET", "/api/templates")
+
+
+@mcp.tool()
+def list_recipes() -> dict:
+    """Resep gaya viral bawaan (id → label, niche, deskripsi) untuk parameter `recipe` di create_clips."""
+    _ensure_server()
+    data = _call("GET", "/api/recipes")["recipes"]
+    return {k: {"label": v["label"], "niche": v["niche"], "desc": v["desc"]} for k, v in data.items()}
 
 
 @mcp.tool()

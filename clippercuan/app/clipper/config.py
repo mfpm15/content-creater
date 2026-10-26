@@ -38,6 +38,8 @@ FFMPEG = _find_ffmpeg()
 
 # Default pipeline — semua bisa diubah dari UI per proyek.
 DEFAULTS: dict = {
+    "recipe": "",                # id resep gaya (recipes.py); kosong = pengaturan manual
+    "storage": "full",           # full | lite (link: hanya audio + potongan klip yang diunduh)
     "content_profile": "auto",  # auto | podcast | tech_review | mobile_legends
     "candidate_count": 10,       # kandidat dibuat sebelum render
     "auto_render": False,        # kandidat harus dipilih sebelum batch render
@@ -63,7 +65,7 @@ DEFAULTS: dict = {
     "caption": {
         "enabled": True,
         "preset": "bold-viral", # clean | bold-viral | minimal | karaoke
-        "style": "box",          # box | wbw | karaoke | clean
+        "style": "box",          # box | wbw | karaoke | clean | keyword
         "font": "Montserrat ExtraBold",
         "size": 82,
         "color": "#FFFFFF",
@@ -74,12 +76,19 @@ DEFAULTS: dict = {
         "safe_area": 0.12,
         "max_chars": 24,
         "animation": "pop",      # pop | none
+        "box": False,            # kotak berwarna mengikuti kata aktif (bisa dipadu gaya apa pun)
+        "effect": "none",        # none | glow
+        "glow_color": "",
+        "y_pct": None,           # posisi vertikal bebas 8..92 (% tinggi frame); None = ikut "position"
+        "accent_font": "Instrument Serif Italic",  # font kata kunci pada gaya "keyword"
     },
     "title": {
         "enabled": True,
-        "preset": "bar",         # bar | outline | neon | clean
+        "preset": "bar",         # bar | outline | neon | clean | duo
         "duration": 0,           # detik; 0 = sepanjang klip
         "size": 70,
+        "accent": "#3DE0A0",     # preset duo: warna baris punchline
+        "glow": "#C6FF3D",
     },
     "emoji": {"enabled": False, "size": 1.0},
     "progress_bar": {"enabled": False, "color": "#FFC933", "height": 12, "position": "bottom"},

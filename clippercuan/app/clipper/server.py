@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 
 from . import __version__, asr, automation, effects, llm, media, project
 from .captions import FONT_PRESETS
-from .config import DATA_DIR, DEFAULTS, UPLOADS_DIR, WEB_DIR
+from .config import DATA_DIR, DEFAULTS, FONTS_DIR, UPLOADS_DIR, WEB_DIR
 
 @asynccontextmanager
 async def lifespan(_app):
@@ -124,6 +124,11 @@ class CandidateAction(BaseModel):
     value: bool = True
 
 
+class ProjectSettings(BaseModel):
+    settings: dict
+    rerender: bool = False
+
+
 class CaptionWorkspaceSave(BaseModel):
     revision: int | None = None
     data: dict
@@ -160,6 +165,13 @@ def info():
     profiles = {name: {k: v for k, v in data.items() if k not in {"weights", "terms"}} for name, data in candidates.PROFILES.items()}
     return {"version": __version__, "data_dir": str(DATA_DIR), "defaults": DEFAULTS, "fonts": list(FONT_PRESETS),
             "profiles": profiles, "inbox_dir": str(automation.INBOX_DIR)}
+
+
+@app.get("/api/recipes")
+def recipes():
+    from .recipes import PROFILE_DEFAULT, public
+
+    return {"recipes": public(), "profile_default": PROFILE_DEFAULT}
 
 
 @app.get("/api/projects")
@@ -272,6 +284,43 @@ def rerender(pid: str, body: Settings):
     return project.rerender_all(pid, body.settings)
 
 
+@app.post("/api/projects/{pid}/settings")
+def project_settings(pid: str, body: ProjectSettings):
+    """Simpan gaya proyek (berlaku untuk render berikutnya); rerender=true langsung render ulang klip yang sudah jadi."""
+    _get(pid)
+    if body.rerender:
+        return project.rerender_all(pid, body.settings)
+    return project.update_settings(pid, body.settings)
+
+
+@app.get("/api/projects/{pid}/words")
+def project_words(pid: str, start: float = 0, end: float = 1e9):
+    """Kata transkrip (waktu absolut) dalam rentang — untuk preview caption langsung di studio."""
+    _get(pid)
+    f = project.pdir(pid) / "transcript.json"
+    if not f.exists():
+        return {"words": []}
+    words = json.loads(f.read_text("utf-8")).get("words", [])
+    return {"words": [{"w": w["w"], "s": w["s"], "e": w["e"]} for w in words if start - 0.05 <= w["s"] <= end + 0.05]}
+
+
+@app.get("/api/clips")
+def all_clips(limit: int = 200):
+    """Galeri semua klip yang sudah dirender, lintas proyek (terbaru dulu)."""
+    out = []
+    for item in project.list_projects():
+        try:
+            p = project.load(item["id"])
+        except KeyError:
+            continue
+        for c in p.get("clips", []):
+            if c.get("status") == "done" and c.get("file"):
+                out.append({"project_id": p["id"], "project_title": p.get("title"), "id": c["id"], "title": c.get("title"),
+                            "score": c.get("score"), "duration": c.get("duration"), "file": c["file"], "thumb": c.get("thumb"),
+                            "version": c.get("version"), "created": p.get("created")})
+    return out[:limit]
+
+
 @app.post("/api/projects/{pid}/candidates/select")
 def select_candidates(pid: str, body: CandidateSelection):
     _get(pid)
@@ -368,7 +417,15 @@ def frame(pid: str, t: float = 0.0):
     d = project.pdir(pid)
     out = d / f"frame_{int(t * 10)}.jpg"
     if not out.exists():
-        media.grab_frame(d / m["file"], t, out, width=640)
+        if m.get("remote"):
+            from . import download
+
+            try:
+                download.grab_remote_frame(p["source"], t, out, width=640)
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(502, f"Frame dari sumber online gagal diambil: {str(e)[:200]}") from None
+        else:
+            media.grab_frame(d / m["file"], t, out, width=640)
     return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "max-age=3600"})
 
 
@@ -377,6 +434,8 @@ def source_video(pid: str):
     p = _get(pid)
     if not p.get("media"):
         raise HTTPException(409, "Video belum siap")
+    if p["media"].get("remote"):
+        raise HTTPException(409, "Mode hemat disk: video penuh tidak disimpan. Pratinjau memakai frame dan klip hasil render.")
     return FileResponse(project.pdir(pid) / p["media"]["file"])
 
 
@@ -638,4 +697,5 @@ def _ffmpeg_err(_, exc):
     return JSONResponse({"detail": str(exc)[-600:]}, status_code=500)
 
 
+app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")  # preview caption memakai font yang sama dengan render
 app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")

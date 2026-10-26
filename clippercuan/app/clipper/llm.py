@@ -68,6 +68,10 @@ DEFAULT_ASR = {                 # transkripsi cloud kompatibel OpenAI (/audio/tr
     "timeout": 600,
 }
 
+DEFAULT_DOWNLOAD = {
+    "cookies_browser": "",      # chrome | edge | firefox | brave | safari — dipakai bila YouTube minta verifikasi
+}
+
 DEFAULT_AUTOMATION = {
     "webhook_url": "",          # POST JSON saat proyek selesai/gagal (untuk AI agent / n8n / Zapier)
     "inbox_enabled": False,     # proses otomatis video yang ditaruh di folder inbox
@@ -87,7 +91,8 @@ def load_settings() -> dict:
     configured["base_url"] = normalize_base_url(configured["base_url"])
     return {"llm": configured,
             "automation": {**DEFAULT_AUTOMATION, **data.get("automation", {})},
-            "asr": {**DEFAULT_ASR, **data.get("asr", {})}}
+            "asr": {**DEFAULT_ASR, **data.get("asr", {})},
+            "download": {**DEFAULT_DOWNLOAD, **data.get("download", {})}}
 
 
 def _write_settings(data: dict) -> None:
@@ -115,6 +120,8 @@ def save_settings(new: dict) -> dict:
             asr.pop("api_key")
         cur["asr"].update(asr)
         cur["asr"]["base_url"] = cur["asr"]["base_url"].strip().rstrip("/")
+    if "download" in new:
+        cur["download"].update({k: str(v).strip().lower() for k, v in new["download"].items() if k in DEFAULT_DOWNLOAD})
     if "automation" in new:
         cur["automation"].update({k: v for k, v in new["automation"].items() if k in DEFAULT_AUTOMATION})
     _write_settings(cur)

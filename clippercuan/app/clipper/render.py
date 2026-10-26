@@ -55,12 +55,19 @@ def framing_filter(layout: str, pr: Probe, cfg: dict, keys: list | None, inp: st
     W, H = pr.width, pr.height
     if layout in ("portrait", "square"):
         a = Wt / Ht
+        cr = cfg.get("crop") or {}
+        zoom = max(1.0, min(3.0, float(cr.get("zoom", 1) or 1)))       # >1 = jendela crop lebih kecil (lewati watermark/bar)
+        cy = max(0.0, min(1.0, float(cr.get("y", 0.5) if cr.get("y") is not None else 0.5)))
+        hold = bool(cr.get("hold"))
         if W / H > a:  # sumber lebih lebar → crop horizontal (bisa ikut wajah)
-            cw = _even(H * a)
-            x = facetrack.x_expr(keys, W, cw) if keys else f"{(W - cw) / 2:.1f}"
-            return f"[{inp}]crop=w={cw}:h={H}:x='{x}':y=0,scale={Wt}:{Ht}:flags=lanczos,setsar=1[fr]"
-        ch = _even(W / a)
-        return f"[{inp}]crop=w={W}:h={ch}:x=0:y={(H - ch) / 2:.1f},scale={Wt}:{Ht}:flags=lanczos,setsar=1[fr]"
+            ch = _even(H / zoom)
+            cw = _even(ch * a)
+            x = facetrack.x_expr(keys, W, cw, hold) if keys else f"{(W - cw) / 2:.1f}"
+            y = f"{(H - ch) * cy:.1f}"
+            return f"[{inp}]crop=w={cw}:h={ch}:x='{x}':y={y},scale={Wt}:{Ht}:flags=lanczos,setsar=1[fr]"
+        cw = _even(W / zoom)
+        ch = _even(cw / a)
+        return f"[{inp}]crop=w={cw}:h={ch}:x={(W - cw) / 2:.1f}:y={(H - ch) * cy:.1f},scale={Wt}:{Ht}:flags=lanczos,setsar=1[fr]"
     if layout == "blur":
         return (f"[{inp}]split[a][b];[a]scale={Wt}:{Ht}:force_original_aspect_ratio=increase,crop={Wt}:{Ht},"
                 f"boxblur=24:3,eq=brightness=-0.07:saturation=1.2[bg];"
