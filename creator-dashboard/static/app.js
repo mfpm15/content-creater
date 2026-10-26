@@ -75,6 +75,22 @@ function render() {
   document.querySelector('#cliTools').textContent = state.tools.filter(tool => tool.type === 'cli').length;
 }
 
+async function refreshProductionQueue() {
+  const box = document.querySelector('#productionQueue'); if (!box) return;
+  try {
+    const response = await fetch('http://127.0.0.1:8765/api/production', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json(), labels = { draft_candidate: 'Draft Candidate', selected: 'Selected', rendering: 'Rendering', ready: 'Ready', published_archived: 'Published / Archived' };
+    box.innerHTML = Object.entries(labels).map(([key, label]) => { const items = data.groups?.[key] || []; return `<article><header><strong>${label}</strong><span>${items.length}</span></header>${items.slice(0, 4).map(x => `<a href="http://127.0.0.1:8765/#/p/${escapeHtml(x.id)}" target="_blank" rel="noopener"><b>${escapeHtml(x.title || x.id)}</b><small>${x.candidate_count || 0} kandidat · ${x.ready_count || 0} siap</small></a>`).join('') || '<p>Kosong</p>'}</article>`; }).join('');
+  } catch { box.innerHTML = '<article class="queue-offline"><strong>Clipper Cuan offline</strong><p>Antrean tidak direka. Jalankan service untuk membaca data lokal nyata.</p></article>'; }
+}
+
+async function refreshClipperHealth() {
+  const el = document.querySelector('#clipperHealth'); if (!el) return;
+  try { const r = await fetch('http://127.0.0.1:8765/api/health', { cache: 'no-store' }); const h = await r.json(); el.textContent = h.ok ? `Siap · ${h.llm?.enabled ? '9Router' : 'fallback lokal'}` : 'Perlu perhatian'; }
+  catch { el.textContent = 'Belum berjalan'; }
+}
+
 async function refresh(silent = false) {
   try {
     const payload = await request('/api/tools');
@@ -154,8 +170,9 @@ document.querySelectorAll('.filter').forEach(button => {
   });
 });
 
-refreshButton.addEventListener('click', () => refresh());
-startRecommended.addEventListener('click', () => act('moneyprinterturbo', 'start'));
+document.querySelector('#sidebarToggle').addEventListener('click', event => { const collapsed = document.body.classList.toggle('sidebar-collapsed'); event.currentTarget.setAttribute('aria-expanded', String(!collapsed)); event.currentTarget.setAttribute('aria-label', collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'); });
+refreshButton.addEventListener('click', () => { refresh(); refreshProductionQueue(); });
+startRecommended.addEventListener('click', async () => { const tool = state.tools.find(item => item.id === 'clippercuan'); if (tool?.status === 'ready') window.open(tool.url, '_blank', 'noopener'); else await act('clippercuan', 'start'); });
 setInterval(() => refresh(true), 5000);
 setInterval(updateLogs, 1200);
-refresh();
+refresh(); refreshClipperHealth(); refreshProductionQueue(); setInterval(refreshClipperHealth, 5000); setInterval(refreshProductionQueue, 5000);

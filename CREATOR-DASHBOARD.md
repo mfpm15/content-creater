@@ -10,6 +10,7 @@ Dashboard lokal ini menjadi pintu masuk untuk lima repository yang sekarang ters
 - **Short Video Factory** untuk editor desktop, template, dan finishing.
 - **Podcastfy** untuk mengubah sumber menjadi podcast berbentuk percakapan.
 - **AI YouTube Shorts Generator** untuk memotong video panjang menjadi highlight vertikal.
+- **Clipper Cuan** untuk klip vertikal lokal, subtitle, smart crop, dan pemilihan momen memakai 9Router opsional.
 
 Dashboard berjalan hanya di `127.0.0.1:3210`. Dashboard tidak mengirimkan API key atau file media ke service lain. Provider yang dikonfigurasi di masing-masing tool tetap dapat mengirim data ke penyedia AI sesuai pengaturannya.
 
@@ -58,6 +59,8 @@ OpenCreator Web              19861
 Remotion Studio               3300
 HyperFrames Studio            4000
 Lemo-Opuscar Studio           3500
+Clipper Cuan                  8765
+9Router                       20128
 ```
 
 Short Video Factory berjalan sebagai aplikasi Electron, bukan service web. Statusnya dinilai dari process tree yang dikelola dashboard, bukan dari port HTTP. AI YouTube Shorts Generator adalah CLI pipeline, sehingga dashboard menyediakan command yang dapat disalin.
@@ -74,7 +77,20 @@ Dashboard hanya memakai konfigurasi tool yang diizinkan di `creator-dashboard/to
 
 ## Konfigurasi API key
 
-Setiap project tetap menggunakan konfigurasi aslinya.
+Setiap project tetap menggunakan konfigurasi aslinya. Dashboard dan Clipper Cuan memakai fallback environment bersama: `LLM_BASE_URL` lalu `OPENAI_BASE_URL`, `LLM_API_KEY` lalu `OPENAI_API_KEY`, serta `LLM_MODEL` lalu `OPENAI_MODEL`. Default lokal: `http://localhost:20128/v1` dan `ag/gemini-3.8-flash-medium`. API key diwariskan hanya ke proses backend dan tidak dikirim lewat HTML, JavaScript, katalog tool, atau API publik.
+
+Contoh tersedia di `.env.example`. Jangan commit `.env`. Set environment Windows sebelum menjalankan dashboard:
+
+```bat
+set LLM_BASE_URL=http://localhost:20128/v1
+set LLM_API_KEY=isi_secret_lokal
+set LLM_MODEL=ag/gemini-3.8-flash-medium
+start-dashboard.bat
+```
+
+### Clipper Cuan
+
+Setup venv terisolasi sekali lewat `clippercuan\app\start.bat`, lalu hentikan service awal bila perlu. Setelah itu kartu dashboard menjalankan `.venv\Scripts\python.exe` dengan working directory `clippercuan\app` pada `http://127.0.0.1:8765`. Health endpoint: `/api/health`; OpenAPI: `/docs`.
 
 ### MoneyPrinterTurbo
 

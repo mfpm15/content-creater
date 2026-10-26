@@ -13,7 +13,8 @@ release/
 
 # secrets / local config
 .env
-.env.local
+.env.*
+!.env.example
 config.toml
 *.key
 
@@ -21,6 +22,9 @@ config.toml
 *.log
 storage/
 output/
+outputs/
+projects/
+uploads/
 tmp/
 .hyperframes/
 .thumbnails/

@@ -230,6 +230,39 @@
       ]
     },
     {
+      "id": "clippercuan",
+      "name": "Clipper Cuan",
+      "shortName": "Clipper Cuan",
+      "description": "Ubah video panjang menjadi klip vertikal lokal dengan transkripsi, pencarian momen, smart crop, subtitle, dan bantuan LLM 9Router.",
+      "category": "AI Video Clipper",
+      "icon": "scissors",
+      "color": "amber",
+      "workingDirectory": "../clippercuan/app",
+      "command": [
+        "cmd",
+        "/d",
+        "/c",
+        "if exist .venv\\Scripts\\python.exe (.venv\\Scripts\\python.exe -m clipper --port 8765 --strict-port --no-browser) else (echo Environment belum tersedia. Jalankan clippercuan\\app\\start.bat sekali untuk setup. & exit /b 1)"
+      ],
+      "url": "http://127.0.0.1:8765",
+      "healthUrl": "http://127.0.0.1:8765/api/health",
+      "port": 8765,
+      "type": "web",
+      "requirements": [
+        "Python 3.10-3.12",
+        "Project venv",
+        "FFmpeg",
+        "9Router optional"
+      ],
+      "capabilities": [
+        "Long video to clips",
+        "Whisper transcription",
+        "Smart crop",
+        "Caption styling",
+        "9Router LLM"
+      ]
+    },
+    {
       "id": "ai-youtube-shorts",
       "name": "AI YouTube Shorts Generator",
       "shortName": "Shorts Generator",

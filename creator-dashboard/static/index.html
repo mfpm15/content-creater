@@ -9,17 +9,19 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <a class="brand" href="#top" aria-label="Creator Control Center">
         <span class="brand-mark">C</span>
         <span><strong>Creator</strong><small>Control Center</small></span>
       </a>
+      <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Ciutkan sidebar" aria-expanded="true">☰</button>
       <nav aria-label="Navigasi utama">
-        <a class="nav-link active" href="#tools"><span>▦</span> Semua Tools</a>
-        <a class="nav-link" href="/videos.html"><span>🎬</span> Video Studio</a>
-        <a class="nav-link" href="/articles.html"><span>✎</span> Article Drafter</a>
-        <a class="nav-link" href="#workflow"><span>⌁</span> Workflow</a>
-        <a class="nav-link" href="#system"><span>◉</span> Status Sistem</a>
+        <small class="nav-group">HOME</small><a class="nav-link active" href="#top" title="Overview"><span>⌂</span><b>Overview</b></a>
+        <small class="nav-group">CREATE</small><a class="nav-link" href="/videos.html" title="Video Studio"><span>▶</span><b>Video Studio</b></a><a class="nav-link" href="/articles.html" title="Article"><span>✎</span><b>Article</b></a>
+        <small class="nav-group">REPURPOSE</small><a class="nav-link accent-link" href="http://127.0.0.1:8765" target="_blank" rel="noopener" title="Clipper Cuan"><span>✂</span><b>Clipper Cuan</b></a>
+        <small class="nav-group">AUDIO</small><a class="nav-link" href="#tools" title="Audio tools"><span>◉</span><b>Audio</b></a>
+        <small class="nav-group">UTILITIES</small><a class="nav-link" href="#tools" title="Semua tools"><span>▦</span><b>Tool Catalog</b></a>
+        <small class="nav-group">SYSTEM</small><a class="nav-link" href="#system" title="Status Sistem"><span>●</span><b>Status Sistem</b></a>
       </nav>
       <div class="sidebar-note">
         <span class="pulse"></span>
@@ -39,13 +41,14 @@
         </div>
       </header>
 
+      <section class="quick-status" aria-label="Status produksi"><article><span>CLIPPER CUAN</span><strong id="clipperHealth">Memeriksa…</strong><a href="http://127.0.0.1:8765" target="_blank" rel="noopener">Buka studio</a></article><article><span>WORKFLOW</span><strong>Long-form → short-form</strong><a href="/videos.html">Buka Video Studio</a></article></section>
       <section class="hero">
         <div class="hero-copy">
           <span class="hero-label">AI CONTENT OPERATING SYSTEM</span>
           <h2>Satu pintu untuk seluruh<br /><em>creator tool</em> Anda.</h2>
           <p>Jalankan, pantau, dan buka setiap aplikasi produksi konten tanpa berpindah folder atau menghafal perintah terminal.</p>
           <div class="hero-actions">
-            <button id="startRecommended" class="primary-button" type="button">Mulai MoneyPrinter</button>
+            <button id="startRecommended" class="primary-button" type="button">Buka Clipper Cuan</button>
             <a class="secondary-button" href="#workflow">Lihat workflow</a>
           </div>
         </div>
@@ -71,12 +74,17 @@
         <div id="toolGrid" class="tool-grid" aria-live="polite"></div>
       </section>
 
+      <section id="production" class="section-block production-section">
+        <div class="section-heading"><div><p class="eyebrow">LOCAL PRODUCTION</p><h2>Production Queue</h2></div><a href="http://127.0.0.1:8765" target="_blank" rel="noopener">Buka Clipper Cuan</a></div>
+        <div id="productionQueue" class="production-queue" aria-live="polite"><article class="queue-offline"><strong>Memuat antrean…</strong></article></div>
+      </section>
+
       <section id="workflow" class="section-block workflow-section">
         <div class="section-heading"><div><p class="eyebrow">RECOMMENDED FLOW</p><h2>Dari ide sampai publikasi</h2></div></div>
         <div class="workflow-grid">
           <article><span>01</span><strong>Riset & Script</strong><p>Gunakan OpenCreator untuk merancang topik, sudut pandang, dan naskah.</p></article>
           <article><span>02</span><strong>Produksi Video</strong><p>MoneyPrinterTurbo menyatukan footage, narration, subtitle, dan BGM.</p></article>
-          <article><span>03</span><strong>Repurpose</strong><p>AI Shorts Generator mengubah video panjang menjadi beberapa highlight.</p></article>
+          <article><span>03</span><strong>Repurpose</strong><p>Clipper Cuan memilih momen utuh, memberi Viral Readiness transparan, caption terbaca, dan metadata siap salin.</p></article>
           <article><span>04</span><strong>Finishing</strong><p>Short Video Factory menangani template, efek, dan pemeriksaan akhir.</p></article>
         </div>
       </section>

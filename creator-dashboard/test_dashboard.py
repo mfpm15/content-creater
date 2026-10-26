@@ -54,7 +54,7 @@ def main() -> int:
         assert "application/json" in content_type
         payload = json.loads(body.decode("utf-8"))
         tools = payload["tools"]
-        assert len(tools) == 8
+        assert len(tools) == 9
         assert {tool["id"] for tool in tools} == {
             "moneyprinterturbo",
             "opencreator",
@@ -63,21 +63,30 @@ def main() -> int:
             "lemo-opuscar",
             "short-video-factory",
             "podcastfy",
+            "clippercuan",
             "ai-youtube-shorts",
         }
         assert all(tool["repositoryExists"] for tool in tools)
         assert all("command" not in tool for tool in tools)
         assert all("environment" not in tool for tool in tools)
+        clipper = next(tool for tool in tools if tool["id"] == "clippercuan")
+        assert clipper["url"] == "http://127.0.0.1:8765"
+        assert clipper["healthUrl"].endswith("/api/health")
+        public_blob = json.dumps(payload)
+        secret = os.environ.get("LLM_API_KEY") or os.environ.get("OPENAI_API_KEY")
+        assert not secret or secret not in public_blob
 
         status, html, content_type = fetch("/")
         assert status == 200
         assert "text/html" in content_type
         assert b"Creator Control Center" in html
+        assert b'id="clipperHealth"' in html and b"Buka Clipper Cuan" in html
 
         status, javascript, content_type = fetch("/app.js")
         assert status == 200
         assert "javascript" in content_type
         assert b"function escapeHtml" in javascript
+        assert b"refreshClipperHealth" in javascript and b"act('clippercuan', 'start')" in javascript
 
         status, css, content_type = fetch("/styles.css")
         assert status == 200
