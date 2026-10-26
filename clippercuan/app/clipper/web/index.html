@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipperCuan Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ffc933'/%3E%3Cpath d='M24 18l22 14-22 14z' fill='%2307080a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside class="side">
+  <a class="brand" href="http://127.0.0.1:3210" title="Kembali ke Creator Control Center"><span class="logo">C</span><span class="brand-copy"><b>Creator</b><small>Clipper Cuan</small></span></a>
+  <nav>
+    <a href="#/new" data-nav="new">＋ Proyek baru</a>
+    <a href="#/history" data-nav="history">▤ Riwayat <span class="badge" id="runBadge" hidden></span></a>
+    <a href="#/captions" data-nav="captions">▣ Transcript & Caption</a>
+    <a href="#/templates" data-nav="templates">◧ Template gaya</a>
+    <a href="#/system" data-nav="system">◉ Cek sistem</a>
+    <a href="#/agent" data-nav="agent">⚡ AI Agent &amp; otomatisasi</a>
+    <a href="#/settings" data-nav="settings">⚙ Pengaturan</a>
+    <a href="#/help" data-nav="help">？ Bantuan</a>
+  </nav>
+  <div class="side-foot"><div class="local-note"><span class="pulse"></span><div><b>Local-first</b><small id="sideFoot">Memuat sistem…</small></div></div></div>
+</aside>
+
+<main><div class="topbar"><div><p class="eyebrow">CREATOR CONTROL CENTER / CLIPPER CUAN</p><strong>Studio repurpose video</strong></div><div class="ai-health" id="aiHealth" role="status" aria-live="polite"><span class="status-dot"></span><span>Memeriksa AI…</span></div></div><div id="view" aria-live="polite"><section class="page"><div class="loading-state"><span class="spin"></span><b>Menyiapkan studio…</b></div></section></div></main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ================= TEMPLATES ================= -->
+<template id="tpl-new">
+  <section class="page new-project">
+    <header class="page-h hero-head"><div><p class="eyebrow">WORKFLOW BARU</p><h1>Ubah video panjang jadi klip siap unggah.</h1><p>Masukkan sumber, pilih momen, rapikan tampilan, lalu render. Video tetap diproses di perangkat ini.</p></div><span class="identity-chip">✦ Clipper Cuan</span></header>
+    <ol class="workflow-steps" aria-label="Tahapan pembuatan klip"><li class="active"><span>01</span><b>Sumber</b></li><li><span>02</span><b>Konfigurasi</b></li><li><span>03</span><b>AI & subtitle</b></li><li><span>04</span><b>Output</b></li><li><span>05</span><b>Proses</b></li></ol>
+
+    <div class="card source-card">
+      <div class="section-title"><span class="step-number">01</span><div><h2>Pilih sumber video</h2><p>Gunakan URL publik atau unggah file dari perangkat.</p></div></div>
+      <div class="seg" id="srcTabs"><button class="on" data-src="link">Link video</button><button data-src="file">File lokal</button></div>
+      <div id="srcLink" class="src-pane">
+        <textarea id="url" class="in big" rows="2" placeholder="https://youtube.com/watch?v=…  (YouTube, TikTok, IG, dll.)&#10;Bisa banyak link sekaligus — satu link per baris" autocomplete="off" spellcheck="false"></textarea>
+        <p class="hint" id="urlCount"></p>
+      </div>
+      <div id="srcFile" class="src-pane" hidden>
+        <label class="drop" id="drop"><input type="file" id="file" accept="video/*" hidden>
+          <b>Tarik &amp; lepas video di sini</b><span>atau klik untuk memilih (mp4, mov, mkv, webm)</span><em id="fileName"></em>
+          <div class="bar" hidden id="upBar"><i></i></div></label>
+      </div>
+    </div>
+
+    <div class="card tpl-bar compact-card">
+      <label class="inline">Template gaya <select id="tplSel" class="in"><option value="">— Pengaturan terakhir —</option></select></label>
+      <button class="btn ghost sm" id="tplSave" type="button">Simpan sebagai template</button>
+    </div>
+
+    <div class="section-divider"><span class="step-number">02</span><div><h2>Atur kandidat konten</h2><p>Pilih profil hasil, jumlah opsi, durasi, dan format. Kandidat tidak dirender sebelum kamu memilih.</p></div></div>
+    <div class="card profile-card">
+      <h3>Content profile</h3>
+      <div class="preset-cards profile-presets" id="contentProfile">
+        <button type="button" data-v="auto"><b>Auto</b><small>Deteksi dari transkrip, metadata, dan aktivitas</small></button>
+        <button type="button" data-v="podcast"><b>Podcast</b><small>Hot take, cerita mini, tanya-jawab, insight mandiri</small></button>
+        <button type="button" data-v="tech_review"><b>Review teknologi</b><small>Demo, perbandingan, verdict, value dengan konteks</small></button>
+        <button type="button" data-v="mobile_legends"><b>Mobile Legends</b><small>Clutch, outplay, team fight, tip, reaksi</small></button>
+      </div>
+      <p class="hint">Auto dapat dioverride. Sistem tidak membuat spesifikasi, harga, atau event game yang tidak didukung sumber.</p>
+    </div>
+    <div class="mode-switch" id="uiMode" role="group" aria-label="Mode pengaturan"><button type="button" data-mode="basic" class="on">Basic</button><button type="button" data-mode="advanced">Advanced</button><span>Basic untuk hasil cepat. Advanced membuka kontrol teknis.</span></div>
+    <div class="grid2 primary-settings">
+      <div class="card">
+        <h3>Durasi & transkripsi</h3>
+        <label>Preset durasi</label>
+        <div class="preset-cards" id="durationPreset">
+          <button type="button" data-v="auto"><b>Auto</b><small>Sesuai struktur ide</small></button>
+          <button type="button" data-v="15-25"><b>15–25 dtk</b><small>Padat, payoff cepat</small></button>
+          <button type="button" data-v="25-40"><b>25–40 dtk</b><small>Konteks sedang</small></button>
+          <button type="button" data-v="40-60"><b>40–60 dtk</b><small>Penjelasan utuh</small></button>
+        </div>
+        <p class="estimate" id="durationEstimate">Estimasi Auto ditentukan setelah transkripsi berdasarkan hook, payoff, kepadatan ujaran, dan jeda.</p>
+        <div class="row3">
+          <label>Jumlah kandidat<input id="candidate_count" class="in" type="number" min="5" max="30"></label>
+          <label class="advanced-only">Jumlah render awal<input id="clip_count" class="in" type="number" min="1" max="30"></label>
+          <label>Durasi min (dtk)<input id="min_sec" class="in" type="number" min="5" max="180"></label>
+          <label>Durasi maks (dtk)<input id="max_sec" class="in" type="number" min="10" max="300"></label>
+        </div>
+        <div class="row2">
+          <label>Bahasa
+            <select id="language" class="in">
+              <option value="auto">Auto-detect</option><option value="id">Indonesia</option><option value="en">Inggris</option>
+              <option value="ms">Melayu</option><option value="jv">Jawa</option><option value="su">Sunda</option><option value="ar">Arab</option>
+              <option value="ja">Jepang</option><option value="ko">Korea</option><option value="zh">Mandarin</option><option value="es">Spanyol</option>
+              <option value="hi">Hindi</option><option value="th">Thai</option><option value="vi">Vietnam</option></select></label>
+          <label>Kualitas transkripsi
+            <select id="model" class="in">
+              <option value="tiny">Tiny — tercepat</option><option value="base">Base — cepat</option>
+              <option value="small">Small — seimbang (disarankan)</option><option value="medium">Medium — akurat, lambat</option>
+              <option value="large-v3">Large v3 — paling akurat, butuh RAM 16 GB</option></select></label>
+        </div>
+        <label>Sumber subtitle
+          <select id="transcriber" class="in">
+            <option value="auto">Otomatis — subtitle YouTube → API cloud → Whisper di laptop (disarankan)</option>
+            <option value="youtube">Subtitle YouTube (tercepat, tanpa beban komputer)</option>
+            <option value="api">API cloud (Groq/OpenAI/9router — atur di Pengaturan)</option>
+            <option value="local">Whisper di laptop (offline, paling akurat untuk timing)</option></select></label>
+        <label class="check"><input type="checkbox" id="translate_en"> Terjemahkan caption ke bahasa Inggris</label>
+        <label class="check"><input type="checkbox" id="cut_silence"> Potong jeda hening otomatis (jump cut, lebih padat)</label>
+        <div class="ai-choice" id="llmRow" hidden><label class="check"><input type="checkbox" id="use_llm" checked> Pilih momen & judul dengan AI</label><small>Model aktif: <b id="llmModel"></b></small></div>
+        <div class="ai-choice fallback" id="localFallback"><span class="status-dot"></span><div><b>Seleksi lokal aktif</b><small>Highlight dipilih dengan analisis transkrip lokal. Tidak memakai 9Router.</small></div></div>
+      </div>
+
+      <div class="card">
+        <h3>Format video</h3>
+        <div class="layouts" id="layouts">
+          <button data-l="portrait"><i class="ly ly-p"></i>Portrait 9:16</button>
+          <button data-l="square"><i class="ly ly-s"></i>Square 1:1</button>
+          <button data-l="blur"><i class="ly ly-b"></i>Blur background</button>
+          <button data-l="split"><i class="ly ly-g"></i>Split gaming</button>
+          <button data-l="landscape"><i class="ly ly-l"></i>Landscape 16:9</button>
+        </div>
+        <label class="check" id="smartRow"><input type="checkbox" id="smart_crop"> Smart crop: ikuti wajah pembicara</label>
+        <div id="splitRow" hidden>
+          <p class="hint">Posisi facecam di video asli:</p>
+          <div class="chips" id="facePos"><button data-f="tl">Kiri atas</button><button data-f="tr">Kanan atas</button><button data-f="bl">Kiri bawah</button><button data-f="br">Kanan bawah</button></div>
+          <label>Ukuran facecam di video asli <input type="range" id="faceSize" min="15" max="50" value="30"></label>
+          <label>Porsi facecam di hasil <input type="range" id="faceRatio" min="25" max="55" value="40"></label>
+        </div>
+      </div>
+    </div>
+
+    <details class="advanced advanced-only" open><summary><span><b>03 · Subtitle & identitas</b><small>Caption, judul, dan watermark</small></span><em>Atur</em></summary><div class="advanced-body grid2">
+      <div class="card" id="capCard">
+        <h3>Caption <label class="sw"><input type="checkbox" id="cap_enabled"><span></span></label></h3>
+        <div class="preset-cards caption-presets" id="capPreset"><button data-v="clean"><b>Clean</b><small>Tenang dan jelas</small></button><button data-v="bold-viral"><b>Bold Viral</b><small>Highlight aktif</small></button><button data-v="minimal"><b>Minimal</b><small>Ringkas tanpa gerak</small></button><button data-v="karaoke"><b>Karaoke</b><small>Kata aktif terbaca</small></button></div>
+        <div class="chips" id="capStyle"><button data-v="box">Box highlight</button><button data-v="wbw">Word by word</button><button data-v="karaoke">Karaoke</button><button data-v="clean">Clean</button></div>
+        <div class="row2">
+          <label>Font<select id="cap_font" class="in"></select></label>
+          <label>Posisi<select id="cap_position" class="in"><option value="bottom">Bawah</option><option value="middle">Tengah</option><option value="top">Atas</option></select></label>
+        </div>
+        <div class="row3">
+          <label>Warna teks<input type="color" id="cap_color" class="in color"></label>
+          <label>Warna sorotan<input type="color" id="cap_highlight" class="in color"></label>
+          <label>Kata per baris<input type="number" id="cap_wpl" class="in" min="1" max="8"></label>
+        </div>
+        <label>Ukuran <input type="range" id="cap_size" min="50" max="130"></label>
+        <label class="check"><input type="checkbox" id="cap_upper"> HURUF BESAR</label>
+        <label class="check"><input type="checkbox" id="cap_pop"> Animasi pop</label>
+        <div class="preview" id="capPreview"><span class="pv-w">Ini</span> <span class="pv-w on">momen</span> <span class="pv-w">penting</span></div>
+      </div>
+
+      <div class="card">
+        <h3>Judul pembuka <label class="sw"><input type="checkbox" id="ttl_enabled"><span></span></label></h3>
+        <div class="chips" id="ttlPreset"><button data-v="bar">Bar</button><button data-v="outline">Outline</button><button data-v="neon">Neon</button><button data-v="clean">Clean</button></div>
+        <label>Tampil selama (detik, 0 = sepanjang klip)<input type="number" id="ttl_duration" class="in" min="0" max="120"></label>
+        <h3 class="mt">Watermark <label class="sw"><input type="checkbox" id="wm_enabled"><span></span></label></h3>
+        <div class="row2">
+          <label>Teks<input id="wm_text" class="in" maxlength="40"></label>
+          <label>Logo PNG (opsional)<span class="inrow"><label class="btn ghost sm upbtn">＋ Pilih logo<input type="file" id="wm_file" accept="image/png,image/jpeg,image/webp" hidden></label><span class="muted ell" id="wmName">belum ada</span></span></label>
+        </div>
+        <div class="chips" id="wmPos"><button data-v="tl">↖</button><button data-v="tr">↗</button><button data-v="c">●</button><button data-v="bl">↙</button><button data-v="br">↘</button></div>
+        <label>Transparansi <input type="range" id="wm_opacity" min="20" max="100"></label>
+      </div>
+    </div></details>
+
+    <details class="advanced advanced-only"><summary><span><b>04 · Efek & audio</b><small>Emoji, progress, CTA, dan musik</small></span><em>Opsional</em></summary><div class="advanced-body grid2">
+      <div class="card">
+        <h3>Efek visual</h3>
+        <div class="fx-row"><div><b>Emoji otomatis</b><span>Emoji muncul saat kata kunci diucapkan (uang 💰, rahasia 🤫, kaget 😱…)</span></div><label class="sw"><input type="checkbox" id="emoji_on"><span></span></label></div>
+        <label id="emojiSizeRow">Ukuran emoji <input type="range" id="emoji_size" min="60" max="160"></label>
+        <div class="fx-row"><div><b>Progress bar</b><span>Garis tipis yang berjalan, bikin penonton bertahan sampai akhir</span></div><label class="sw"><input type="checkbox" id="pb_on"><span></span></label></div>
+        <div class="row2" id="pbRow"><label>Warna<input type="color" id="pb_color" class="in color"></label><label>Posisi<select id="pb_pos" class="in"><option value="bottom">Bawah</option><option value="top">Atas</option></select></label></div>
+        <div class="fx-row"><div><b>Ajakan di akhir (CTA)</b><span>Teks penutup, mis. "Follow untuk part 2"</span></div><label class="sw"><input type="checkbox" id="cta_on"><span></span></label></div>
+        <div class="row2" id="ctaRow"><label>Teks<input id="cta_text" class="in" maxlength="50"></label><label>Durasi (dtk)<input id="cta_dur" type="number" class="in" min="1" max="10"></label></div>
+      </div>
+      <div class="card">
+        <h3>Musik latar <label class="sw"><input type="checkbox" id="mu_on"><span></span></label></h3>
+        <p class="hint">Volume musik turun otomatis saat ada suara (ducking). Pakai musik bebas royalti / milikmu sendiri.</p>
+        <div id="muBody">
+          <div class="inrow"><select id="mu_file" class="in"></select><label class="btn ghost sm upbtn">＋ Unggah<input type="file" id="mu_up" accept="audio/*" hidden></label></div>
+          <audio id="mu_prev" controls preload="none" class="mu-prev"></audio>
+          <label>Volume musik <input type="range" id="mu_vol" min="3" max="60"></label>
+          <label class="check"><input type="checkbox" id="mu_duck"> Ducking otomatis (disarankan)</label>
+        </div>
+      </div>
+    </div></details>
+
+    <div class="go sticky-action"><div><b>Siap membuat opsi konten?</b><span class="hint" id="startHint">Kandidat dibuat dan diranking sebelum render.</span></div><button class="btn big" id="start"><span>Generate Candidates</span><small>Unduh · transkripsi · klasifikasi · ranking</small></button></div>
+  </section>
+</template>
+
+<template id="tpl-project">
+  <section class="page">
+    <header class="page-h proj-h">
+      <div><h1 id="pTitle">…</h1><p id="pSource" class="muted ell"></p></div>
+      <div class="acts">
+        <button class="btn ghost" id="pFolder">Buka folder</button>
+        <button class="btn ghost" id="pRetry" hidden>Ulangi</button>
+        <button class="btn ghost danger" id="pCancel" hidden>Batalkan</button>
+      </div>
+    </header>
+    <div class="card status" id="pStatus">
+      <div class="st-top"><b id="pMsg">…</b><span id="pPct"></span></div>
+      <div class="bar"><i id="pBar"></i></div>
+      <p class="warn" id="pWarn" hidden></p>
+      <details id="pErr" hidden><summary>Detail error</summary><pre></pre></details>
+    </div>
+    <div class="readiness-panel" id="pReadiness" hidden><div><small>VIRAL READINESS</small><strong id="pReadyScore">—</strong><span>Bukan jaminan viral</span></div><div id="pReadyBreakdown"></div></div>
+    <div class="toolbar" id="pTools" hidden>
+      <span class="muted" id="pMeta"></span>
+      <div class="acts candidate-tools">
+        <input class="in sm" id="pSearch" type="search" placeholder="Cari topik atau transkrip" aria-label="Cari kandidat">
+        <select class="in sm" id="pSort"><option value="score">Urut: skor tertinggi</option><option value="time">Urut: waktu sumber</option><option value="duration">Urut: durasi</option><option value="cluster">Urut: topic cluster</option></select>
+        <select class="in sm" id="pGoal"><option value="best_overall">Best Overall</option><option value="strongest_hook">Hook Terkuat</option><option value="densest_insight">Insight Terpadat</option><option value="most_emotional">Paling Lucu/Emosional</option><option value="easiest_to_understand">Paling Mudah Dipahami</option><option value="series_potential">Potensi Seri</option></select>
+        <button class="btn ghost sm" id="pTop3">Select Top 3</button><button class="btn ghost sm" id="pTop5">Select Top 5</button>
+        <button class="btn sm" id="pRenderSelected">Render Semua Terpilih</button>
+        <button class="btn ghost sm" id="pRerank">Rerank</button>
+        <a class="btn ghost sm" id="pManifest">Manifest JSON</a>
+        <button class="btn ghost sm" id="pAdd">＋ Rentang manual</button>
+        <button class="btn ghost sm" id="pSplit" hidden>Atur area split</button>
+        <button class="btn ghost sm" id="pStyleAll">Ubah gaya semua</button>
+        <a class="btn sm" id="pZip">⬇ Download semua (ZIP)</a>
+      </div>
+    </div>
+    <div class="clips" id="pClips"><div class="empty result-empty"><b>Hasil klip akan muncul di sini</b><span>Proses sumber, transkripsi, pemilihan momen, dan render sedang disiapkan.</span></div></div>
+  </section>
+</template>
+
+<template id="tpl-clip">
+  <article class="clip" tabindex="0">
+    <div class="clip-vid"><video controls playsinline preload="metadata"></video><span class="score"></span><div class="busy" hidden><span class="spin"></span><b>Merender…</b></div></div>
+    <div class="clip-body">
+      <div class="clip-top"><label class="candidate-select"><input class="c-select" type="checkbox"><b class="cid"></b></label><span class="dur muted"></span></div>
+      <div class="candidate-meta"><span class="rank"></span><span class="profile"></span><span class="cluster"></span><span class="overlap"></span></div>
+      <div class="clip-readiness"><span class="ready-score"></span><span class="confidence"></span></div>
+      <div class="clip-warnings" hidden></div>
+      <label class="lbl">Judul pembuka
+        <div class="inrow"><input class="in c-title" maxlength="80"><button class="btn ghost sm c-ai" title="Saran judul AI" hidden>✦</button></div></label>
+      <div class="ai-list" hidden></div>
+      <div class="row2">
+        <label class="lbl">Mulai (dtk)<input class="in c-start" type="number" step="0.1" min="0"></label>
+        <label class="lbl">Selesai (dtk)<input class="in c-end" type="number" step="0.1" min="0"></label>
+      </div>
+      <p class="reason muted"></p><details class="score-detail"><summary>Lihat breakdown skor</summary><div class="score-grid"></div></details>
+      <details class="post"><summary>Caption posting &amp; hashtag</summary>
+        <textarea class="in c-post" rows="3"></textarea>
+        <div class="inrow"><button class="btn ghost sm c-copy" type="button">Salin</button><button class="btn ghost sm c-postsave" type="button">Simpan</button><button class="btn ghost sm c-postai" type="button" hidden>✦ Buat dengan AI</button></div>
+      </details>
+      <div class="clip-acts">
+        <button class="btn ghost sm c-pin" type="button">Pin</button>
+        <button class="btn ghost sm c-ban" type="button">Ban</button>
+        <button class="btn ghost sm c-pin" type="button">Pin</button>
+        <button class="btn ghost sm c-ban" type="button">Ban</button>
+        <button class="btn sm c-save">Simpan &amp; render</button>
+        <a class="btn ghost sm c-dl" download>⬇ MP4</a>
+        <a class="btn ghost sm c-srt" download>⬇ SRT</a>
+        <button class="btn ghost sm c-words">Edit caption</button>
+        <button class="btn ghost sm c-crop">Atur crop</button>
+        <button class="btn ghost sm danger c-del" title="Hapus klip">🗑</button>
+        <select class="in sm c-layout" title="Format klip ini"><option value="">Format: ikut proyek</option><option value="portrait">Portrait</option><option value="square">Square</option><option value="blur">Blur</option><option value="split">Split gaming</option><option value="landscape">Landscape</option></select>
+      </div>
+      <p class="err" hidden></p>
+    </div>
+  </article>
+</template>
+
+<dialog id="dlg"><form method="dialog"><button class="x" aria-label="Tutup">×</button></form><div id="dlgBody"></div></dialog>
+<script src="app.js"></script>
+</body>
+</html>
