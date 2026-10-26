@@ -239,3 +239,28 @@ def test_auto_recipe_gameplay_without_facecam_switches_to_blur_and_youtube_subs_
     assert p["settings"]["layout"] == "blur" and p["settings"]["caption"]["y_pct"] == 76    # tanpa facecam → blur
     assert p["settings"]["duration_preset"] == "custom"                                       # pilihan pengguna menang
     assert not (project.pdir(p["id"]) / "audio.wav").exists()
+
+
+def test_delete_clip_stays_deleted_after_reload():
+    p = project.create("/nonexistent.mp4", {})
+    project.cancel(p["id"])
+    with project._LOCK:
+        q = project.load(p["id"])
+        q["candidates"] = q["clips"] = [{"id": "a", "status": "done"}, {"id": "b", "status": "done"}]
+        project.save(q)
+    project.delete_clip(p["id"], "a")
+    assert [c["id"] for c in project.load(p["id"])["clips"]] == ["b"]
+
+
+def test_finish_renders_waits_for_manual_clips_and_reports_failures():
+    p = project.create("/nonexistent.mp4", {})
+    project.cancel(p["id"])
+    with project._LOCK:
+        q = project.load(p["id"])
+        q["candidates"] = q["clips"] = [{"id": "a", "status": "done", "selected": True}, {"id": "clip_01", "status": "queued", "manual": True}]
+        project.save(q)
+    assert project._finish_renders(p["id"]) is False          # klip manual masih antre
+    project._set_clip(p["id"], "clip_01", status="error")
+    assert project._finish_renders(p["id"]) is True
+    q = project.load(p["id"])
+    assert q["status"] == "done" and "1 gagal" in q["message"]

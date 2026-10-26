@@ -114,7 +114,7 @@ def main() -> None:
     ap.add_argument("--strict-port", action="store_true", help="gagal bila port terpakai (dipakai server MCP)")
     c = sub.add_parser("cli", help="proses tanpa UI")
     c.add_argument("source", help="link video atau path file")
-    c.add_argument("--clips", default="auto", help='jumlah klip; "auto" = ±1 per 7,5 menit video (1 jam ≈ 8)')
+    c.add_argument("--clips", default="auto", help='jumlah klip; "auto" = ±1 per 3 menit video, 3–10 (≥30 menit = 10)')
     c.add_argument("--layout", default=None, choices=["portrait", "square", "blur", "split", "landscape"])
     c.add_argument("--lang", default=None)
     c.add_argument("--model", default=None)

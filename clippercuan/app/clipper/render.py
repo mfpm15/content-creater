@@ -205,7 +205,11 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     if emojis:
         es = int(170 * W / 1080 * float(cfg["emoji"].get("size", 1.0)))
         cap_pos = cfg["caption"].get("position", "bottom")
-        ey = {"bottom": int(H * 0.60), "middle": int(H * 0.36), "top": int(H * 0.30)}[cap_pos] - es
+        if cfg["caption"].get("y_pct") not in (None, ""):   # emoji tepat di atas caption yang diposisikan bebas
+            cap_fs = int(float(cfg["caption"].get("size", 82)) * W / 1080)
+            ey = max(0, int(H * float(cfg["caption"]["y_pct"]) / 100) - int(cap_fs * 0.9) - es)
+        else:
+            ey = {"bottom": int(H * 0.60), "middle": int(H * 0.36), "top": int(H * 0.30)}[cap_pos] - es
         for k, em in enumerate(emojis):
             idx = add_input(["-loop", "1", "-framerate", "30", "-t", f"{em['e'] + 0.2:.2f}", "-i", em["file"]])
             d = em["e"] - em["s"]

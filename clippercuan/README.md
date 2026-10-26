@@ -27,9 +27,10 @@ Hasil tersimpan di folder `~/ClipperCuan/projects/` (tombol **Buka folder** di a
 |---|---|
 | Studio | Satu layar seperti aplikasi desktop: preview 9:16 dengan caption & judul tampil langsung, panel Instant style / Clip setting / Branding, deretan *Detected clips* (skor x/10, filter Hot/Terpilih/Rendered), bilah render |
 | Resep gaya viral | **Otomatis sesuai konten** (bawaan) + 8 resep: Podcast Box merah, Podcast Hormozi, Quote glow, Review tech, Mobile Legends Hype kuning / Neon pink, Edukasi word-by-word, Campaign clipping (`--recipe` di CLI, `recipe` di MCP) |
-| Otomatis penuh | Link → deteksi jenis konten & facecam → ±8 klip terbaik dari video 1 jam langsung dirender (jumlah bisa diatur) |
+| Otomatis penuh | Link → deteksi jenis konten & facecam → 15 kandidat diranking #01–#15 (🔥 hot) → 10 klip terbaik dari video ≥ 30 menit langsung dirender (jumlah bisa diatur) |
+| Kualitas | Output 1080p / 1440p / 4K (2160×3840); sumber terbaik sampai 4K (VP9/AV1, SDR); x264 CRF 18 atau GPU (NVIDIA/Intel/Apple/AMD) otomatis; peringatan bila sumber harus diperbesar |
 | Hemat disk | Bawaan untuk link: momen dicari dari subtitle YouTube (0 MB) atau audio saja; hanya potongan klip yang diunduh saat render lalu dihapus (`--lite`). File lokal tidak diduplikasi |
-| Sumber video | Link YouTube/TikTok/Instagram/dll (yt-dlp, maks 1080p) atau file lokal (drag & drop); cookies browser bila YouTube minta verifikasi |
+| Sumber video | Link YouTube/TikTok/Instagram/dll (yt-dlp, sampai 4K) atau file lokal (drag & drop); cookies browser bila YouTube minta verifikasi |
 | Subtitle otomatis | Mode Otomatis: subtitle YouTube → API cloud (Groq/OpenAI/9router) → Whisper lokal; timestamp per kata, 14+ bahasa, opsi terjemah ke Inggris |
 | Cari momen | Skor hook (pertanyaan/angka/kata pemicu), kata emosional, energi audio, **aktivitas visual (scene & gerak dari keyframe)**, tempo bicara, kalimat utuh |
 | Judul pembuka | Otomatis dari kalimat paling kuat; preset Duo glow (2 baris) / Bar / Outline / Neon / Clean; pilihan judul alternatif per klip |

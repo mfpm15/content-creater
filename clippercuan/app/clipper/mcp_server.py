@@ -103,7 +103,7 @@ def create_clips(source: str, clip_count: int = 0, layout: str = "", template: s
     source: link (YouTube/TikTok/IG/…) atau path file video lokal di komputer ini.
     layout: portrait | square | blur | split | landscape.
     template: nama template gaya yang tersimpan (lihat list_templates); pengaturan lain menimpanya.
-    clip_count: jumlah klip yang dirender; 0 = otomatis (±1 per 7,5 menit video, 3–10; video 1 jam ≈ 8 klip).
+    clip_count: jumlah klip yang dirender; 0 = otomatis (±1 per 3 menit video, 3–10; video ≥ 30 menit = 10 klip, diranking #01..).
     recipe: "auto" (bawaan, sesuai jenis konten) atau resep dari list_recipes, mis. podcast-box, podcast-hormozi, ml-hype; "" = tanpa resep.
     lite: hemat disk untuk link — video penuh tidak disimpan, hanya audio + potongan klip yang diunduh.
     caption_style: box | wbw | karaoke | clean | keyword (kosong = ikut resep/template/bawaan).

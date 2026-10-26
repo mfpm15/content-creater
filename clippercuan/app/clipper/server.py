@@ -421,7 +421,7 @@ def frame(pid: str, t: float = 0.0):
             from . import download
 
             try:
-                download.grab_remote_frame(p["source"], t, out, width=640)
+                download.grab_remote_frame(p["source"], t, out, width=640, max_h=download.source_height(p.get("settings"), True))
             except Exception as e:  # noqa: BLE001
                 raise HTTPException(502, f"Frame dari sumber online gagal diambil: {str(e)[:200]}") from None
         else:

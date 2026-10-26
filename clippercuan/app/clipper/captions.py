@@ -196,7 +196,8 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
                     s0 = w["s"] if k else line[0]["s"]
                     e0 = line[k + 1]["s"] if k + 1 < len(line) else l_end
                     grow = r"\t(0,120,\fscx104\fscy104)\t(120,220,\fscx100\fscy100)" if pop else ""
-                    if box_on:  # lapis bawah: kotak solid hanya di kata aktif
+                    if box_on:  # lapis bawah: (glow) + kotak solid hanya di kata aktif
+                        glow_layer(s0, e0, " ".join(_esc(up(x["w"])) for x in line))
                         box_parts = []
                         for j, x in enumerate(line):
                             t = _esc(up(x["w"]))

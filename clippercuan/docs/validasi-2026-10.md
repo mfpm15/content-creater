@@ -84,7 +84,7 @@ Sinyal visual (scene & gerak) hanya ada di mode penuh; di mode hemat skor memaka
 ## Otomatis dari link sampai klip jadi
 - **Resep "Otomatis sesuai konten"** (bawaan UI & CLI/MCP): podcast → Box merah, review → Karaoke biru, gameplay → Hype kuning. Pilihan eksplisit pengguna tetap menang.
 - **Deteksi gameplay & facecam**: 8 frame sampel (tanpa unduh penuh di mode hemat) → wajah besar = podcast; wajah kecil konsisten = facecam (kotak split dihitung otomatis); tanpa wajah + ujaran jarang = gameplay → format Blur agar HUD & minimap utuh.
-- **Jumlah klip otomatis**: ±1 per 7,5 menit (1 jam ≈ 8, rentang 3–10), sesuai estimasi industri 6–8 Short per jam podcast. Kandidat dengan skor < 45 dilewati (minimal 1 klip tetap dibuat).
+- **Jumlah klip otomatis**: ±1 per 7,5 menit (1 jam ≈ 8, rentang 3–10) — *diubah di bagian 4 menjadi ±1 per 3 menit (≥ 30 menit = 10 klip)*. Kandidat dengan skor < 45 dilewati (minimal 1 klip tetap dibuat).
 - **Render langsung** klip terbaik setelah ranking (bisa dimatikan; kandidat lain tetap bisa dirender di studio).
 
 ## Gaya caption Mobile Legends
@@ -100,3 +100,45 @@ gaming (savage, maniac, lord, comeback, clutch, dll.) menaikkan skor hook dan ot
 - Belum diuji dengan unduhan YouTube sungguhan dari lingkungan ini (IP diblokir); perlu dicoba di laptop.
 
 Sumber: https://www.clipspeed.ai/blog/podcast-youtube-shorts-strategy.html · https://www.opus.pro/blog/youtube-shorts-hook-formulas · https://www.shortimize.com/blog/how-to-edit-videos-for-tiktok · https://pippit.capcut.com/templates/mobile-legends-capcut-color-adjustment
+
+---
+
+# Bagian 4 — Kualitas 1080p–4K, ranking otomatis, cek ulang menyeluruh (26 Oktober 2026)
+
+## Kenapa hasil sebelumnya bisa "burik"
+Unduhan dibatasi 1080p H.264. Crop portrait dari video landscape 1080p hanya menyisakan 608×1080 piksel, lalu diperbesar 1,8×
+ke 1080×1920. Ditambah encode cepat (veryfast, CRF 20) dan, di mode hemat, encode ganda ultrafast.
+
+## Perbaikan & hasil uji (klip 8 detik, CPU 4 core)
+| Sumber → output | Resolusi | Ketajaman* | Bitrate | Waktu render |
+|---|---|---|---|---|
+| 1080p → 1080p (perilaku lama) | 1080×1920 | 25 | 4,7 Mb/s | 7 dtk |
+| **4K → 1080p (bawaan baru)** | 1080×1920 | **44** | 7,5 Mb/s | 5 dtk |
+| 4K → 4K | 2160×3840 | 53 | 23,8 Mb/s | 18 dtk |
+
+\*Variance of Laplacian pada area yang sama (makin tinggi makin tajam). Video uji sintetis, bukan footage nyata.
+
+- Sumber terbaik sampai 4K (VP9/AV1 di YouTube; SDR diutamakan, HDR di-tonemap). Bawaan: 4K di mode hemat (hanya potongan klip yang diunduh), 1440p di mode unduh penuh.
+- Output 1080p / 1440p / 4K; caption, emoji, watermark ikut berskala.
+- Encode x264 `medium` CRF 18 + aq-mode 3, tag warna BT.709, audio AAC 192k; GPU NVENC/QSV/VideoToolbox/AMF dipakai otomatis dengan cadangan CPU (GPU belum bisa diuji di lingkungan ini).
+- Penajaman ringan hanya saat sumber terpaksa diperbesar; peringatan jujur per klip (mis. output 4K portrait dari sumber 4K landscape tetap diperbesar 1,8× — 8K tidak umum, jadi 1080p/1440p memberi detail per piksel terbaik).
+
+## Ranking otomatis seperti referensi
+15 kandidat dibuat dan diranking #01–#15 berdasarkan skor (kandidat yang isinya hampir sama diturunkan), 40% teratas
+dengan skor ≥ 60 ditandai 🔥 Hot, header "N ditemukan · N dirender · N hot". Render otomatis: ±1 klip per 3 menit
+(video ≥ 30 menit = 10 klip, minimal 3). ZIP/ekspor dinamai sesuai rank (`01 - Judul.mp4`). Diuji lewat UI dengan video 12 menit:
+15 kandidat, urutan #01–#06 benar, 4 klip dirender otomatis tanpa klik tambahan.
+
+## Hasil code review menyeluruh (10 temuan, semua diperbaiki)
+1. Hapus klip tidak benar-benar terhapus (muncul lagi saat reload) — diperbaiki + tes.
+2. Render terakhir gagal → webhook/ekspor tidak pernah terkirim — diperbaiki.
+3. Profil Mobile Legends dipilih manual → facecam tidak dideteksi, selalu blur — diperbaiki.
+4. Klip manual/render ulang diabaikan saat menentukan proyek selesai — diperbaiki + tes.
+5. Emoji menimpa caption yang diposisikan bebas — diperbaiki.
+6. Glow hilang saat box highlight aktif (resep Neon pink) — diperbaiki, dicek visual.
+7. "Ulangi" menimpa gaya yang sudah diedit di studio — diperbaiki.
+8. Dokumentasi jumlah klip tidak sinkron — diperbaiki.
+9. Model wajah dimuat 8× per proyek — sekarang sekali.
+10. Resolusi stream tidak konsisten di mode hemat (ekstraksi YouTube ganda) — diperbaiki.
+
+Total 51 tes otomatis lulus.

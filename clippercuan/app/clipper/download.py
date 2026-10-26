@@ -151,10 +151,11 @@ def _input(stream: dict, start: float | None = None, end: float | None = None) -
     return args + ["-i", stream["url"]]
 
 
-def fetch_audio(source: str, out_dir: Path, progress: Callable[[float, str], None] = lambda p, m: None) -> tuple[Path, dict]:
+def fetch_audio(source: str, out_dir: Path, progress: Callable[[float, str], None] = lambda p, m: None,
+                max_h: int = 2160) -> tuple[Path, dict]:
     """Mode hemat: hanya audio (untuk transkripsi & energi) + metadata video. Video penuh tidak disimpan."""
     progress(0.1, "Membaca info video (mode hemat)…")
-    meta = resolve_streams(source)
+    meta = resolve_streams(source, max_h=max_h)
     src = meta["audio"] or meta["video"]
     out = out_dir / "audio-source.m4a"
     progress(0.4, "Mengambil audio saja (mode hemat disk)…")
@@ -183,8 +184,8 @@ def fetch_segment(source: str, start: float, end: float, dst: Path, max_h: int =
     return dst
 
 
-def grab_remote_frame(source: str, t: float, dst: Path, width: int = 640) -> Path:
-    meta = resolve_streams(source)
+def grab_remote_frame(source: str, t: float, dst: Path, width: int = 640, max_h: int = 2160) -> Path:
+    meta = resolve_streams(source, max_h=max_h)
     cmd = [FFMPEG, "-hide_banner", "-nostdin", "-loglevel", "error", "-y", *_input(meta["video"], max(t, 0)),
            "-frames:v", "1", "-vf", f"scale={width}:-2", "-q:v", "4", str(dst)]
     subprocess.run(cmd, capture_output=True, check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

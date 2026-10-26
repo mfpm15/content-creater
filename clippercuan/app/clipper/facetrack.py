@@ -218,13 +218,15 @@ def detect_facecam(frames: list[np.ndarray]) -> dict:
     import cv2
 
     small, big = [], 0
+    det, det_size = None, None
     for fr in frames:
         g = fr if fr.ndim == 2 else cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
         h0, w0 = g.shape
         scale = 640 / w0
         g = cv2.resize(g, (640, max(2, int(h0 * scale))))
         try:
-            det = _Detector(g.shape[1], g.shape[0])
+            if det is None or det_size != g.shape:   # model wajah dimuat sekali per ukuran frame
+                det, det_size = _Detector(g.shape[1], g.shape[0]), g.shape
             faces = det(g)
         except Exception:  # noqa: BLE001
             return {"rect": None, "big_face": False, "hits": 0}

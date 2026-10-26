@@ -170,7 +170,7 @@ def _pipeline(pid: str) -> None:
 
         def get_wav() -> Path:  # audio hanya diunduh bila subtitle YouTube tidak tersedia/tidak dipakai
             if not wav.exists():
-                audio, _ = download.fetch_audio(p["source"], work, _progress(pid, 0.18, 0.2))
+                audio, _ = download.fetch_audio(p["source"], work, _progress(pid, 0.18, 0.2), max_h=download.source_height(cfg, True))
                 media.extract_audio(audio, wav)
                 audio.unlink(missing_ok=True)
             return wav
@@ -258,7 +258,7 @@ def _pipeline(pid: str) -> None:
 
 
 def clip_target(cfg: dict, duration: float) -> int:
-    """Jumlah klip yang dirender otomatis. "auto"/0: ±1 klip per 7,5 menit (video 1 jam ≈ 8), 3–10 klip."""
+    """Jumlah klip yang dirender otomatis. "auto"/0: ±1 klip per 3 menit video, 3–10 (video ≥ 30 menit = 10 klip)."""
     raw = cfg.get("clip_count", "auto")
     if raw in (None, "", "auto", 0, "0"):
         return int(max(3, min(10, round((duration or 0) / 180))))
@@ -284,7 +284,7 @@ def _sample_frames(p: dict, pr: media.Probe, src: Path | None, n: int = 8) -> li
             f = Path(td) / f"f{i}.jpg"
             try:
                 if src is None:
-                    download.grab_remote_frame(p["source"], t, f, width=640)
+                    download.grab_remote_frame(p["source"], t, f, width=640, max_h=download.source_height(p.get("settings"), True))
                 else:
                     media.grab_frame(src, t, f, width=640)
                 img = cv2.imread(str(f))
@@ -299,7 +299,8 @@ def _activity(p: dict, pr: media.Probe, src: Path | None, tr: dict, cfg: dict) -
     """Sinyal non-teks untuk klasifikasi profil: gameplay (tanpa wajah besar + ujaran jarang/istilah game) & facecam."""
     from . import facetrack
 
-    need = cfg.get("content_profile", "auto") == "auto" or (cfg.get("split") or {}).get("auto")
+    need = (cfg.get("content_profile", "auto") in ("auto", "mobile_legends") or cfg.get("recipe") == "auto"
+            or (cfg.get("split") or {}).get("auto"))
     if not need or not pr.duration:
         return {}
     cam = facetrack.detect_facecam(_sample_frames(p, pr, src))
@@ -313,7 +314,7 @@ def _apply_auto_recipe(pid: str, cfg: dict, profile_name: str, classified: dict)
     """Resep "auto": pilih resep sesuai konten. Untuk gaming, split bila facecam terdeteksi, selain itu blur."""
     from .recipes import PROFILE_DEFAULT, RECIPES
 
-    if cfg.get("recipe") == "auto":
+    if cfg.get("recipe") == "auto" and not cfg.get("recipe_applied"):   # Ulangi tidak menimpa gaya yang sudah diedit
         rid = PROFILE_DEFAULT.get(profile_name, "podcast-box")
         look = {k: v for k, v in RECIPES[rid]["settings"].items() if k not in ("content_profile",)}
         if cfg.get("duration_preset") not in (None, "auto"):
@@ -510,7 +511,7 @@ def add_clip(pid: str, start: float, end: float, title: str = "") -> dict:
 def delete_clip(pid: str, cid: str) -> dict:
     with _LOCK:
         p = load(pid)
-        p["clips"] = [c for c in p["clips"] if c["id"] != cid]
+        p["candidates"] = p["clips"] = [c for c in p["clips"] if c["id"] != cid]
         save(p)
     for ext in (".mp4", ".jpg", ".ass", ".srt", ".src.mkv"):
         (pdir(pid) / f"{cid}{ext}").unlink(missing_ok=True)
@@ -750,9 +751,9 @@ def _finish_renders(pid: str) -> bool:
     with _LOCK:
         p = load(pid)
         cands = p.get("candidates", [])
-        if any(x.get("selected") and x.get("status") in ("selected", "queued", "rendering") for x in cands):
+        if any(x.get("status") in ("queued", "rendering") for x in cands):   # termasuk klip manual & render ulang
             return False
-        failed = sum(x.get("status") == "error" for x in cands if x.get("selected"))
+        failed = sum(x.get("status") == "error" for x in cands)
         done = sum(x.get("status") == "done" for x in cands)
         msg = "Semua render terpilih selesai" if not failed else f"{done} klip selesai, {failed} gagal (lihat pesan error di kartu klip)"
         first = not p.get("done_notified")
@@ -773,11 +774,17 @@ def _worker() -> None:
                     _notify(pid, "project.candidates_ready")
                 # auto_render: notifikasi dikirim setelah render terakhir selesai
             elif kind == "render":
+                err = None
                 try:
                     _render_one(pid, extra["cid"])
-                finally:
-                    first = _finish_renders(pid)
+                except KeyError:
+                    raise
+                except Exception as e:  # noqa: BLE001 — klip gagal tetap menutup proyek & mengirim notifikasi
+                    err = e
+                first = _finish_renders(pid)
                 _notify(pid, "project.done" if first else "clip.rendered", extra["cid"])
+                if err:
+                    raise err
         except Cancelled:
             safe_update(pid, status="cancelled", message="Dibatalkan")
             _notify(pid, "project.cancelled")
