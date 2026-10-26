@@ -1,4 +1,4 @@
-name: Build desktop app
+name: ClipperCuan - Build desktop app
 
 # Hanya dijalankan manual (tab Actions → Build desktop app → Run workflow)
 on:
@@ -19,7 +19,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: app
+        working-directory: clippercuan/app
     steps:
       - uses: actions/checkout@v4
 
@@ -27,15 +27,15 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: app/requirements.txt
+          cache-dependency-path: clippercuan/app/requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          pip install -r requirements.txt pyinstaller pytest
 
       - name: Unit tests
-        run: python tests/test_core.py
+        run: python -m pytest -q tests
 
       - name: Build
         run: python build.py
@@ -80,5 +80,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: app/${{ matrix.name }}.zip
+          path: clippercuan/app/${{ matrix.name }}.zip
           retention-days: 30

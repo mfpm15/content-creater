@@ -139,7 +139,7 @@ def scan_inbox_once() -> list[str]:
         shutil.move(str(f), dst)
         _seen.pop(f, None)
         tpl = project.list_templates().get(cfg.get("inbox_template") or "", {})
-        p = project.create(str(dst), {**tpl, "origin": "inbox"})
+        p = project.create(str(dst), {**tpl, "origin": "inbox", "auto_render": True})
         created.append(p["id"])
         print(f"[inbox] {f.name} → proyek {p['id']}")
     return created

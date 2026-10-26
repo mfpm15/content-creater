@@ -114,7 +114,7 @@ def create_clips(source: str, clip_count: int = 6, layout: str = "portrait", tem
         if template not in tpls:
             raise RuntimeError(f"Template '{template}' tidak ada. Tersedia: {', '.join(tpls) or '(kosong)'}")
         settings.update(tpls[template])
-    settings.update({"clip_count": clip_count, "layout": layout, "language": language, "min_sec": min_sec, "max_sec": max_sec})
+    settings.update({"auto_render": True, "clip_count": clip_count, "layout": layout, "language": language, "min_sec": min_sec, "max_sec": max_sec})
     if caption_style:
         settings.setdefault("caption", {})["style"] = caption_style
     if cut_silence is not None:

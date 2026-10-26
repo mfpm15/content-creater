@@ -140,7 +140,9 @@ def normalize(raw: dict, index: int, profile_name: str, source_duration: float) 
         warnings.append("Periksa hak sumber dan konteks sebelum publikasi")
     if breakdown["transcript_confidence"] < 70:
         warnings.append("Confidence transkrip rendah")
+    extras = {k: v for k, v in raw.items() if k not in {"s", "e", "seg0", "seg1"}}  # hasil render/edit tidak boleh hilang saat rerank
     return {
+        **extras,
         "id": raw.get("id") or f"candidate_{index:02d}_{digest[:5]}", "rank": 0,
         "start": round(start, 2), "end": round(end, 2), "duration": round(max(0, end - start), 2),
         "transcript_excerpt": text, "text": text, "profile": profile_name,
@@ -175,7 +177,8 @@ def rerank(items: list[dict], profile_name: str, diversity: float = 0.3, max_ove
         if chosen["banned"]:
             continue
         chosen["overlap_percentage"] = round(max((overlap(chosen, x) for x in selected), default=0) * 100, 1)
-        if not chosen["pinned"] and chosen["overlap_percentage"] > max_overlap * 100:
+        keep = chosen["pinned"] or chosen.get("manual") or chosen.get("status") in {"queued", "rendering", "done"}
+        if not keep and chosen["overlap_percentage"] > max_overlap * 100:
             continue
         selected.append(chosen)
     for rank, item in enumerate(selected, 1):

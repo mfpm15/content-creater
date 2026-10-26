@@ -102,7 +102,9 @@ def youtube_captions(url: str, language: str = "auto", log: Callable[[str], None
     """Ambil subtitle YouTube (manual diutamakan, lalu otomatis). None bila tidak tersedia."""
     import yt_dlp
 
-    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True}) as ydl:
+    from .download import _youtube_js_opts
+
+    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True, **_youtube_js_opts()}) as ydl:
         info = ydl.extract_info(url, download=False)
         manual, auto = info.get("subtitles") or {}, info.get("automatic_captions") or {}
         orig = info.get("language") or next((k[:-5] for k in auto if k.endswith("-orig")), None)

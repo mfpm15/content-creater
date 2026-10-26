@@ -12,6 +12,15 @@ def is_url(s: str) -> bool:
     return s.strip().lower().startswith(("http://", "https://"))
 
 
+def _youtube_js_opts() -> dict:
+    """YouTube kini butuh runtime JavaScript (deno/node/bun/quickjs) + yt-dlp-ejs untuk memecahkan tantangan player."""
+    runtimes = {name: {} for name in ("deno", "node", "bun", "quickjs") if shutil.which(name)}
+    opts: dict = {"remote_components": ["ejs:github"]}  # solver diunduh sekali bila paket yt-dlp-ejs tidak terpasang
+    if runtimes:
+        opts["js_runtimes"] = runtimes
+    return opts
+
+
 def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = lambda p, m: None) -> tuple[Path, str]:
     """Kembalikan (path video, judul sumber)."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -49,6 +58,7 @@ def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = l
         "retries": 5,
         "fragment_retries": 5,
     }
+    opts.update(_youtube_js_opts())
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(source.strip(), download=True)
     files = sorted(out_dir.glob("source.*"), key=lambda p: p.stat().st_size, reverse=True)

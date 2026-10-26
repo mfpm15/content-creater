@@ -17,13 +17,15 @@ HOOK_WORDS = {
     # Indonesia
     "rahasia", "jangan", "ternyata", "kenapa", "gimana", "bagaimana", "cara", "trik", "tips", "kesalahan",
     "penting", "wajib", "harus", "pertama", "terbesar", "terbaik", "terburuk", "jujur", "sebenarnya",
-    "nggak", "gak", "enggak", "tidak", "pernah", "semua", "orang", "kamu", "lo", "lu", "gue", "aku",
+    "pernah",
     "uang", "duit", "cuan", "gaji", "juta", "miliar", "gratis", "bahaya", "gila", "parah", "serius",
     "kaget", "viral", "stop", "berhenti", "hidup", "mati", "sukses", "gagal", "bisnis", "rezeki",
     # English
     "secret", "never", "always", "why", "how", "mistake", "biggest", "best", "worst", "money", "truth",
-    "actually", "crazy", "insane", "important", "stop", "you", "nobody", "everyone", "million", "free",
+    "actually", "crazy", "insane", "important", "stop", "nobody", "everyone", "million", "free",
 }
+# Kata ganti & negasi umum: ada di hampir setiap kalimat, jadi bobotnya kecil (hanya penguat, bukan pemicu).
+WEAK_HOOK_WORDS = {"nggak", "gak", "enggak", "tidak", "semua", "orang", "kamu", "lo", "lu", "gue", "aku", "you"}
 EMO_WORDS = {
     "wow", "anjir", "astaga", "gokil", "mantap", "keren", "sedih", "senang", "marah", "takut", "cinta",
     "benci", "bangga", "malu", "nangis", "ketawa", "lucu", "amazing", "love", "hate", "scared", "funny",
@@ -48,7 +50,7 @@ def _hook_score(text: str) -> float:
         s += 0.35
     if any(t.isdigit() for t in toks):
         s += 0.2
-    s += min(sum(t in HOOK_WORDS for t in toks) * 0.15, 0.6)
+    s += min(sum(t in HOOK_WORDS for t in toks) * 0.15 + sum(t in WEAK_HOOK_WORDS for t in toks) * 0.03, 0.6)
     return min(s, 1.0)
 
 
@@ -69,13 +71,27 @@ def duration_range(preset: str, tr: dict | None = None) -> tuple[float, float, s
     return 40.0, 60.0, "Ujaran lebih tenang; rentang panjang menjaga ide tetap utuh"
 
 
-def _candidate_breakdown(first: str, full: str, last: str, pace: float, energy_s: float, conf: float) -> dict:
+def _is_punctuated(segs: list[dict]) -> bool:
+    """Subtitle YouTube otomatis tidak punya tanda baca; untuk itu jeda bicara dipakai sebagai batas kalimat."""
+    return bool(segs) and sum(_ends_sentence(x["text"]) for x in segs) / len(segs) >= 0.2
+
+
+def _clean_end(segs: list[dict], words: list[dict], j: int, punctuated: bool) -> bool:
+    if punctuated:
+        return _ends_sentence(segs[j]["text"])
+    if j + 1 >= len(segs):
+        return True
+    return segs[j + 1]["s"] - segs[j]["e"] >= 0.45
+
+
+def _candidate_breakdown(first: str, full: str, last: str, pace: float, energy_s: float, conf: float,
+                         clean_end: bool | None = None) -> dict:
     toks = _tokens(full)
     hook = round(_hook_score(first) * 100)
     novelty = min(100, round(len(set(toks)) / max(len(toks), 1) * 150))
     emotional = min(100, round(sum(t in EMO_WORDS for t in toks) * 28 + energy_s * 45))
-    clarity = max(0, 100 - (25 if re.match(r"^(dan|tapi|jadi|terus|ini|itu)\\b", first.strip(), re.I) else 0))
-    payoff = 100 if _ends_sentence(last) else 25
+    clarity = max(0, 100 - (25 if re.match(r"^(dan|tapi|jadi|terus|ini|itu)\b", first.strip(), re.I) else 0))
+    payoff = 100 if (_ends_sentence(last) if clean_end is None else clean_end) else 25
     quotability = min(100, round(_hook_score(full) * 70 + (20 if len(toks) <= 35 else 0)))
     visual = min(100, round(energy_s * 75 + 15))
     density = max(0, min(100, round(100 - abs(pace - 2.5) * 28)))
@@ -107,6 +123,7 @@ def readiness(breakdown: dict) -> tuple[int, list[str]]:
 def score_candidates(tr: dict, energy: np.ndarray, min_sec: float = 20, max_sec: float = 60, hop: float = 0.5) -> list[dict]:
     """Semua jendela kandidat (dari batas kalimat) beserta skor lokal, urut terbaik."""
     segs, words = tr["segments"], tr["words"]
+    punctuated = _is_punctuated(segs)
     cands = []
     for i, first in enumerate(segs):
         text_parts = []
@@ -119,7 +136,6 @@ def score_candidates(tr: dict, energy: np.ndarray, min_sec: float = 20, max_sec:
             if length < min_sec:
                 continue
             full = " ".join(text_parts)
-            toks = _tokens(full)
             nwords = sum(len(segs[k]["words"]) for k in range(i, j + 1))
             pace = nwords / max(length, 1)
             e0, e1 = int(start / hop), max(int(end / hop), int(start / hop) + 1)
@@ -127,13 +143,10 @@ def score_candidates(tr: dict, energy: np.ndarray, min_sec: float = 20, max_sec:
             if en.size == 0:
                 en = np.zeros(1)
             energy_s = float(en.mean() * 0.6 + np.percentile(en, 90) * 0.4)
-            kw = sum(t in HOOK_WORDS for t in toks) + 1.5 * sum(t in EMO_WORDS for t in toks)
-            kw_s = min(kw / max(len(toks), 1) * 6, 1.0)
-            pace_s = float(np.clip((pace - 1.2) / 2.0, 0, 1))
-            complete = 1.0 if _ends_sentence(segs[j]["text"]) else 0.3
             conf = float(np.mean([words[k]["p"] for k in range(first["words"][0], segs[j]["words"][-1] + 1)]))
             ideal = 1 - min(abs(length - (min_sec + max_sec) / 2) / max_sec, 1) * 0.3
-            breakdown = _candidate_breakdown(first["text"], full, segs[j]["text"], pace, energy_s, conf)
+            breakdown = _candidate_breakdown(first["text"], full, segs[j]["text"], pace, energy_s, conf,
+                                             _clean_end(segs, words, j, punctuated))
             ready, warnings = readiness(breakdown)
             score = ready / 100 * ideal
             cands.append({"s": start, "e": end, "seg0": i, "seg1": j, "score": score, "text": full,
@@ -187,7 +200,7 @@ but so if just very more why how what when never always""".split())
 
 
 def title_options(text: str) -> list[str]:
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\\s+", text) if s.strip()]
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
     out = []
     for s in sentences[:8]:
         t = make_title([s], 7)

@@ -39,11 +39,36 @@ def load(pid: str) -> dict:
         p = json.loads(f.read_text("utf-8"))
         # Migrasi non-destruktif: proyek lama tetap memakai clips sebagai kandidat.
         p["schema_version"] = max(3, int(p.get("schema_version", 1)))
-        p.setdefault("candidates", p.get("clips", []))
+        _unify_clips(p)
         p.setdefault("rankings", candidates.rankings(p["candidates"]) if p["candidates"] else {})
         p.setdefault("production", {"status": "draft_candidate", "planned_date": "", "notes": "", "platform": ""})
         p.setdefault("caption_workspace", {"schema_version": 3, "revision": 0})
         return p
+
+
+_RENDER_FIELDS = ("status", "file", "thumb", "srt", "words", "crop_keys", "overrides", "post", "title", "start", "end",
+                  "duration", "version", "error", "cut_saved", "emojis", "caption_cues", "crop_confidence", "render_warnings", "manual")
+
+
+def _unify_clips(p: dict) -> None:
+    """`clips` dan `candidates` harus satu daftar yang sama (render & edit menulis ke clips, UI membaca candidates).
+
+    Proyek lama menyimpan dua salinan yang bisa berbeda; hasil render/edit di `clips` dimenangkan atas salinan kandidat.
+    """
+    cands = p.get("candidates")
+    clips = p.get("clips") or []
+    if cands is None:
+        p["candidates"] = clips
+        return
+    by_id = {c["id"]: c for c in cands}
+    for clip in clips:
+        base = by_id.get(clip["id"])
+        if base is None:
+            cands.append(clip)
+            by_id[clip["id"]] = clip
+        elif base is not clip:
+            base.update({k: clip[k] for k in _RENDER_FIELDS if k in clip})
+    p["clips"] = cands
 
 
 def save(p: dict) -> None:
@@ -174,7 +199,7 @@ def _pipeline(pid: str) -> None:
     manifest = candidates.manifest(ranked, profile_name, p["source"])
     (work / "candidate-manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), "utf-8")
     update(pid, candidates=ranked, clips=ranked, rankings=manifest["rankings"], rights_checklist=manifest["rights_checklist"],
-           language=lang, status="candidates_ready", progress=0.65,
+           language=lang, status="running" if cfg.get("auto_render") else "candidates_ready", progress=0.65,
            message=f"{len(ranked)} kandidat siap dipilih", viral_readiness=round(sum(x["score"] for x in ranked) / max(1, len(ranked))))
     if cfg.get("auto_render"):
         select_candidates(pid, [x["id"] for x in ranked[:int(cfg.get("clip_count", 3))]])
@@ -497,12 +522,15 @@ def rerender_all(pid: str, settings: dict) -> dict:
     with _LOCK:
         p = load(pid)
         p["settings"] = deep_merge(p["settings"], settings)
-        for c in p["clips"]:
+        todo = [c for c in p["clips"] if c.get("selected") or c.get("status") in ("done", "error", "rendering", "queued") or c.get("manual")]
+        for c in todo:
             c["status"] = "queued"
             if "layout" in settings:
                 c["crop_keys"] = None
+        if todo:
+            p["status"], p["message"] = "rendering", f"{len(todo)} klip dirender ulang"
         save(p)
-    for c in p["clips"]:
+    for c in todo:
         _JOBS.put(("render", pid, {"cid": c["id"]}))
     return p
 
@@ -577,21 +605,39 @@ def batch_render(pid: str, ids: list[str] | None = None) -> dict:
 
 
 # ---------------------------------------------------------------- worker
+def _finish_renders(pid: str) -> bool:
+    """Tandai proyek selesai bila tidak ada render tersisa. True bila baru saja selesai."""
+    with _LOCK:
+        p = load(pid)
+        cands = p.get("candidates", [])
+        if any(x.get("selected") and x.get("status") in ("selected", "queued", "rendering") for x in cands):
+            return False
+        failed = sum(x.get("status") == "error" for x in cands if x.get("selected"))
+        done = sum(x.get("status") == "done" for x in cands)
+        msg = "Semua render terpilih selesai" if not failed else f"{done} klip selesai, {failed} gagal (lihat pesan error di kartu klip)"
+        first = not p.get("done_notified")
+        update(pid, status="done" if done or not failed else "error", progress=1.0, message=msg, done_notified=True)
+        return first
+
+
 def _worker() -> None:
     while True:
         kind, pid, extra = _JOBS.get()
         try:
             if kind == "pipeline":
                 _CANCEL.discard(pid)
+                update(pid, done_notified=False)
                 _pipeline(pid)
-                _notify(pid, "project.done")
+                st = load(pid).get("status")
+                if st == "candidates_ready":
+                    _notify(pid, "project.candidates_ready")
+                # auto_render: notifikasi dikirim setelah render terakhir selesai
             elif kind == "render":
-                _render_one(pid, extra["cid"])
-                current = load(pid)
-                pending = [x for x in current.get("candidates", []) if x.get("selected") and x.get("status") in ("selected", "queued", "rendering")]
-                if not pending:
-                    safe_update(pid, status="done", progress=1.0, message="Semua render terpilih selesai")
-                _notify(pid, "clip.rendered", extra["cid"])
+                try:
+                    _render_one(pid, extra["cid"])
+                finally:
+                    first = _finish_renders(pid)
+                _notify(pid, "project.done" if first else "clip.rendered", extra["cid"])
         except Cancelled:
             safe_update(pid, status="cancelled", message="Dibatalkan")
             _notify(pid, "project.cancelled")
@@ -613,7 +659,7 @@ def _notify(pid: str, event: str, cid: str | None = None) -> None:
     try:
         if event == "clip.rendered":
             p = load(pid)
-            if p.get("status") != "done" or any(c.get("status") in ("queued", "rendering") for c in p["clips"]):
+            if p.get("status") not in ("done", "error") or any(c.get("status") in ("queued", "rendering") for c in p["clips"]):
                 return
             event = "project.updated"
         automation.on_finished(pid, event)

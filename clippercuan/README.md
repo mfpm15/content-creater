@@ -80,12 +80,13 @@ app/
     server.py      API lokal (127.0.0.1)
     web/           UI aplikasi
     fonts/         font OFL untuk caption
-app/tests/           tes otomatis (python app/tests/test_core.py)
+app/tests/           tes otomatis (cd app && python -m pytest -q tests)
 docs/feature-map.md  peta fitur referensi → implementasi
 docs/usulan-fitur.md fitur tambahan versi kita + usulan berikutnya
 docs/agent-api.md    panduan AI agent: MCP, CLI, REST, webhook, inbox
 docs/cloud.md        tanpa membebani laptop: subtitle cloud, server Docker + password
-.github/workflows/   build otomatis paket Windows & macOS + uji asap
+docs/validasi-2026-10.md audit ulang, bug yang diperbaiki, riset, dan backlog
+(CI ada di ../.github/workflows/clippercuan-*.yml: tes otomatis + build paket manual)
 site/                landing page (opsional, untuk jualan)
 ```
 

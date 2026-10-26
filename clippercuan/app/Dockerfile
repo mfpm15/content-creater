@@ -8,6 +8,9 @@ FROM ${BASE_IMAGE}
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 CLIPPER_HOME=/data
 WORKDIR /app
 
+# Runtime JavaScript untuk yt-dlp (tantangan player YouTube)
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
@@ -16,7 +19,7 @@ COPY tests ./tests
 
 # Opsional: unduh model Whisper saat build agar run pertama cepat (docker build --build-arg WHISPER_MODEL=small .)
 ARG WHISPER_MODEL=""
-RUN if [ -n "$WHISPER_MODEL" ]; then python -c "from faster_whisper import WhisperModel; WhisperModel('$WHISPER_MODEL', device='cpu', compute_type='int8', download_root='/opt/models')"; fi
+RUN if [ -n "$WHISPER_MODEL" ]; then python -c "from faster_whisper import WhisperModel; WhisperModel('$WHISPER_MODEL', device='cpu', compute_type='int8', download_root='/data/models')"; fi
 
 VOLUME /data
 EXPOSE 8765

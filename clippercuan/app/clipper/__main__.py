@@ -43,7 +43,7 @@ def cli(args) -> None:
         if args.template not in tpl:
             sys.exit(f"Template '{args.template}' tidak ada. Tersedia: {', '.join(tpl) or '(kosong)'}")
         settings.update(tpl[args.template])
-    settings.update({"clip_count": args.clips, "layout": args.layout, "language": args.lang, "model": args.model,
+    settings.update({"auto_render": True, "clip_count": args.clips, "layout": args.layout, "language": args.lang, "model": args.model,
                      "min_sec": args.min, "max_sec": args.max})
     if args.caption:
         settings.setdefault("caption", {})["style"] = args.caption

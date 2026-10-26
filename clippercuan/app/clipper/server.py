@@ -67,11 +67,37 @@ def _copy_limited(source: BinaryIO, destination: Path, limit: int) -> None:
         raise
 
 
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "[::1]", "::1", "testserver"} | {
+    h.strip().lower() for h in os.environ.get("CLIPPER_ALLOWED_HOSTS", "").split(",") if h.strip()}
+
+
+def _host_only(value: str) -> str:
+    value = value.strip().lower()
+    if value.startswith("["):
+        return value.split("]")[0] + "]"
+    return value.split(":")[0]
+
+
+def _local_request_ok(host: str, origin: str, method: str) -> bool:
+    """Mode lokal tanpa token: tolak DNS-rebinding (Host asing) dan POST/PUT/DELETE lintas-situs (Origin asing)."""
+    if _host_only(host) not in LOCAL_HOSTS:
+        return False
+    if method in {"POST", "PUT", "PATCH", "DELETE"} and origin and origin != "null":
+        from urllib.parse import urlparse
+
+        if (urlparse(origin).netloc or "").lower() != host.strip().lower():
+            return False
+    return True
+
+
 @app.middleware("http")
 async def auth(request: Request, call_next):
-    """Mode server/cloud: wajib token (Bearer untuk agent, Basic auth untuk browser). Lokal tanpa token = bebas."""
-    if TOKEN and not _authorized(request.headers.get("authorization", ""), TOKEN):
-        return Response("Butuh login ClipperCuan", status_code=401, headers={"WWW-Authenticate": 'Basic realm="ClipperCuan"'})
+    """Mode server/cloud: wajib token (Bearer untuk agent, Basic auth untuk browser). Lokal tanpa token: hanya Host/Origin lokal."""
+    if TOKEN:
+        if not _authorized(request.headers.get("authorization", ""), TOKEN):
+            return Response("Butuh login ClipperCuan", status_code=401, headers={"WWW-Authenticate": 'Basic realm="ClipperCuan"'})
+    elif not _local_request_ok(request.headers.get("host", ""), request.headers.get("origin", ""), request.method):
+        return Response("Permintaan ditolak: Host/Origin bukan lokal", status_code=403)
     return await call_next(request)
 
 
@@ -151,8 +177,12 @@ def new_project(body: NewProject):
         if not f.is_file() or f.parent != UPLOADS_DIR:
             raise HTTPException(400, "File unggahan tidak ditemukan")
         src = str(f)
-    elif not src.lower().startswith(("http://", "https://")) and not Path(src).expanduser().is_file():
-        raise HTTPException(400, "Link harus diawali http(s):// atau path file yang ada")
+    elif not src.lower().startswith(("http://", "https://")):
+        f = Path(src).expanduser()
+        if not f.is_file():
+            raise HTTPException(400, "Link harus diawali http(s):// atau path file yang ada")
+        if TOKEN and not f.resolve().is_relative_to(DATA_DIR.resolve()):
+            raise HTTPException(400, "Mode server: file harus diunggah atau ditaruh di folder inbox/data ClipperCuan")
     return project.create(src, body.settings)
 
 
@@ -375,7 +405,10 @@ def production_board():
 
 @app.get("/files/{pid}/{name}")
 def files(pid: str, name: str):
-    d = project.pdir(pid)
+    try:
+        d = project.pdir(pid)
+    except KeyError:
+        raise HTTPException(404)
     f = (d / name).resolve()
     if f.parent != d.resolve() or not f.is_file() or f.suffix not in {".mp4", ".jpg", ".ass", ".srt"}:
         raise HTTPException(404)
