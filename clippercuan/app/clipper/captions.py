@@ -67,14 +67,14 @@ def _word_tags(w: dict) -> str:
 
 def _keyword_index(line: list[dict]) -> int | None:
     """Satu kata paling 'berbobot' per baris (pemicu/emosi > angka > kata panjang); None bila tak ada."""
-    from .highlights import EMO_WORDS, HOOK_WORDS, STOP
+    from .highlights import EMO_WORDS, GAME_WORDS, HOOK_WORDS, STOP
 
     best, best_s = None, 0.0
     for i, w in enumerate(line):
         t = "".join(ch for ch in w["w"].lower() if ch.isalnum())
         if not t:
             continue
-        sc = 3.0 if t in HOOK_WORDS or t in EMO_WORDS else 2.0 if any(ch.isdigit() for ch in t) else (
+        sc = 3.0 if t in HOOK_WORDS or t in EMO_WORDS or t in GAME_WORDS else 2.0 if any(ch.isdigit() for ch in t) else (
             1.0 + len(t) / 20 if len(t) >= 6 and t not in STOP else 0.0)
         if (w.get("style") or {}).get("emphasis"):
             sc = 10.0

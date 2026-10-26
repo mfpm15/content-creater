@@ -37,7 +37,7 @@
       <div id="srcLink" class="src-pane">
         <div class="url-row"><textarea id="url" class="in big" rows="2" placeholder="https://youtube.com/watch?v=…  (YouTube, TikTok, IG, dll.)&#10;Bisa banyak link sekaligus — satu link per baris" autocomplete="off" spellcheck="false"></textarea><button class="btn big" type="button" id="startTop">▶ Run pipeline</button></div>
         <p class="hint" id="urlCount"></p>
-        <div class="fx-row lite-row"><div><b>Hemat disk — jangan simpan video penuh</b><span>Hanya audio (±1 MB/menit) yang diunduh untuk transkripsi. Saat render, hanya potongan klip yang diambil lalu langsung dihapus. Butuh internet saat render.</span></div><label class="sw"><input type="checkbox" id="storage_lite"><span></span></label></div>
+        <div class="fx-row lite-row"><div><b>Hemat disk — jangan unduh video penuh</b><span>Momen terbaik dicari dari subtitle YouTube (tanpa unduh apa pun) atau dari audio saja. Yang diunduh hanya potongan klip terpilih, lalu langsung dihapus setelah dirender. Butuh internet saat render.</span><span class="lite-est" id="liteEst"></span></div><label class="sw"><input type="checkbox" id="storage_lite"><span></span></label></div>
       </div>
       <div id="srcFile" class="src-pane" hidden>
         <label class="drop" id="drop"><input type="file" id="file" accept="video/*" hidden>
@@ -50,6 +50,11 @@
     <div class="card recipe-card">
       <div class="section-title"><span class="step-number">✦</span><div><h2>Resep gaya viral</h2><p>Satu klik: durasi, format, caption, judul, dan efek disetel untuk niche-mu. Semua tetap bisa diubah.</p></div></div>
       <div class="recipe-grid" id="recipes"><span class="muted">Memuat resep…</span></div>
+    </div>
+    <div class="card auto-card">
+      <div class="section-title"><span class="step-number">⚡</span><div><h2>Mode otomatis</h2><p>Setelah kandidat diranking, klip terbaik langsung dirender. Kandidat lain tetap bisa kamu pilih & render nanti di studio.</p></div><label class="sw"><input type="checkbox" id="auto_render"><span></span></label></div>
+      <div class="pn-row"><span>Jumlah klip yang dibuat</span><div class="seg" id="clipCount"><button data-v="auto">Otomatis</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="8">8</button><button data-v="10">10</button></div></div>
+      <p class="hint" id="autoHint"></p>
     </div>
     <div class="card tpl-bar compact-card">
       <label class="inline">Template gaya <select id="tplSel" class="in"><option value="">— Pengaturan terakhir —</option></select></label>
@@ -81,7 +86,6 @@
         <p class="estimate" id="durationEstimate">Estimasi Auto ditentukan setelah transkripsi berdasarkan hook, payoff, kepadatan ujaran, dan jeda.</p>
         <div class="row3">
           <label>Jumlah kandidat<input id="candidate_count" class="in" type="number" min="5" max="30"></label>
-          <label class="advanced-only">Jumlah render awal<input id="clip_count" class="in" type="number" min="1" max="30"></label>
           <label>Durasi min (dtk)<input id="min_sec" class="in" type="number" min="5" max="180"></label>
           <label>Durasi maks (dtk)<input id="max_sec" class="in" type="number" min="10" max="300"></label>
         </div>

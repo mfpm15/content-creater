@@ -24,6 +24,12 @@ HOOK_WORDS = {
     "secret", "never", "always", "why", "how", "mistake", "biggest", "best", "worst", "money", "truth",
     "actually", "crazy", "insane", "important", "stop", "nobody", "everyone", "million", "free",
 }
+# Istilah momen gaming (Mobile Legends & umum) — penanda klimaks/aksi
+GAME_WORDS = {
+    "savage", "maniac", "triple", "double", "wiped", "lord", "turtle", "comeback", "clutch", "outplay", "gank", "ulti",
+    "mvp", "mythic", "immortal", "epic", "legend", "kill", "killing", "steal", "throw", "rekt", "noob", "pro", "gg",
+    "menang", "kalah", "bantai", "sikat", "tewas", "push", "tower", "turret", "war", "teamfight", "retri", "flicker",
+}
 # Kata ganti & negasi umum: ada di hampir setiap kalimat, jadi bobotnya kecil (hanya penguat, bukan pemicu).
 WEAK_HOOK_WORDS = {"nggak", "gak", "enggak", "tidak", "semua", "orang", "kamu", "lo", "lu", "gue", "aku", "you"}
 EMO_WORDS = {
@@ -50,7 +56,7 @@ def _hook_score(text: str) -> float:
         s += 0.35
     if any(t.isdigit() for t in toks):
         s += 0.2
-    s += min(sum(t in HOOK_WORDS for t in toks) * 0.15 + sum(t in WEAK_HOOK_WORDS for t in toks) * 0.03, 0.6)
+    s += min(sum(t in HOOK_WORDS or t in GAME_WORDS for t in toks) * 0.15 + sum(t in WEAK_HOOK_WORDS for t in toks) * 0.03, 0.6)
     return min(s, 1.0)
 
 

@@ -174,3 +174,68 @@ def test_studio_endpoints_recipes_settings_words_clips():
         assert out["settings"]["caption"]["style"] == "keyword" and out["settings"]["caption"]["font"]
         assert c.get(f"/api/projects/{p['id']}/words?start=0&end=5").json() == {"words": []}
         assert isinstance(c.get("/api/clips").json(), list)
+
+
+def test_auto_clip_target_and_quality_gate():
+    assert project.clip_target({"clip_count": "auto"}, 3600) == 8           # video 1 jam ≈ 8 klip
+    assert project.clip_target({"clip_count": 0}, 600) == 3                 # minimal 3
+    assert project.clip_target({"clip_count": "auto"}, 6 * 3600) == 10      # maksimal 10
+    assert project.clip_target({"clip_count": 5}, 3600) == 5
+    ranked = [{"id": "a", "score": 80}, {"id": "b", "score": 30}, {"id": "c", "score": 60, "banned": True}, {"id": "d", "score": 50}]
+    assert [x["id"] for x in project.auto_picks(ranked, 8)] == ["a", "d"]
+    assert [x["id"] for x in project.auto_picks([{"id": "z", "score": 10}], 3)] == ["z"]   # tetap ada 1 klip
+
+
+def test_detect_facecam_small_corner_face_vs_podcast():
+    import numpy as np
+
+    from clipper import facetrack
+
+    class Fake:
+        def __init__(self, faces):
+            self.faces = faces
+
+        def __call__(self, g):
+            return self.faces
+
+    frames = [np.zeros((360, 640), np.uint8)] * 6
+    orig = facetrack._Detector
+    try:
+        facetrack._Detector = lambda w, h: Fake([(500, 260, 80, 80, None)])        # wajah kecil kanan bawah
+        cam = facetrack.detect_facecam(frames)
+        x, y, w, h = cam["rect"]
+        fx, fy = (500 + 40) / 640, (260 + 40) / 360                                  # pusat wajah
+        assert x <= fx <= x + w and y <= fy <= y + h and w < .5 and not cam["big_face"]
+        facetrack._Detector = lambda w, h: Fake([(200, 40, 260, 280, None)])       # wajah besar = podcast
+        assert facetrack.detect_facecam(frames)["big_face"] is True
+        facetrack._Detector = lambda w, h: Fake([])
+        assert facetrack.detect_facecam(frames)["rect"] is None
+    finally:
+        facetrack._Detector = orig
+
+
+@pytest.mark.skipif(not (shutil.which(FFMPEG) or Path(FFMPEG).exists()), reason="ffmpeg tidak tersedia")
+def test_auto_recipe_gameplay_without_facecam_switches_to_blur_and_youtube_subs_skip_downloads(monkeypatch):
+    from clipper import asr, download
+
+    tmp = Path(tempfile.mkdtemp())
+    v = tmp / "v.mp4"
+    subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=24:d=70",
+                    "-f", "lavfi", "-i", "sine=f=300:d=70", "-shortest", "-c:v", "libx264", "-c:a", "aac", str(v)], check=True)
+    meta = {"title": "MLBB savage maniac gameplay", "duration": 70.0, "width": 640, "height": 360, "fps": 24.0,
+            "video": {"url": str(v), "headers": {}}, "audio": {"url": str(v), "headers": {}}}
+    monkeypatch.setattr(download, "resolve_streams", lambda *a, **k: meta)
+    tr = {**fake_transcript(), "source": "youtube-auto"}
+    monkeypatch.setattr(asr, "youtube_captions", lambda *a, **k: tr)
+    def no_audio(*a, **k):
+        raise AssertionError("audio tidak boleh diunduh bila subtitle YouTube ada")
+    monkeypatch.setattr(download, "fetch_audio", no_audio)
+    project.start_worker()
+    p = project.create("https://www.youtube.com/watch?v=abc", {"storage": "lite", "recipe": "auto", "auto_render": True,
+                                                              "clip_count": 1, "min_sec": 8, "max_sec": 15, "duration_preset": "custom"})
+    p = _wait_done(p["id"])
+    assert p["status"] == "done", (p["message"], p.get("error"), [c.get("error") for c in p["clips"]])
+    assert p["content_profile"] == "mobile_legends" and p["settings"]["recipe_applied"] == "ml-hype"
+    assert p["settings"]["layout"] == "blur" and p["settings"]["caption"]["y_pct"] == 76    # tanpa facecam → blur
+    assert p["settings"]["duration_preset"] == "custom"                                       # pilihan pengguna menang
+    assert not (project.pdir(p["id"]) / "audio.wav").exists()

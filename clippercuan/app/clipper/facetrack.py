@@ -205,3 +205,45 @@ def x_expr(keys: list[list[float]], src_w: int, crop_w: int, hold: bool = False)
         seg = f"{a:.1f}" if hold else f"{a:.1f}+({b - a:.1f})*(t-{t0:.2f})/{max(t1 - t0, 0.01):.2f}"
         expr = f"if(lt(t,{t1:.2f}),{seg},{expr})"
     return f"if(lt(t,{keys[0][0]:.2f}),{px(keys[0][1]):.1f},{expr})"
+
+
+def detect_facecam(frames: list[np.ndarray]) -> dict:
+    """Cari facecam di video gaming dari beberapa frame (BGR/gray).
+
+    Hasil: {"rect": [x, y, w, h] pecahan | None, "big_face": bool, "hits": n}. Facecam = wajah kecil (<30% lebar)
+    yang muncul di posisi hampir sama pada ≥ separuh sampel. Wajah besar = video kamera biasa (podcast/vlog).
+    """
+    if not frames:
+        return {"rect": None, "big_face": False, "hits": 0}
+    import cv2
+
+    small, big = [], 0
+    for fr in frames:
+        g = fr if fr.ndim == 2 else cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
+        h0, w0 = g.shape
+        scale = 640 / w0
+        g = cv2.resize(g, (640, max(2, int(h0 * scale))))
+        try:
+            det = _Detector(g.shape[1], g.shape[0])
+            faces = det(g)
+        except Exception:  # noqa: BLE001
+            return {"rect": None, "big_face": False, "hits": 0}
+        W, H = g.shape[1], g.shape[0]
+        for x, y, w, h, _ in faces:
+            if w / W >= 0.30:
+                big += 1
+            else:
+                small.append((x / W, y / H, w / W, h / H))
+    n = len(frames)
+    if big >= n / 2:
+        return {"rect": None, "big_face": True, "hits": big}
+    if len(small) < max(2, n / 2):
+        return {"rect": None, "big_face": False, "hits": len(small)}
+    cx = np.median([s[0] + s[2] / 2 for s in small]); cy = np.median([s[1] + s[3] / 2 for s in small])
+    near = [s for s in small if abs(s[0] + s[2] / 2 - cx) < 0.08 and abs(s[1] + s[3] / 2 - cy) < 0.08]
+    if len(near) < max(2, n / 2):
+        return {"rect": None, "big_face": False, "hits": len(near)}
+    fw, fh = float(np.median([s[2] for s in near])), float(np.median([s[3] for s in near]))
+    w, h = min(1.0, fw * 2.6), min(1.0, fh * 2.4)          # facecam biasanya ±2,5× ukuran wajah
+    x = float(min(max(cx - w / 2, 0), 1 - w)); y = float(min(max(cy - h / 2.2, 0), 1 - h))
+    return {"rect": [round(x, 4), round(y, 4), round(w, 4), round(h, 4)], "big_face": False, "hits": len(near)}

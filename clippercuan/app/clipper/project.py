@@ -125,7 +125,7 @@ def create(source: str, settings: dict | None = None) -> dict:
     p = {
         "id": pid, "schema_version": 3, "source": source, "title": "Memproses…", "status": "queued", "progress": 0.0,
         "message": "Menunggu antrean", "created": time.time(), "updated": time.time(), "owner": os.getpid(),
-        "settings": _with_recipe(settings or {}), "clips": [], "candidates": [], "rankings": {},
+        "settings": _with_recipe(settings or {}), "user_settings": settings or {}, "clips": [], "candidates": [], "rankings": {},
         "production": {"status": "draft_candidate", "planned_date": "", "notes": "", "platform": ""}, "error": None,
     }
     save(p)
@@ -157,48 +157,72 @@ def _pipeline(pid: str) -> None:
     update(pid, status="running", message="Menyiapkan video…")
 
     lite = cfg.get("storage") == "lite" and download.is_url(p["source"])
-    if lite:  # hemat disk: hanya audio; potongan video diambil saat render
-        src, meta = download.fetch_audio(p["source"], work, _progress(pid, 0.0, 0.18))
+    wav = work / "audio.wav"
+    np_ = __import__("numpy")
+    if lite:  # hemat disk: video penuh tidak pernah diunduh; potongan klip diambil saat render
+        _progress(pid, 0.0, 0.18)(0.1, "Membaca info video (mode hemat)…")
+        meta = download.resolve_streams(p["source"])
         title = meta["title"]
-        pr = media.Probe(meta["duration"] or media.probe(src).duration, meta["width"], meta["height"], meta["fps"], True)
+        src = None
+        pr = media.Probe(meta["duration"], meta["width"], meta["height"], meta["fps"], True)
         update(pid, title=title, media={"file": None, "remote": True, "duration": pr.duration, "width": pr.width,
                                         "height": pr.height, "fps": pr.fps})
+
+        def get_wav() -> Path:  # audio hanya diunduh bila subtitle YouTube tidak tersedia/tidak dipakai
+            if not wav.exists():
+                audio, _ = download.fetch_audio(p["source"], work, _progress(pid, 0.18, 0.2))
+                media.extract_audio(audio, wav)
+                audio.unlink(missing_ok=True)
+            return wav
+
+        if not pr.duration:  # situs tanpa info durasi → ukur dari audio
+            import wave
+
+            with wave.open(str(get_wav()), "rb") as w:
+                pr = media.Probe(w.getnframes() / w.getframerate(), pr.width, pr.height, pr.fps, True)
+            update(pid, media={**load(pid)["media"], "duration": pr.duration})
+        tr = _transcript(pid, p["source"], cfg, work, get_wav, pr.duration)
+        if not wav.exists() and cfg.get("lite_energy", False):
+            get_wav()
+        energy = media.audio_energy(wav) if wav.exists() else np_.zeros(1)
+        update(pid, download_saved=("Subtitle YouTube dipakai: tidak ada audio/video penuh yang diunduh"
+                                    if not wav.exists() else "Hanya audio yang diunduh"))
     else:
         src, title = download.fetch(p["source"], work, _progress(pid, 0.0, 0.18))
         pr = media.probe(src)
         # file lokal milik pengguna direferensikan dengan path absolut (tidak disalin)
         update(pid, title=title, media={"file": src.name if src.parent == work else str(src), "duration": pr.duration,
                                         "width": pr.width, "height": pr.height, "fps": pr.fps})
-
-    wav = work / "audio.wav"
-    if pr.has_audio:
-        _progress(pid, 0.18, 0.2)(0, "Mengekstrak audio…")
-        media.extract_audio(src, wav)
-        if lite:
-            src.unlink(missing_ok=True)
-        tr = _transcript(pid, p["source"], cfg, work, wav, pr.duration)
-        energy = media.audio_energy(wav)
-    else:
-        tr, energy = {"language": None, "words": [], "segments": []}, __import__("numpy").zeros(1)
+        if pr.has_audio:
+            _progress(pid, 0.18, 0.2)(0, "Mengekstrak audio…")
+            media.extract_audio(src, wav)
+            tr = _transcript(pid, p["source"], cfg, work, lambda: wav, pr.duration)
+            energy = media.audio_energy(wav)
+        else:
+            tr, energy = {"language": None, "words": [], "segments": []}, np_.zeros(1)
 
     visual = None
     if not lite:
         _progress(pid, 0.62, 0.65)(0, "Membaca aktivitas visual (scene & gerak)…")
         visual = media.visual_activity(src, pr.duration)
     _progress(pid, 0.62, 0.65)(0.2, "Membuat dan meranking kandidat…")
-    count = max(1, min(30, int(cfg.get("candidate_count", cfg.get("clip_count", 10)))))
+    target = clip_target(cfg, pr.duration)
+    count = max(target + 3, min(30, int(cfg.get("candidate_count") or 10)))
+    count = min(30, count)
+    # profil & resep ditentukan dulu: resep otomatis ikut menentukan durasi, format, dan gaya
+    classified = candidates.classify_profile(tr, {"title": title}, _activity(p, pr, src, tr, cfg))
+    profile_name = cfg.get("content_profile", "auto")
+    if profile_name == "auto":
+        profile_name = classified["profile"]
+    cfg = _apply_auto_recipe(pid, cfg, profile_name, classified)
     preset = cfg.get("duration_preset", "custom" if (cfg.get("min_sec"), cfg.get("max_sec")) != (15, 60) else "auto")
     if preset == "custom":
         mn, mx, duration_reason = float(cfg["min_sec"]), float(cfg["max_sec"]), "Rentang durasi kustom"
     else:
         mn, mx, duration_reason = highlights.duration_range(preset, tr)
     cfg["min_sec"], cfg["max_sec"] = mn, mx
-    update(pid, settings=cfg, duration_estimate={"min": mn, "max": mx, "reason": duration_reason, "preset": preset})
-    classified = candidates.classify_profile(tr, {"title": title})
-    profile_name = cfg.get("content_profile", "auto")
-    if profile_name == "auto":
-        profile_name = classified["profile"]
-    update(pid, content_profile=profile_name, profile_classification=classified)
+    update(pid, settings=cfg, duration_estimate={"min": mn, "max": mx, "reason": duration_reason, "preset": preset},
+           content_profile=profile_name, profile_classification=classified, clip_target=target)
     moments, engine = None, "lokal"
     if tr["segments"] and llm.active("moments") and cfg.get("use_llm", True):
         model = llm.cfg()["model_moments"]
@@ -228,11 +252,91 @@ def _pipeline(pid: str) -> None:
            language=lang, status="running" if cfg.get("auto_render") else "candidates_ready", progress=0.65,
            message=f"{len(ranked)} kandidat siap dipilih", viral_readiness=round(sum(x["score"] for x in ranked) / max(1, len(ranked))))
     if cfg.get("auto_render"):
-        select_candidates(pid, [x["id"] for x in ranked[:int(cfg.get("clip_count", 3))]])
+        picks = auto_picks(ranked, target, float(cfg.get("min_score", 45)))
+        select_candidates(pid, [x["id"] for x in picks])
         batch_render(pid)
 
 
-def _transcript(pid: str, source: str, cfg: dict, work: Path, wav: Path, duration: float) -> dict:
+def clip_target(cfg: dict, duration: float) -> int:
+    """Jumlah klip yang dirender otomatis. "auto"/0: ±1 klip per 7,5 menit (video 1 jam ≈ 8), 3–10 klip."""
+    raw = cfg.get("clip_count", "auto")
+    if raw in (None, "", "auto", 0, "0"):
+        return int(max(3, min(10, round((duration or 0) / 450))))
+    return max(1, min(30, int(raw)))
+
+
+def auto_picks(ranked: list[dict], target: int, min_score: float = 45) -> list[dict]:
+    """Klip terbaik untuk render otomatis: urut ranking, lewati yang skornya terlalu lemah (minimal 1 klip)."""
+    good = [x for x in ranked if not x.get("banned") and (x.get("pinned") or float(x.get("score", 0)) >= min_score)]
+    return (good or ranked[:1])[:target]
+
+
+def _sample_frames(p: dict, pr: media.Probe, src: Path | None, n: int = 8) -> list:
+    """Beberapa frame merata (tanpa unduh video penuh di mode hemat) untuk deteksi facecam/gameplay."""
+    import tempfile
+
+    import cv2
+
+    out = []
+    times = [pr.duration * (i + 1) / (n + 1) for i in range(n)]
+    with tempfile.TemporaryDirectory() as td:
+        for i, t in enumerate(times):
+            f = Path(td) / f"f{i}.jpg"
+            try:
+                if src is None:
+                    download.grab_remote_frame(p["source"], t, f, width=640)
+                else:
+                    media.grab_frame(src, t, f, width=640)
+                img = cv2.imread(str(f))
+                if img is not None:
+                    out.append(img)
+            except Exception:  # noqa: BLE001 — sampel gagal: lanjut
+                continue
+    return out
+
+
+def _activity(p: dict, pr: media.Probe, src: Path | None, tr: dict, cfg: dict) -> dict:
+    """Sinyal non-teks untuk klasifikasi profil: gameplay (tanpa wajah besar + ujaran jarang/istilah game) & facecam."""
+    from . import facetrack
+
+    need = cfg.get("content_profile", "auto") == "auto" or (cfg.get("split") or {}).get("auto")
+    if not need or not pr.duration:
+        return {}
+    cam = facetrack.detect_facecam(_sample_frames(p, pr, src))
+    coverage = caption_workspace.quality_report(tr, pr.duration)["coverage"] if tr.get("words") else 0.0
+    gameplay = not cam["big_face"] and (cam["rect"] is not None or coverage < 0.35)
+    update(p["id"], facecam=cam)
+    return {"gameplay": gameplay, "facecam": cam["rect"], "speech_coverage": coverage}
+
+
+def _apply_auto_recipe(pid: str, cfg: dict, profile_name: str, classified: dict) -> dict:
+    """Resep "auto": pilih resep sesuai konten. Untuk gaming, split bila facecam terdeteksi, selain itu blur."""
+    from .recipes import PROFILE_DEFAULT, RECIPES
+
+    if cfg.get("recipe") == "auto":
+        rid = PROFILE_DEFAULT.get(profile_name, "podcast-box")
+        look = {k: v for k, v in RECIPES[rid]["settings"].items() if k not in ("content_profile",)}
+        if cfg.get("duration_preset") not in (None, "auto"):
+            look.pop("duration_preset", None)
+        if "watermark" in look:
+            look["watermark"] = {**cfg.get("watermark", {}), **{k: v for k, v in look["watermark"].items() if k != "text"}}
+        p = load(pid)
+        cfg = deep_merge(deep_merge(cfg, look), p.get("user_settings") or {})  # pilihan eksplisit pengguna tetap menang
+        cfg["recipe"], cfg["recipe_applied"] = "auto", rid
+    p = load(pid)
+    cam = p.get("facecam") or {}
+    if cfg.get("layout") == "split" and (cfg.get("split") or {}).get("auto"):
+        if cam.get("rect"):
+            cfg["split"] = {**cfg["split"], "face": cam["rect"], "game": [0.0, 0.0, 1.0, 1.0]}
+        else:  # gameplay tanpa facecam: gameplay utuh di tengah, caption di bawahnya (tidak menutup HUD)
+            cfg["layout"] = "blur"
+            cfg["caption"] = {**cfg["caption"], "y_pct": 76}
+            cfg["layout_reason"] = "Facecam tidak terdeteksi: format Blur agar HUD & minimap tetap utuh"
+    update(pid, settings=cfg)
+    return cfg
+
+
+def _transcript(pid: str, source: str, cfg: dict, work: Path, get_wav, duration: float) -> dict:
     """Rantai sumber subtitle: YouTube → API cloud → Whisper lokal (cadangan selalu tersedia)."""
     mode = cfg.get("transcriber", "auto")
     key = {"mode": mode, "model": cfg["model"], "language": cfg["language"], "translate_en": cfg["translate_en"]}
@@ -256,12 +360,12 @@ def _transcript(pid: str, source: str, cfg: dict, work: Path, wav: Path, duratio
     use_api = mode == "api" or (mode == "auto" and bool(acfg.get("api_key")))
     if tr is None and use_api:
         try:
-            tr = asr.api_transcribe(wav, acfg, cfg["language"], cfg["translate_en"], duration, cb)
+            tr = asr.api_transcribe(get_wav(), acfg, cfg["language"], cfg["translate_en"], duration, cb)
         except Exception as e:  # noqa: BLE001
             notes.append(f"Transkripsi cloud gagal ({str(e)[:160]})")
             tr = None
     if tr is None:
-        tr = transcribe.transcribe(wav, cfg["model"], cfg["language"], cfg["translate_en"], cb, duration)
+        tr = transcribe.transcribe(get_wav(), cfg["model"], cfg["language"], cfg["translate_en"], cb, duration)
         tr["source"] = "whisper-lokal"
     if notes:
         update(pid, asr_warning=" · ".join(notes) + f". Dipakai: {tr['source']}.")

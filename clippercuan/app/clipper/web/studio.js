@@ -117,7 +117,7 @@ async function pageProject(pid) {
       <div class="acts"><button class="btn ghost sm" id="sFolder">Buka folder</button><button class="btn ghost sm" id="sRetry" hidden>Ulangi</button><button class="btn ghost sm danger" id="sCancel" hidden>Batalkan</button><a class="btn ghost sm" id="sManifest" target="_blank">Manifest</a><a class="btn sm" id="sZip">⬇ Download semua (ZIP)</a></div>
     </header>
     <div class="st-progress" id="sProg"><i id="sBar"></i></div>
-    <p class="warn" id="sWarn" hidden></p>
+    <p class="warn" id="sWarn" hidden></p><p class="st-auto" id="sAuto" hidden></p>
     <details id="sErr" class="card" hidden><summary>Detail error</summary><pre></pre></details>
     <div class="st-main">
       <div class="st-stage">
@@ -280,7 +280,7 @@ async function pageProject(pid) {
   async function buildStyleTab() {
     const box = $('.st-tab[data-tab="style"]'), recipes = await getRecipes().catch(() => ({}));
     const cap = S.caption, fonts = INFO.fonts;
-    box.innerHTML = `<div class="pn-sec"><h4>Resep gaya viral</h4><div class="rc-grid">${Object.values(recipes).map(r => `<button type="button" data-r="${esc(r.id)}" class="${S.recipe === r.id ? 'on' : ''}" title="${esc(r.desc)}"><b>${esc(r.label)}</b><small>${esc(r.badge || '')}</small></button>`).join('')}</div></div>
+    box.innerHTML = `<div class="pn-sec"><h4>Resep gaya viral</h4><div class="rc-grid">${Object.values(recipes).filter(r => r.id !== 'auto').map(r => `<button type="button" data-r="${esc(r.id)}" class="${(S.recipe_applied || S.recipe) === r.id ? 'on' : ''}" title="${esc(r.desc)}"><b>${esc(r.label)}</b><small>${esc(r.badge || '')}</small></button>`).join('')}</div></div>
       <div class="pn-sec"><h4>Font caption</h4><div class="font-grid">${fonts.map(f => `<button type="button" data-font="${esc(f)}" class="${cap.font === f ? 'on' : ''}" style="font-family:${ffam(f)};${fitalic(f) ? 'font-style:italic' : ''}">${esc(f.replace(' ExtraBold', '').replace(' Black', ''))}<small>${esc(f)}</small></button>`).join('')}</div>
         <div class="cap-sample" id="capSample"></div></div>
       <div class="pn-sec"><h4>Gaya caption</h4><div class="seg wrap" id="pStyle"><button data-v="clean">Plain</button><button data-v="karaoke">Karaoke</button><button data-v="wbw">Word by word</button><button data-v="keyword">Subtract &amp; font</button></div>
@@ -314,7 +314,7 @@ async function pageProject(pid) {
     $$('[data-r]', box).forEach(b => b.onclick = () => {
       const r = recipes[b.dataset.r]; if (!r) return;
       const { content_profile, duration_preset, ...look } = r.settings;
-      S = merge(S, look); S.recipe = r.id; $$('[data-r]', box).forEach(x => x.classList.toggle('on', x === b)); markDirty(); sync(); showPreview();
+      S = merge(S, look); S.recipe = r.id; S.recipe_applied = r.id; $$('[data-r]', box).forEach(x => x.classList.toggle('on', x === b)); markDirty(); sync(); showPreview();
       toast(`Resep "${r.label}" diterapkan ke preview. Simpan untuk dipakai saat render.`);
     });
     const bindIn = (id, fn) => $(id, box).addEventListener('input', e => { fn(e.target); markDirty(); sync(); });
@@ -427,6 +427,8 @@ async function pageProject(pid) {
     $('#sDot').className = 'status-dot ' + (P.status === 'error' ? 'bad' : busyProj ? 'busy' : 'ok');
     $('#sCancel').hidden = !['queued', 'running'].includes(P.status); $('#sRetry').hidden = !['error', 'cancelled'].includes(P.status);
     const warn = [P.asr_warning, P.llm_warning].filter(Boolean).join(' · '); $('#sWarn').hidden = !warn; $('#sWarn').textContent = warn;
+    const auto = [P.settings.recipe === 'auto' && P.settings.recipe_applied ? `Resep otomatis: ${(RECIPES?.[P.settings.recipe_applied]?.label) || P.settings.recipe_applied}` : '', P.settings.layout_reason, P.download_saved, P.clip_target && P.settings.auto_render ? `${P.clip_target} klip terbaik dirender otomatis` : ''].filter(Boolean).join(' · ');
+    $('#sAuto').hidden = !auto; $('#sAuto').textContent = '⚡ ' + auto;
     $('#sErr').hidden = !P.error; if (P.error) $('#sErr pre').textContent = P.error;
     $('#sZip').toggleAttribute('disabled', !P.clips.some(c => c.status === 'done'));
     $('#sSplit').hidden = S.layout !== 'split' || !m;
@@ -454,6 +456,7 @@ async function pageProject(pid) {
     if (e.target.closest('input,textarea,select,dialog')) return;
     if (e.key === ' ') { e.preventDefault(); $('#sPlay').click(); } else if (e.key === 'ArrowRight') $('#sNext').click(); else if (e.key === 'ArrowLeft') $('#sPrev').click();
   });
+  await getRecipes().catch(() => null);
   await load();
 }
 

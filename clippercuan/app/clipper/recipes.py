@@ -15,7 +15,7 @@ RECIPES: dict[str, dict] = {
             "caption": {"preset": "box-merah", "style": "clean", "box": True, "effect": "none", "font": "Barlow Condensed", "size": 92,
                         "color": "#FFFFFF", "highlight": "#FF2D2D", "uppercase": False, "words_per_line": 3, "max_chars": 22,
                         "y_pct": 62, "animation": "pop"},
-            "title": {"enabled": True, "preset": "duo", "duration": 0, "size": 66, "accent": "#3DE0A0", "glow": "#C6FF3D"},
+            "title": {"enabled": True, "preset": "duo", "duration": 0, "size": 84, "accent": "#3DE0A0", "glow": "#C6FF3D"},
             "emoji": {"enabled": False}, "progress_bar": {"enabled": False},
         },
     },
@@ -39,7 +39,7 @@ RECIPES: dict[str, dict] = {
             "caption": {"preset": "quote-glow", "style": "keyword", "box": False, "effect": "glow", "glow_color": "#C6FF3D",
                         "font": "Barlow Condensed", "size": 90, "color": "#FFFFFF", "highlight": "#C6FF3D", "uppercase": False,
                         "words_per_line": 4, "max_chars": 26, "y_pct": 64, "animation": "none", "accent_font": "Instrument Serif Italic"},
-            "title": {"enabled": True, "preset": "duo", "duration": 0, "size": 66, "accent": "#3DE0A0", "glow": "#C6FF3D"},
+            "title": {"enabled": True, "preset": "duo", "duration": 0, "size": 84, "accent": "#3DE0A0", "glow": "#C6FF3D"},
             "emoji": {"enabled": False}, "progress_bar": {"enabled": False},
         },
     },
@@ -56,15 +56,29 @@ RECIPES: dict[str, dict] = {
         },
     },
     "ml-hype": {
-        "label": "Mobile Legends · Hype split", "niche": "mobile_legends", "badge": "Gaming",
-        "desc": "Facecam atas + gameplay bawah, caption pink di garis tengah agar HUD tidak tertutup, emoji reaksi.",
+        "label": "Mobile Legends · Hype kuning", "niche": "mobile_legends", "badge": "Gaming",
+        "desc": "Facecam terdeteksi otomatis → split; tanpa facecam → gameplay utuh + caption di bawah. Box kuning teks hitam (font Anton, kata kunci Bangers): paling kontras di peta hijau dan tidak bentrok dengan warna tim merah/biru.",
         "settings": {
             "content_profile": "mobile_legends", "duration_preset": "15-25", "layout": "split", "cut_silence": False,
-            "caption": {"preset": "gaming", "style": "clean", "box": True, "effect": "none", "font": "Bangers", "size": 86,
-                        "color": "#FFFFFF", "highlight": "#FF5D8F", "uppercase": True, "words_per_line": 3, "max_chars": 20,
-                        "y_pct": 41, "animation": "pop"},
-            "title": {"enabled": True, "preset": "outline", "duration": 3, "size": 66},
-            "emoji": {"enabled": True, "size": 0.9}, "progress_bar": {"enabled": True, "color": "#FF5D8F"},
+            "split": {"auto": True, "face_ratio": 0.38},
+            "caption": {"preset": "gaming", "style": "keyword", "box": True, "effect": "none", "font": "Anton", "size": 128,
+                        "color": "#FFFFFF", "highlight": "#FFD60A", "uppercase": True, "words_per_line": 3, "max_chars": 20,
+                        "y_pct": 40, "animation": "pop", "accent_font": "Bangers"},
+            "title": {"enabled": True, "preset": "outline", "duration": 3, "size": 112},
+            "emoji": {"enabled": True, "size": 0.9}, "progress_bar": {"enabled": True, "color": "#FFD60A"},
+        },
+    },
+    "ml-neon": {
+        "label": "Mobile Legends · Neon pink", "niche": "mobile_legends", "badge": "Gaming alternatif",
+        "desc": "Varian mencolok untuk montage/funny moment: box magenta. Kontras baik di peta hijau; pakai bila channel-mu identik warna neon.",
+        "settings": {
+            "content_profile": "mobile_legends", "duration_preset": "15-25", "layout": "split", "cut_silence": False,
+            "split": {"auto": True, "face_ratio": 0.38},
+            "caption": {"preset": "gaming-neon", "style": "keyword", "box": True, "effect": "glow", "glow_color": "#FF2BD6",
+                        "font": "Anton", "size": 128, "color": "#FFFFFF", "highlight": "#FF2BD6", "uppercase": True,
+                        "words_per_line": 3, "max_chars": 20, "y_pct": 40, "animation": "pop", "accent_font": "Bangers"},
+            "title": {"enabled": True, "preset": "neon", "duration": 3, "size": 112},
+            "emoji": {"enabled": True, "size": 0.9}, "progress_bar": {"enabled": True, "color": "#FF2BD6"},
         },
     },
     "edukasi-wbw": {
@@ -94,8 +108,11 @@ RECIPES: dict[str, dict] = {
     },
 }
 
+AUTO = {"id": "auto", "label": "Otomatis sesuai konten", "niche": "auto", "badge": "Disarankan",
+        "desc": "Jenis konten dideteksi dari transkrip, judul, wajah, dan gerak; resep terbaik dipilih otomatis (podcast → Box merah, review → Karaoke biru, gameplay → Hype kuning)."}
+
 PROFILE_DEFAULT = {"podcast": "podcast-box", "tech_review": "tech-review", "mobile_legends": "ml-hype"}
 
 
 def public() -> dict:
-    return {k: {**v, "id": k} for k, v in RECIPES.items()}
+    return {"auto": {**AUTO, "settings": {}}, **{k: {**v, "id": k} for k, v in RECIPES.items()}}

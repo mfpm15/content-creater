@@ -66,3 +66,37 @@ kata kunci berfont aksen, judul hook dua baris, 2–3 kata per layar untuk tempo
 Angka peningkatan retensi dari blog vendor (mis. "+40–80%") tidak terverifikasi independen — gunakan A/B di akun sendiri.
 Untuk campaign clipping: aturan (watermark, hashtag, disclosure, larangan repost) berbeda per brief, jadi resep Campaign hanya titik awal.
 Sumber: https://socialvisuals.pro/ · https://captions.ai/help/guides/engagement/caption-styles-by-platform · https://blitzcutai.com/blog/tiktok-caption-trends-2026 · https://openclip.app/guides/whop-clipping-guide
+
+---
+
+# Bagian 3 — Otomatis penuh, video panjang tanpa unduh penuh, gaya Mobile Legends (26 Oktober 2026)
+
+## Video 1 jam tanpa mengunduh file besar
+| Kondisi | Yang diunduh untuk mencari momen | Saat render |
+|---|---|---|
+| Link YouTube + subtitle tersedia (mode hemat) | **0 MB** — momen dicari dari subtitle | ±10–20 MB per klip (potongan 1080p) |
+| Link tanpa subtitle (mode hemat) | Audio saja ±30–60 MB/jam | ±10–20 MB per klip |
+| Mode penuh / file lokal | Video penuh (1 jam 1080p ≈ 1–2,5 GB) | — |
+
+Mode hemat kini aktif bawaan untuk link di UI. Kompromi: render butuh internet, preview sumber di studio berupa frame (bukan video).
+Sinyal visual (scene & gerak) hanya ada di mode penuh; di mode hemat skor memakai teks + audio (bila audio diunduh).
+
+## Otomatis dari link sampai klip jadi
+- **Resep "Otomatis sesuai konten"** (bawaan UI & CLI/MCP): podcast → Box merah, review → Karaoke biru, gameplay → Hype kuning. Pilihan eksplisit pengguna tetap menang.
+- **Deteksi gameplay & facecam**: 8 frame sampel (tanpa unduh penuh di mode hemat) → wajah besar = podcast; wajah kecil konsisten = facecam (kotak split dihitung otomatis); tanpa wajah + ujaran jarang = gameplay → format Blur agar HUD & minimap utuh.
+- **Jumlah klip otomatis**: ±1 per 7,5 menit (1 jam ≈ 8, rentang 3–10), sesuai estimasi industri 6–8 Short per jam podcast. Kandidat dengan skor < 45 dilewati (minimal 1 klip tetap dibuat).
+- **Render langsung** klip terbaik setelah ranking (bisa dimatikan; kandidat lain tetap bisa dirender di studio).
+
+## Gaya caption Mobile Legends
+Pink sebelumnya diganti **box kuning teks hitam** sebagai bawaan, karena: kontras tertinggi terhadap peta yang dominan hijau,
+tidak memakai merah/biru yang di game berarti tim lawan/kawan, dan kuning/emas lazim untuk momen "epic/savage". Pink tetap ada
+sebagai resep **Mobile Legends · Neon pink**. Font isi Anton (kotak pas dengan teks), kata kunci Bangers. Caption di garis
+pertemuan facecam/gameplay (split) atau di bawah gameplay (blur) agar tidak menutup tombol skill & joystick. Istilah momen
+gaming (savage, maniac, lord, comeback, clutch, dll.) menaikkan skor hook dan otomatis disorot.
+
+## Batas yang jujur
+- Klaim retensi/angka viral dari blog vendor tidak terverifikasi independen; gunakan retention curve YouTube Studio milikmu.
+- Deteksi facecam berbasis wajah: facecam dengan wajah sangat kecil/miring atau overlay webcam berbentuk bulat bisa terlewat → atur manual lewat "Area split".
+- Belum diuji dengan unduhan YouTube sungguhan dari lingkungan ini (IP diblokir); perlu dicoba di laptop.
+
+Sumber: https://www.clipspeed.ai/blog/podcast-youtube-shorts-strategy.html · https://www.opus.pro/blog/youtube-shorts-hook-formulas · https://www.shortimize.com/blog/how-to-edit-videos-for-tiktok · https://pippit.capcut.com/templates/mobile-legends-capcut-color-adjustment

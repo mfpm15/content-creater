@@ -26,8 +26,9 @@ Hasil tersimpan di folder `~/ClipperCuan/projects/` (tombol **Buka folder** di a
 | Fitur | Keterangan |
 |---|---|
 | Studio | Satu layar seperti aplikasi desktop: preview 9:16 dengan caption & judul tampil langsung, panel Instant style / Clip setting / Branding, deretan *Detected clips* (skor x/10, filter Hot/Terpilih/Rendered), bilah render |
-| Resep gaya viral | 7 resep satu klik: Podcast Box merah, Podcast Hormozi, Quote glow, Review tech, Mobile Legends hype split, Edukasi word-by-word, Campaign clipping (`--recipe` di CLI, `recipe` di MCP) |
-| Hemat disk | Link: hanya audio yang diunduh, potongan klip diambil saat render lalu dihapus (`--lite`). File lokal tidak diduplikasi |
+| Resep gaya viral | **Otomatis sesuai konten** (bawaan) + 8 resep: Podcast Box merah, Podcast Hormozi, Quote glow, Review tech, Mobile Legends Hype kuning / Neon pink, Edukasi word-by-word, Campaign clipping (`--recipe` di CLI, `recipe` di MCP) |
+| Otomatis penuh | Link → deteksi jenis konten & facecam → ±8 klip terbaik dari video 1 jam langsung dirender (jumlah bisa diatur) |
+| Hemat disk | Bawaan untuk link: momen dicari dari subtitle YouTube (0 MB) atau audio saja; hanya potongan klip yang diunduh saat render lalu dihapus (`--lite`). File lokal tidak diduplikasi |
 | Sumber video | Link YouTube/TikTok/Instagram/dll (yt-dlp, maks 1080p) atau file lokal (drag & drop); cookies browser bila YouTube minta verifikasi |
 | Subtitle otomatis | Mode Otomatis: subtitle YouTube → API cloud (Groq/OpenAI/9router) → Whisper lokal; timestamp per kata, 14+ bahasa, opsi terjemah ke Inggris |
 | Cari momen | Skor hook (pertanyaan/angka/kata pemicu), kata emosional, energi audio, **aktivitas visual (scene & gerak dari keyframe)**, tempo bicara, kalimat utuh |

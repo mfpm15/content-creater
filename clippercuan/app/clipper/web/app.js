@@ -104,7 +104,7 @@ async function pageNew(override) {
   const durationText = { auto: 'Auto: AI memilih rentang setelah transkripsi tanpa memotong kalimat.', '15-25': '15–25 detik: ujaran padat dan payoff cepat.', '25-40': '25–40 detik: konteks sedang sebelum payoff.', '40-60': '40–60 detik: penjelasan lebih utuh.' };
   chipGroup($('#durationPreset'), durationPreset, v => { durationPreset = v; const [a, b] = v === 'auto' ? [15, 60] : v.split('-').map(Number); $('#min_sec').value = a; $('#max_sec').value = b; $('#durationEstimate').textContent = durationText[v]; });
   $('#durationEstimate').textContent = durationText[durationPreset] || durationText.auto;
-  ['candidate_count', 'clip_count', 'min_sec', 'max_sec', 'language', 'model', 'transcriber'].forEach(k => $('#' + k).value = cfg[k]);
+  ['candidate_count', 'min_sec', 'max_sec', 'language', 'model', 'transcriber'].forEach(k => $('#' + k).value = cfg[k]);
   $('#translate_en').checked = !!cfg.translate_en; $('#cut_silence').checked = !!cfg.cut_silence;
   const aiActive = !!HEALTH?.llm?.enabled;
   $('#llmRow').hidden = !aiActive; $('#localFallback').hidden = aiActive; $('#llmModel').textContent = SETTINGS.llm.model_moments;
@@ -142,11 +142,20 @@ async function pageNew(override) {
   ['cap_color', 'cap_highlight', 'cap_upper', 'cap_font', 'cap_size', 'cap_box', 'cap_glow'].forEach(k => $('#' + k).addEventListener('input', pv)); pv();
 
   let posTouched = false; $('#cap_position').addEventListener('change', () => posTouched = true);
-  $('#storage_lite').checked = cfg.storage === 'lite';
-  let recipeId = cfg.recipe || '';
+  const last = store.get('lastSettings', {});
+  $('#storage_lite').checked = override || 'storage' in last ? cfg.storage === 'lite' : true;   // bawaan: hemat disk
+  const liteTxt = () => { $('#liteEst').textContent = $('#storage_lite').checked ? 'Contoh video 1 jam: 0 MB (ada subtitle YouTube) atau ±30–60 MB audio, + ±10–20 MB per klip. Tanpa mode hemat: ±1–2,5 GB (1080p).' : 'Video penuh diunduh (1 jam 1080p ≈ 1–2,5 GB). Preview sumber di studio lebih lengkap; render tidak butuh internet.'; };
+  $('#storage_lite').addEventListener('change', liteTxt); liteTxt();
+  let recipeId = override || 'recipe' in last ? (cfg.recipe ?? '') : 'auto';
+  let autoRender = override || 'auto_render' in last ? cfg.auto_render !== false : true, clipCount = String(cfg.clip_count ?? 'auto');
+  if (clipCount === '0' || clipCount === '') clipCount = 'auto';
+  $('#auto_render').checked = autoRender;
+  const autoTxt = () => { $('#autoHint').textContent = !$('#auto_render').checked ? 'Mati: kandidat menunggu kamu pilih di studio sebelum dirender.' : clipCount === 'auto' ? 'Otomatis: ±1 klip per 7,5 menit video (video 1 jam ≈ 8 klip, 3–10), kandidat yang skornya terlalu lemah dilewati.' : `${clipCount} klip terbaik langsung dirender.`; };
+  $('#auto_render').addEventListener('change', autoTxt);
+  chipGroup($('#clipCount'), clipCount, v => { clipCount = v; autoTxt(); }); autoTxt();
   getRecipes().then(rs => {
     const box = $('#recipes'); if (!box) return;
-    box.innerHTML = Object.values(rs).map(r => `<button type="button" data-r="${esc(r.id)}" class="${r.id === recipeId ? 'on' : ''}"><span class="rb">${esc(r.badge || '')}</span><b>${esc(r.label)}</b><small>${esc(r.desc)}</small></button>`).join('') + `<button type="button" data-r="" class="${recipeId ? '' : 'on'}"><span class="rb">Manual</span><b>Atur sendiri</b><small>Pakai pengaturan di bawah tanpa resep.</small></button>`;
+    box.innerHTML = Object.values(rs).map(r => `<button type="button" data-r="${esc(r.id)}" class="${r.id === recipeId ? 'on' : ''}"><span class="rb">${esc(r.badge || '')}</span><b>${esc(r.label)}</b><small>${esc(r.desc)}</small></button>`).join('') + `<button type="button" data-r="" class="${recipeId ? '' : 'on'}"><span class="rb">Manual</span><b>Atur sendiri</b><small>Pakai pengaturan di bawah (Advanced) tanpa resep.</small></button>`;
     $$('[data-r]', box).forEach(b => b.onclick = () => {
       try { sessionStorage.setItem('draftUrl', $('#url').value); } catch {}
       const r = rs[b.dataset.r], now = collect();
@@ -197,8 +206,8 @@ async function pageNew(override) {
   function collect() {
     const fs = +$('#faceSize').value / 100, pos = { tl: [0, 0], tr: [1 - fs, 0], bl: [0, 1 - fs], br: [1 - fs, 1 - fs] }[facePos];
     return {
-      content_profile: contentProfile, candidate_count: +$('#candidate_count').value, auto_render: false,
-      clip_count: +$('#clip_count').value, duration_preset: durationPreset, min_sec: +$('#min_sec').value, max_sec: +$('#max_sec').value, language: $('#language').value, model: $('#model').value, transcriber: $('#transcriber').value,
+      content_profile: contentProfile, candidate_count: +$('#candidate_count').value, auto_render: $('#auto_render').checked,
+      clip_count: clipCount === 'auto' ? 'auto' : +clipCount, duration_preset: durationPreset, min_sec: +$('#min_sec').value, max_sec: +$('#max_sec').value, language: $('#language').value, model: $('#model').value, transcriber: $('#transcriber').value,
       translate_en: $('#translate_en').checked, cut_silence: $('#cut_silence').checked, use_llm: $('#use_llm').checked, layout, smart_crop: $('#smart_crop').checked,
       split: { face: [pos[0], pos[1], fs, fs], game: [0, 0, 1, 1], face_ratio: +$('#faceRatio').value / 100 },
       caption: { ...cfg.caption, enabled: $('#cap_enabled').checked, style: capStyle, box: $('#cap_box').checked, effect: $('#cap_glow').checked ? 'glow' : 'none', font: $('#cap_font').value, size: +$('#cap_size').value, color: $('#cap_color').value, highlight: $('#cap_highlight').value, uppercase: $('#cap_upper').checked, words_per_line: +$('#cap_wpl').value, position: $('#cap_position').value, y_pct: posTouched ? null : cfg.caption.y_pct, animation: $('#cap_pop').checked ? 'pop' : 'none' },
@@ -212,15 +221,22 @@ async function pageNew(override) {
     };
   }
 
+  const forSubmit = st => {   // resep otomatis: gaya dipilih server sesuai konten → jangan kirim gaya dari form
+    if (st.recipe !== 'auto') return st;
+    const o = { ...st }; ['caption', 'title', 'emoji', 'progress_bar', 'layout', 'smart_crop', 'cut_silence', 'split', 'content_profile'].forEach(k => delete o[k]);
+    if (o.duration_preset === 'auto') { delete o.min_sec; delete o.max_sec; }
+    if (contentProfile !== 'auto') o.content_profile = contentProfile;
+    return o;
+  };
   $('#startTop').onclick = $('#startTop2').onclick = () => $('#start').click();
   $('#start').onclick = async () => {
     let sources = [];
     if (srcMode === 'link') { sources = links(); if (!sources.length || sources.some(s => !/^https?:\/\//i.test(s))) return toast('Tempel link video yang valid (diawali https://), satu per baris', true); }
     else { if (!upload) return toast('Pilih file video dulu', true); sources = [upload.id]; }
-    const settings = collect();
+    const settings = forSubmit(collect());
     if (settings.min_sec >= settings.max_sec) return toast('Durasi minimum harus lebih kecil dari maksimum', true);
     if (settings.candidate_count < 5) return toast('Jumlah kandidat minimal 5', true);
-    store.set('lastSettings', { ...settings, watermark: { ...settings.watermark, image: '' } });
+    const all = collect(); store.set('lastSettings', { ...all, watermark: { ...all.watermark, image: '' } });
     try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch {}
     const start = $('#start'); start.disabled = true; start.classList.add('is-loading'); start.querySelector('span').textContent = 'Menyiapkan proyek…';
     try {

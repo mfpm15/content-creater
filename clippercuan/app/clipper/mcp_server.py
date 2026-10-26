@@ -92,7 +92,7 @@ def _wait(pid: str, timeout_sec: int) -> dict:
 
 # ------------------------------------------------------------------ tools
 @mcp.tool()
-def create_clips(source: str, clip_count: int = 6, layout: str = "", template: str = "", recipe: str = "",
+def create_clips(source: str, clip_count: int = 0, layout: str = "", template: str = "", recipe: str = "auto",
                  language: str = "auto", min_sec: int | None = None, max_sec: int | None = None, caption_style: str = "",
                  lite: bool = False,
                  cut_silence: bool | None = None, emoji: bool | None = None, transcriber: str = "",
@@ -103,7 +103,8 @@ def create_clips(source: str, clip_count: int = 6, layout: str = "", template: s
     source: link (YouTube/TikTok/IG/…) atau path file video lokal di komputer ini.
     layout: portrait | square | blur | split | landscape.
     template: nama template gaya yang tersimpan (lihat list_templates); pengaturan lain menimpanya.
-    recipe: resep gaya viral bawaan (lihat list_recipes), mis. podcast-box, podcast-hormozi, tech-review, ml-hype.
+    clip_count: jumlah klip yang dirender; 0 = otomatis (±1 per 7,5 menit video, 3–10; video 1 jam ≈ 8 klip).
+    recipe: "auto" (bawaan, sesuai jenis konten) atau resep dari list_recipes, mis. podcast-box, podcast-hormozi, ml-hype; "" = tanpa resep.
     lite: hemat disk untuk link — video penuh tidak disimpan, hanya audio + potongan klip yang diunduh.
     caption_style: box | wbw | karaoke | clean | keyword (kosong = ikut resep/template/bawaan).
     transcriber: auto | youtube | api | local — sumber subtitle (auto: YouTube → API cloud → Whisper lokal).
@@ -117,11 +118,11 @@ def create_clips(source: str, clip_count: int = 6, layout: str = "", template: s
         if template not in tpls:
             raise RuntimeError(f"Template '{template}' tidak ada. Tersedia: {', '.join(tpls) or '(kosong)'}")
         settings.update(tpls[template])
-    if recipe:
+    if recipe and not template:
         settings["recipe"] = recipe
     if lite:
         settings["storage"] = "lite"
-    settings.update({"auto_render": True, "clip_count": clip_count, "language": language})
+    settings.update({"auto_render": True, "clip_count": clip_count or "auto", "language": language})
     if layout:
         settings["layout"] = layout
     if min_sec is not None or max_sec is not None:

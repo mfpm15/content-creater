@@ -38,7 +38,8 @@ FFMPEG = _find_ffmpeg()
 
 # Default pipeline — semua bisa diubah dari UI per proyek.
 DEFAULTS: dict = {
-    "recipe": "",                # id resep gaya (recipes.py); kosong = pengaturan manual
+    "recipe": "",                # id resep gaya (recipes.py) | "auto" = sesuai konten | "" = pengaturan manual
+    "min_score": 45,             # render otomatis melewati kandidat di bawah skor ini (minimal 1 klip tetap dibuat)
     "storage": "full",           # full | lite (link: hanya audio + potongan klip yang diunduh)
     "content_profile": "auto",  # auto | podcast | tech_review | mobile_legends
     "candidate_count": 10,       # kandidat dibuat sebelum render
@@ -49,7 +50,7 @@ DEFAULTS: dict = {
     "translate_en": False,       # caption diterjemahkan ke Inggris (Whisper translate)
     "model": "small",            # tiny | base | small | medium | large-v3
     "transcriber": "auto",       # auto | youtube | api | local  (auto: YouTube → API cloud → Whisper lokal)
-    "clip_count": 10,
+    "clip_count": "auto",        # jumlah render otomatis; "auto" = ±1 per 7,5 menit video (1 jam ≈ 8), 3–10
     "duration_preset": "auto",  # auto | 15-25 | 25-40 | 40-60 | custom
     "min_sec": 15,
     "max_sec": 60,

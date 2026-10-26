@@ -38,12 +38,14 @@ def cli(args) -> None:
     from . import automation, project
 
     settings: dict = {}
-    if args.recipe:
+    if args.recipe and args.recipe != "auto":
         from .recipes import RECIPES
 
         if args.recipe not in RECIPES:
             sys.exit(f"Resep '{args.recipe}' tidak ada. Tersedia: {', '.join(RECIPES)}")
         settings["recipe"] = args.recipe
+    elif not args.template:
+        settings["recipe"] = "auto"  # bawaan CLI: resep sesuai jenis konten
     if args.template:
         tpl = project.list_templates()
         if args.template not in tpl:
@@ -112,7 +114,7 @@ def main() -> None:
     ap.add_argument("--strict-port", action="store_true", help="gagal bila port terpakai (dipakai server MCP)")
     c = sub.add_parser("cli", help="proses tanpa UI")
     c.add_argument("source", help="link video atau path file")
-    c.add_argument("--clips", type=int, default=6)
+    c.add_argument("--clips", default="auto", help='jumlah klip; "auto" = ±1 per 7,5 menit video (1 jam ≈ 8)')
     c.add_argument("--layout", default=None, choices=["portrait", "square", "blur", "split", "landscape"])
     c.add_argument("--lang", default=None)
     c.add_argument("--model", default=None)
