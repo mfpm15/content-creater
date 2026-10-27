@@ -22,6 +22,22 @@ RECIPES: dict[str, dict] = {
             "emoji": {"enabled": False}, "progress_bar": {"enabled": False}, "cta": {"enabled": False},
         },
     },
+    "clean-focus": {
+        "label": "Clean Focus · Keyword", "niche": "auto", "badge": "Menarik & aman",
+        "desc": "Baseline bersih dengan satu kata penting berwarna kuning dan pembesaran halus. Tanpa karaoke, glow, box aktif, atau pergantian font.",
+        "settings": {
+            "content_profile": "auto", "duration_preset": "auto", "layout": "portrait", "smart_crop": True,
+            "cut_silence": False, "caption_layers": 1, "source_has_burned_captions": "unknown",
+            "caption": {"enabled": True, "role": "spoken-caption", "preset": "clean-focus", "style": "keyword",
+                        "box": False, "effect": "none", "font": "Barlow Condensed", "size": 66,
+                        "outline": 3, "shadow": 0, "color": "#FFFFFF", "highlight": "#FFD166",
+                        "uppercase": False, "words_per_line": 4, "max_chars": 28,
+                        "safe_area": 0.18, "y_pct": 76, "animation": "none",
+                        "accent_font": "Barlow Condensed", "accent_mode": "color", "accent_scale": 108},
+            "title": {"enabled": False, "role": "hook", "preset": "clean", "duration": 3, "size": 58, "y_pct": 12},
+            "emoji": {"enabled": False}, "progress_bar": {"enabled": False}, "cta": {"enabled": False},
+        },
+    },
     "podcast-box": {
         "label": "Podcast · Box merah", "niche": "podcast", "badge": "Paling populer",
         "desc": "Huruf campuran, kotak merah mengikuti kata aktif, judul hook dua baris. Gaya klip podcast yang paling sering dipakai.",

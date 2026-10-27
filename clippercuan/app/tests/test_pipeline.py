@@ -149,7 +149,9 @@ def test_caption_styles_box_toggle_keyword_glow_and_duo_title():
     from clipper.config import DEFAULTS, deep_merge
 
     words = [{"w": w, "s": i * .4, "e": i * .4 + .35} for i, w in enumerate("kenapa bisnis bisa bangkrut".split())]
-    cfg = deep_merge(DEFAULTS, {"caption": {"style": "keyword", "box": True, "effect": "glow", "y_pct": 60, "highlight": "#FFC933"},
+    cfg = deep_merge(DEFAULTS, {"caption": {"style": "keyword", "box": True, "effect": "glow", "y_pct": 60,
+                                             "highlight": "#FFC933", "accent_mode": "font",
+                                             "accent_font": "Instrument Serif Italic"},
                                 "title": {"enabled": True, "role": "hook", "preset": "duo", "duration": 3}})
     ass = captions.build_ass(words, "Kenapa bisnis bangkrut? Ini sebabnya", cfg, (1080, 1920), 3)
     assert "CapBox" in ass and r"\blur" in ass and r"\pos(540,1152)" in ass

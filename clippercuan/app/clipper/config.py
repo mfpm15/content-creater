@@ -86,7 +86,9 @@ DEFAULTS: dict = {
         "effect": "none",        # none | glow
         "glow_color": "",
         "y_pct": None,           # posisi vertikal bebas 8..92 (% tinggi frame); None = ikut "position"
-        "accent_font": "Instrument Serif Italic",  # font kata kunci pada gaya "keyword"
+        "accent_font": "Barlow Condensed",  # font kata kunci; mode color mempertahankan font utama
+        "accent_mode": "color",        # color | font
+        "accent_scale": 108,            # pembesaran halus 100..115 agar layout tetap stabil
     },
     "title": {
         "enabled": False,

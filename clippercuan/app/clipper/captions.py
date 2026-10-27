@@ -153,7 +153,9 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
         if cap.get("y_pct") not in (None, ""):
             y = int(H * max(.08, min(.92, float(cap["y_pct"]) / 100)))
             pos = rf"\an5\pos({W // 2},{y})"
-        acc_font, acc_italic = FONT_PRESETS.get(cap.get("accent_font") or "Instrument Serif Italic", ("Instrument Serif", 1))
+        acc_font, acc_italic = FONT_PRESETS.get(cap.get("accent_font") or font, (font, italic))
+        accent_mode = cap.get("accent_mode", "font")
+        accent_scale = max(100, min(115, int(cap.get("accent_scale", 108))))
         keyword = style == "keyword"
         box_text = _text_on(cap["highlight"])
 
@@ -185,8 +187,10 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
                     t = _esc(up(x["w"]))
                     own = _word_tags(x)
                     tags = own
-                    if j == kw:  # kata kunci: font aksen, miring, warna sorotan, sedikit lebih besar
-                        tags += rf"\fn{acc_font}\i{acc_italic}\c{hl}\fscx118\fscy118"
+                    if j == kw:  # satu kata kunci: warna kontras dan pembesaran halus; font khusus hanya bila diminta
+                        if accent_mode == "font":
+                            tags += rf"\fn{acc_font}\i{acc_italic}"
+                        tags += rf"\c{hl}\fscx{accent_scale}\fscy{accent_scale}"
                     if active and box_on:
                         tags += r"\c" + box_text + r"\bord0\shad0"
                     elif active and style == "karaoke":
@@ -209,7 +213,8 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
                         box_parts = []
                         for j, x in enumerate(line):
                             t = _esc(up(x["w"]))
-                            kwt = rf"\fn{acc_font}\i{acc_italic}\fscx118\fscy118" if j == kw else ""
+                            kwt = ((rf"\fn{acc_font}\i{acc_italic}" if accent_mode == "font" else "")
+                                   + rf"\fscx{accent_scale}\fscy{accent_scale}") if j == kw else ""
                             vis = r"\1a&HFF&\3a&H00&\4a&HFF&" + grow if j == k else r"\1a&HFF&\3a&HFF&\4a&HFF&"
                             box_parts.append("{" + _word_tags(x) + kwt + vis + "}" + t)
                         add(0, s0, e0, "CapBox", head() + " ".join(box_parts))

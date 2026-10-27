@@ -93,6 +93,29 @@ def test_render_exports_sidecars_outside_mp4_directory_basename_contract():
     assert '"ass": f"subtitles/{cid}.ass"' in source
 
 
+def test_clean_focus_uses_same_font_and_subtle_keyword_scale():
+    cfg = deep_merge(DEFAULTS, {"caption": {"style": "keyword", "accent_mode": "color",
+                                             "accent_font": "Barlow Condensed", "accent_scale": 108,
+                                             "highlight": "#FFD166"}})
+    ass = captions.build_ass(_words("ini rahasia caption yang tetap bersih"), "", cfg, (1080, 1920), 8)
+    dialogue = "\n".join(line for line in ass.splitlines() if line.startswith("Dialogue:"))
+    assert "\\fscx108\\fscy108" in dialogue
+    assert "\\fscx118" not in dialogue
+    assert "\\fnInstrument Serif" not in dialogue
+    events = [line for line in dialogue.splitlines() if line]
+    assert len(events) == 2
+    assert all(line.count(captions._ass_color("#FFD166")) == 1 for line in events)
+
+
+def test_clean_focus_recipe_is_opt_in_and_keeps_single_layer_contract():
+    recipe = recipes.RECIPES["clean-focus"]["settings"]
+    cap = recipe["caption"]
+    assert cap["style"] == "keyword" and cap["accent_mode"] == "color"
+    assert cap["font"] == cap["accent_font"] == "Barlow Condensed"
+    assert cap["accent_scale"] == 108 and cap["box"] is False and cap["effect"] == "none"
+    assert recipe["caption_layers"] == 1 and recipe["title"]["enabled"] is False
+
+
 def test_duo_is_hook_style_not_duplicate_transcript():
     cfg = deep_merge(DEFAULTS, {"caption": {"style": "clean"},
                                 "title": {"enabled": True, "preset": "duo", "duration": 3, "role": "hook"}})

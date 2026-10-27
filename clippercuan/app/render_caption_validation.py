@@ -66,15 +66,16 @@ def validation_configs() -> dict[str, dict]:
                 "box": False, "effect": "none",
             }
         })),
-        "enhanced": deep_merge(DEFAULTS, deep_merge(common, {
+        "enhanced_v2": deep_merge(DEFAULTS, deep_merge(common, {
             "caption": {
-                "enabled": True, "role": "spoken-caption", "preset": "clean-enhanced",
-                "style": "keyword", "font": "Barlow Condensed", "size": 64,
+                "enabled": True, "role": "spoken-caption", "preset": "clean-focus",
+                "style": "keyword", "font": "Barlow Condensed", "size": 66,
                 "outline": 3, "shadow": 0, "color": "#FFFFFF",
-                "highlight": "#38BDF8", "uppercase": False,
+                "highlight": "#FFD166", "uppercase": False,
                 "words_per_line": 4, "max_chars": 28, "safe_area": 0.18,
-                "position": "bottom", "y_pct": 78, "animation": "none",
-                "box": False, "effect": "none", "accent_font": "Instrument Serif Italic",
+                "position": "bottom", "y_pct": 76, "animation": "none",
+                "box": False, "effect": "none", "accent_font": "Barlow Condensed",
+                "accent_mode": "color", "accent_scale": 108,
             }
         })),
     }

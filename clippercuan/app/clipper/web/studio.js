@@ -60,7 +60,14 @@ function captionHTML(cap, words, t) {
     if (st.color) css.push(`color:${st.color}`);
     if (st.font) css.push(`font-family:${ffam(st.font)}`, fitalic(st.font) ? 'font-style:italic' : '');
     if (st.scale && Math.abs(st.scale - 1) > .01) css.push(`font-size:${st.scale}em`);
-    if (isKw) css.push(`font-family:${ffam(cap.accent_font || 'Instrument Serif Italic')}`, fitalic(cap.accent_font || 'Instrument Serif Italic') ? 'font-style:italic' : '', `color:${hl}`, 'font-size:1.18em');
+    if (isKw) {
+      const accentScale = Math.max(100, Math.min(115, +(cap.accent_scale || 108))) / 100;
+      if ((cap.accent_mode || 'font') === 'font') {
+        const accentFont = cap.accent_font || cap.font;
+        css.push(`font-family:${ffam(accentFont)}`, fitalic(accentFont) ? 'font-style:italic' : '');
+      }
+      css.push(`color:${hl}`, `font-size:${accentScale}em`);
+    }
     if (isOn && box) css.push(`background:${hl}`, `color:${onBox(hl)}`, 'text-shadow:none');
     else if (isOn) css.push(`color:${hl}`);
     return `<span class="w${isOn ? ' on' : ''}" style="${css.filter(Boolean).join(';')}">${esc(up(w.w))}</span>`;
@@ -304,7 +311,7 @@ async function pageProject(pid) {
       chipGroup($('#pLay', box), S.layout, v => { S.layout = v; markDirty(); showPreview(); });
       chipGroup($('#pQ', box), String((S.quality || {}).output || '1080'), v => { S.quality = { ...(S.quality || {}), output: v }; markDirty(); });
       $$('[data-font]', box).forEach(b => b.classList.toggle('on', b.dataset.font === c.font));
-      $('#pCol', box).value = c.color; $('#pHl', box).value = c.highlight; $('#pWpl', box).value = c.words_per_line; $('#pAcc', box).value = c.accent_font || 'Instrument Serif Italic';
+      $('#pCol', box).value = c.color; $('#pHl', box).value = c.highlight; $('#pWpl', box).value = c.words_per_line; $('#pAcc', box).value = c.accent_font || c.font || 'Barlow Condensed';
       const y = c.y_pct ?? { bottom: 76, middle: 50, top: 20 }[c.position || 'bottom']; $('#pY', box).value = y; $('#pYv', box).textContent = Math.round(y) + '%';
       S.caption_layers = 1; c.role = 'spoken-caption';
       $('#sLayerBadge').textContent = S.source_has_burned_captions === 'yes' ? 'Caption sumber · tanpa tambahan' : '1 layer subtitle';
