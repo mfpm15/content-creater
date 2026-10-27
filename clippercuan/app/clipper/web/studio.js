@@ -121,7 +121,7 @@ async function pageProject(pid) {
     <details id="sErr" class="card" hidden><summary>Detail error</summary><pre></pre></details>
     <div class="st-main">
       <div class="st-stage">
-        <div class="st-phone" id="sPhone"><video playsinline preload="metadata"></video><img alt="" hidden><div class="cc-title"></div><div class="cc-cap"></div><div class="cc-wm" hidden></div><div class="cc-pb" hidden></div><div class="safe" hidden></div><div class="st-empty" id="sEmpty"><span class="spin"></span><b>Menyiapkan kandidat…</b><small>Unduh · transkripsi · cari momen</small></div></div>
+        <div class="st-phone" id="sPhone"><video playsinline preload="metadata"></video><img alt="" hidden><div class="cc-title"></div><div class="cc-cap"></div><div class="cc-wm" hidden></div><div class="cc-pb" hidden></div><div class="safe" hidden></div><div class="layer-badge" id="sLayerBadge">1 layer subtitle</div><div class="st-empty" id="sEmpty"><span class="spin"></span><b>Menyiapkan kandidat…</b><small>Unduh · transkripsi · cari momen</small></div></div>
         <div class="st-stage-bar"><button class="btn ghost sm" id="sPrev" title="Klip sebelumnya">‹</button><button class="btn sm st-play" id="sPlay">▶</button><button class="btn ghost sm" id="sNext" title="Klip berikutnya">›</button><span id="sTime" class="muted">0:00</span><span class="sp"></span><span class="st-mode" id="sMode"></span><label class="check sm"><input type="checkbox" id="sSafe"> Safe area</label></div>
       </div>
       <aside class="st-panel">
@@ -280,7 +280,7 @@ async function pageProject(pid) {
   async function buildStyleTab() {
     const box = $('.st-tab[data-tab="style"]'), recipes = await getRecipes().catch(() => ({}));
     const cap = S.caption, fonts = INFO.fonts;
-    box.innerHTML = `<div class="pn-sec"><h4>Resep gaya viral</h4><div class="rc-grid">${Object.values(recipes).filter(r => r.id !== 'auto').map(r => `<button type="button" data-r="${esc(r.id)}" class="${(S.recipe_applied || S.recipe) === r.id ? 'on' : ''}" title="${esc(r.desc)}"><b>${esc(r.label)}</b><small>${esc(r.badge || '')}</small></button>`).join('')}</div></div>
+    box.innerHTML = `<div class="pn-sec layer-stack"><h4>Layer aktif <span class="layer-ok">1 layer subtitle</span></h4><div><span>Video</span><span class="${S.title.enabled ? 'on' : ''}">Hook opsional</span><span class="on">Caption tunggal</span><span class="${S.emoji.enabled ? 'on' : ''}">Emoji opsional</span></div><small>${S.source_has_burned_captions === 'yes' ? 'Caption sumber aktif: caption tambahan dimatikan saat render.' : S.source_has_burned_captions === 'no' ? 'Sumber ditandai tanpa burned captions.' : 'Status caption bawaan sumber belum diketahui. Periksa preview bila teks tampak ganda.'}</small></div><div class="pn-sec"><h4>Preset tampilan</h4><div class="rc-grid">${Object.values(recipes).filter(r => r.id !== 'auto').map(r => `<button type="button" data-r="${esc(r.id)}" class="${(S.recipe_applied || S.recipe) === r.id ? 'on' : ''}" title="${esc(r.desc)}"><b>${esc(r.label)}</b><small>${esc(r.badge || '')}</small></button>`).join('')}</div></div>
       <div class="pn-sec"><h4>Font caption</h4><div class="font-grid">${fonts.map(f => `<button type="button" data-font="${esc(f)}" class="${cap.font === f ? 'on' : ''}" style="font-family:${ffam(f)};${fitalic(f) ? 'font-style:italic' : ''}">${esc(f.replace(' ExtraBold', '').replace(' Black', ''))}<small>${esc(f)}</small></button>`).join('')}</div>
         <div class="cap-sample" id="capSample"></div></div>
       <div class="pn-sec"><h4>Gaya caption</h4><div class="seg wrap" id="pStyle"><button data-v="clean">Plain</button><button data-v="karaoke">Karaoke</button><button data-v="wbw">Word by word</button><button data-v="keyword">Subtract &amp; font</button></div>
@@ -291,7 +291,7 @@ async function pageProject(pid) {
         <label>Posisi vertikal <b id="pYv"></b><input type="range" id="pY" min="10" max="90"></label>
         <label>Ukuran <b id="pSv"></b><input type="range" id="pSize" min="50" max="140"></label>
         <div class="pn-row"><label class="check"><input type="checkbox" id="pUp"> HURUF BESAR</label><label class="check"><input type="checkbox" id="pPop"> Animasi pop</label><label class="check"><input type="checkbox" id="pOn"> Tampilkan</label></div></div>
-      <div class="pn-sec"><h4>Judul pembuka</h4><div class="seg wrap" id="pTtl"><button data-v="duo">Duo glow</button><button data-v="bar">Bar</button><button data-v="outline">Outline</button><button data-v="neon">Neon</button><button data-v="clean">Clean</button><button data-v="off">Tanpa</button></div>
+      <div class="pn-sec advanced-only"><h4>Hook opsional · area atas</h4><div class="seg wrap" id="pTtl"><button data-v="duo">Dua baris aksen</button><button data-v="bar">Label warna</button><button data-v="outline">Outline</button><button data-v="neon">Neon</button><button data-v="clean">Teks bersih</button><button data-v="off">Tanpa hook</button></div>
         <label>Tampil (detik, 0 = sepanjang klip)<input type="number" class="in" id="pTd" min="0" max="120"></label></div>
       <div class="pn-sec"><h4>Format proyek</h4><div class="seg wrap" id="pLay"><button data-v="portrait">9:16</button><button data-v="square">1:1</button><button data-v="blur">Blur</button><button data-v="split">Split gaming</button><button data-v="landscape">16:9</button></div>
         <div class="pn-row"><span>Kualitas hasil</span><div class="seg sm" id="pQ"><button data-v="1080">1080p</button><button data-v="1440">1440p</button><button data-v="2160">4K</button></div></div></div>`;
@@ -300,12 +300,15 @@ async function pageProject(pid) {
       chipGroup($('#pStyle', box), c.style === 'box' ? 'clean' : c.style, v => { c.style = v; markDirty(); sync(); });
       chipGroup($('#pBox', box), c.box || c.style === 'box' ? 'on' : 'off', v => { c.box = v === 'on'; if (c.style === 'box') c.style = 'clean'; markDirty(); sync(); });
       chipGroup($('#pFx', box), c.effect || 'none', v => { c.effect = v; markDirty(); sync(); });
-      chipGroup($('#pTtl', box), S.title.enabled ? S.title.preset : 'off', v => { S.title.enabled = v !== 'off'; if (v !== 'off') S.title.preset = v; markDirty(); });
+      chipGroup($('#pTtl', box), S.title.enabled ? S.title.preset : 'off', v => { S.title.enabled = v !== 'off'; S.title.role = 'hook'; S.title.duration = Math.min(5, Math.max(.5, +S.title.duration || 3)); if (v !== 'off') S.title.preset = v; markDirty(); sync(); showPreview(); });
       chipGroup($('#pLay', box), S.layout, v => { S.layout = v; markDirty(); showPreview(); });
       chipGroup($('#pQ', box), String((S.quality || {}).output || '1080'), v => { S.quality = { ...(S.quality || {}), output: v }; markDirty(); });
       $$('[data-font]', box).forEach(b => b.classList.toggle('on', b.dataset.font === c.font));
       $('#pCol', box).value = c.color; $('#pHl', box).value = c.highlight; $('#pWpl', box).value = c.words_per_line; $('#pAcc', box).value = c.accent_font || 'Instrument Serif Italic';
       const y = c.y_pct ?? { bottom: 76, middle: 50, top: 20 }[c.position || 'bottom']; $('#pY', box).value = y; $('#pYv', box).textContent = Math.round(y) + '%';
+      S.caption_layers = 1; c.role = 'spoken-caption';
+      $('#sLayerBadge').textContent = S.source_has_burned_captions === 'yes' ? 'Caption sumber · tanpa tambahan' : '1 layer subtitle';
+      $('#sLayerBadge').classList.toggle('warn', S.source_has_burned_captions === 'unknown');
       $('#pSize', box).value = c.size; $('#pSv', box).textContent = c.size;
       $('#pUp', box).checked = !!c.uppercase; $('#pPop', box).checked = c.animation === 'pop'; $('#pOn', box).checked = c.enabled; $('#pTd', box).value = S.title.duration || 0;
       const sample = [{ w: 'Ini', s: 0, e: .3 }, { w: 'rahasia', s: .3, e: .7 }, { w: 'cuan', s: .7, e: 1 }];
@@ -323,7 +326,7 @@ async function pageProject(pid) {
     bindIn('#pCol', t => S.caption.color = t.value); bindIn('#pHl', t => { S.caption.highlight = t.value; if (S.caption.effect === 'glow') S.caption.glow_color = t.value; });
     bindIn('#pWpl', t => S.caption.words_per_line = Math.max(1, +t.value || 3)); bindIn('#pAcc', t => S.caption.accent_font = t.value);
     bindIn('#pY', t => S.caption.y_pct = +t.value); bindIn('#pSize', t => S.caption.size = +t.value);
-    bindIn('#pUp', t => S.caption.uppercase = t.checked); bindIn('#pPop', t => S.caption.animation = t.checked ? 'pop' : 'none'); bindIn('#pOn', t => S.caption.enabled = t.checked);
+    bindIn('#pUp', t => S.caption.uppercase = t.checked); bindIn('#pPop', t => S.caption.animation = t.checked ? 'pop' : 'none'); bindIn('#pOn', t => { S.caption.enabled = t.checked; S.caption_layers = 1; });
     bindIn('#pTd', t => S.title.duration = +t.value || 0);
     sync();
   }

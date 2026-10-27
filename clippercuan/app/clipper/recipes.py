@@ -7,6 +7,20 @@ Ini titik awal yang masuk akal, bukan jaminan viral: uji A/B dengan data unggaha
 from __future__ import annotations
 
 RECIPES: dict[str, dict] = {
+    "recommended": {
+        "label": "Rekomendasi · Clean Pro", "niche": "auto", "badge": "Default aman",
+        "desc": "Satu layer subtitle utama yang bersih, maksimal dua baris, tanpa efek dekoratif otomatis.",
+        "settings": {
+            "content_profile": "auto", "duration_preset": "auto", "layout": "portrait", "smart_crop": True,
+            "cut_silence": False, "caption_layers": 1, "source_has_burned_captions": "unknown",
+            "caption": {"enabled": True, "role": "spoken-caption", "preset": "clean-pro", "style": "clean",
+                        "box": False, "effect": "none", "font": "Barlow Condensed", "size": 76,
+                        "color": "#FFFFFF", "highlight": "#FFD166", "uppercase": False,
+                        "words_per_line": 6, "max_chars": 34, "safe_area": 0.15, "y_pct": 74, "animation": "none"},
+            "title": {"enabled": False, "role": "hook", "preset": "clean", "duration": 3, "size": 58, "y_pct": 12},
+            "emoji": {"enabled": False}, "progress_bar": {"enabled": False}, "cta": {"enabled": False},
+        },
+    },
     "podcast-box": {
         "label": "Podcast · Box merah", "niche": "podcast", "badge": "Paling populer",
         "desc": "Huruf campuran, kotak merah mengikuti kata aktif, judul hook dua baris. Gaya klip podcast yang paling sering dipakai.",
@@ -15,7 +29,7 @@ RECIPES: dict[str, dict] = {
             "caption": {"preset": "box-merah", "style": "clean", "box": True, "effect": "none", "font": "Barlow Condensed", "size": 92,
                         "color": "#FFFFFF", "highlight": "#FF2D2D", "uppercase": False, "words_per_line": 3, "max_chars": 22,
                         "y_pct": 62, "animation": "pop"},
-            "title": {"enabled": True, "preset": "duo", "duration": 0, "size": 84, "accent": "#3DE0A0", "glow": "#C6FF3D"},
+            "title": {"enabled": True, "role": "hook", "preset": "duo", "duration": 3, "size": 68, "accent": "#3DE0A0", "glow": "#C6FF3D", "y_pct": 12},
             "emoji": {"enabled": False}, "progress_bar": {"enabled": False},
         },
     },
@@ -39,20 +53,22 @@ RECIPES: dict[str, dict] = {
             "caption": {"preset": "quote-glow", "style": "keyword", "box": False, "effect": "glow", "glow_color": "#C6FF3D",
                         "font": "Barlow Condensed", "size": 90, "color": "#FFFFFF", "highlight": "#C6FF3D", "uppercase": False,
                         "words_per_line": 4, "max_chars": 26, "y_pct": 64, "animation": "none", "accent_font": "Instrument Serif Italic"},
-            "title": {"enabled": True, "preset": "duo", "duration": 0, "size": 84, "accent": "#3DE0A0", "glow": "#C6FF3D"},
+            "title": {"enabled": True, "role": "hook", "preset": "duo", "duration": 3, "size": 68, "accent": "#3DE0A0", "glow": "#C6FF3D", "y_pct": 12},
             "emoji": {"enabled": False}, "progress_bar": {"enabled": False},
         },
     },
     "tech-review": {
-        "label": "Review tech · Karaoke biru", "niche": "tech_review", "badge": "Gadget",
-        "desc": "Kata aktif menyala biru, posisi bawah agar produk tetap terlihat. Durasi 25–40 dtk untuk demo + verdict.",
+        "label": "Review tech · Fokus biru", "niche": "tech_review", "badge": "Opt-in",
+        "desc": "Satu caption dengan penekanan biru terkendali. Hook opsional tiga detik, produk tetap terlihat.",
         "settings": {
-            "content_profile": "tech_review", "duration_preset": "25-40", "layout": "portrait", "smart_crop": True, "cut_silence": True,
-            "caption": {"preset": "tech", "style": "karaoke", "box": False, "effect": "none", "font": "Barlow Condensed", "size": 84,
-                        "color": "#F8FAFC", "highlight": "#38BDF8", "uppercase": False, "words_per_line": 4, "max_chars": 26,
-                        "y_pct": 72, "animation": "none"},
-            "title": {"enabled": True, "preset": "clean", "duration": 5, "size": 64},
-            "emoji": {"enabled": False}, "progress_bar": {"enabled": True, "color": "#38BDF8"},
+            "content_profile": "tech_review", "duration_preset": "25-40", "layout": "portrait", "smart_crop": True,
+            "cut_silence": True, "caption_layers": 1,
+            "caption": {"enabled": True, "role": "spoken-caption", "preset": "tech", "style": "karaoke", "box": False,
+                        "effect": "none", "font": "Barlow Condensed", "size": 78, "color": "#F8FAFC",
+                        "highlight": "#38BDF8", "uppercase": False, "words_per_line": 5, "max_chars": 32,
+                        "safe_area": 0.15, "y_pct": 74, "animation": "none"},
+            "title": {"enabled": False, "role": "hook", "preset": "clean", "duration": 3, "size": 56, "y_pct": 12},
+            "emoji": {"enabled": False}, "progress_bar": {"enabled": False},
         },
     },
     "ml-hype": {
@@ -108,10 +124,10 @@ RECIPES: dict[str, dict] = {
     },
 }
 
-AUTO = {"id": "auto", "label": "Otomatis sesuai konten", "niche": "auto", "badge": "Disarankan",
-        "desc": "Jenis konten dideteksi dari transkrip, judul, wajah, dan gerak; resep terbaik dipilih otomatis (podcast → Box merah, review → Karaoke biru, gameplay → Hype kuning)."}
+AUTO = {"id": "auto", "label": "Otomatis sesuai konten", "niche": "auto", "badge": "Lanjutan",
+        "desc": "Deteksi konten tetap tersedia, tetapi gaya dekoratif tidak lagi dipilih otomatis untuk podcast atau review teknologi."}
 
-PROFILE_DEFAULT = {"podcast": "podcast-box", "tech_review": "tech-review", "mobile_legends": "ml-hype"}
+PROFILE_DEFAULT = {"podcast": "recommended", "tech_review": "recommended", "mobile_legends": "ml-hype"}
 
 
 def public() -> dict:

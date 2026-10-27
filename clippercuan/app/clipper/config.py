@@ -38,7 +38,9 @@ FFMPEG = _find_ffmpeg()
 
 # Default pipeline — semua bisa diubah dari UI per proyek.
 DEFAULTS: dict = {
-    "recipe": "",                # id resep gaya (recipes.py) | "auto" = sesuai konten | "" = pengaturan manual
+    "recipe": "recommended",     # default aman: satu spoken-caption bersih
+    "caption_layers": 1,          # invariant: satu layer transcript aktif per timestamp
+    "source_has_burned_captions": "unknown",  # unknown | yes | no; heuristik hanya warning
     "min_score": 45,             # render otomatis melewati kandidat di bawah skor ini (minimal 1 klip tetap dibuat)
     "storage": "full",           # full | lite (link: hanya audio + potongan klip yang diunduh)
     "content_profile": "auto",  # auto | podcast | tech_review | mobile_legends
@@ -65,18 +67,19 @@ DEFAULTS: dict = {
     },
     "caption": {
         "enabled": True,
-        "preset": "bold-viral", # clean | bold-viral | minimal | karaoke
-        "style": "box",          # box | wbw | karaoke | clean | keyword
-        "font": "Montserrat ExtraBold",
-        "size": 82,
+        "role": "spoken-caption",
+        "preset": "clean-pro",
+        "style": "clean",        # box | wbw | karaoke | clean | keyword
+        "font": "Barlow Condensed",
+        "size": 76,
         "color": "#FFFFFF",
-        "highlight": "#FFC933",
-        "uppercase": True,
-        "words_per_line": 3,
+        "highlight": "#FFD166",
+        "uppercase": False,
+        "words_per_line": 6,
         "position": "bottom",    # bottom | middle | top
-        "safe_area": 0.12,
-        "max_chars": 24,
-        "animation": "pop",      # pop | none
+        "safe_area": 0.15,
+        "max_chars": 34,
+        "animation": "none",     # pop | none
         "box": False,            # kotak berwarna mengikuti kata aktif (bisa dipadu gaya apa pun)
         "effect": "none",        # none | glow
         "glow_color": "",
@@ -84,10 +87,12 @@ DEFAULTS: dict = {
         "accent_font": "Instrument Serif Italic",  # font kata kunci pada gaya "keyword"
     },
     "title": {
-        "enabled": True,
-        "preset": "bar",         # bar | outline | neon | clean | duo
-        "duration": 0,           # detik; 0 = sepanjang klip
-        "size": 70,
+        "enabled": False,
+        "role": "hook",
+        "preset": "clean",       # bar | outline | neon | clean | duo
+        "duration": 3,            # hook wajib terbatas; 0 tidak lagi menjadi default
+        "size": 58,
+        "y_pct": 12,
         "accent": "#3DE0A0",     # preset duo: warna baris punchline
         "glow": "#C6FF3D",
     },

@@ -141,16 +141,36 @@ def segment(words: list[dict], max_words: int = 7, max_chars: int = 34, pause: f
     return chunks
 
 
+def normalize_cues(items: list[dict]) -> list[dict]:
+    """Deduplicate identical spoken cues and trim overlaps without deleting text."""
+    out = []
+    for raw in sorted(copy.deepcopy(items), key=lambda cue: (float(cue.get("start", 0)), float(cue.get("end", 0)))):
+        cue = {**raw, "role": raw.get("role") or "spoken-caption",
+               "provenance": raw.get("provenance") or "transcript"}
+        key = " ".join(str(cue.get("text", "")).casefold().split())
+        duplicate = next((old for old in out if old["role"] == cue["role"]
+                          and " ".join(str(old.get("text", "")).casefold().split()) == key
+                          and float(cue["start"]) < float(old["end"])), None)
+        if duplicate:
+            duplicate["start"] = min(float(duplicate["start"]), float(cue["start"]))
+            duplicate["end"] = max(float(duplicate["end"]), float(cue["end"]))
+            duplicate["provenance"] = f"{duplicate['provenance']}+{cue['provenance']}"
+            continue
+        out.append(cue)
+    for left, right in zip(out, out[1:]):
+        if left["role"] == right["role"] == "spoken-caption" and float(left["end"]) > float(right["start"]):
+            left["end"] = max(float(left["start"]), float(right["start"]))
+    return out
+
+
 def cues(words: list[dict], config: dict | None = None) -> list[dict]:
     config = config or {}
-    result = []
-    for index, group in enumerate(segment(words, int(config.get("max_words", 7)), int(config.get("max_chars", 34)))):
-        end = float(group[-1]["e"]) + .12
-        if index + 1 < len(segment(words, int(config.get("max_words", 7)), int(config.get("max_chars", 34)))):
-            pass
-        result.append({"id": f"cue-{index + 1}", "start": float(group[0]["s"]), "end": end, "text": " ".join(w["w"] for w in group), "words": copy.deepcopy(group)})
-    for left, right in zip(result, result[1:]): left["end"] = min(left["end"], right["start"])
-    return result
+    groups = segment(words, int(config.get("max_words", 7)), int(config.get("max_chars", 34)))
+    result = [{"id": f"cue-{index + 1}", "start": float(group[0]["s"]), "end": float(group[-1]["e"]) + .12,
+               "text": " ".join(w["w"] for w in group), "words": copy.deepcopy(group),
+               "role": "spoken-caption", "provenance": group[0].get("provenance", "transcript")}
+              for index, group in enumerate(groups)]
+    return normalize_cues(result)
 
 
 def validate_cues(items: list[dict], frame: tuple[int, int] = (1080, 1920), safe_area: float = .15) -> dict:
@@ -182,4 +202,10 @@ def recommend(profile: str, quality: dict) -> str:
 
 def workspace(transcript: dict, duration: float, profile: str = "podcast", custom_glossary: list[dict] | None = None) -> dict:
     report = quality_report(transcript, duration)
-    return {"schema_version": SCHEMA_VERSION, "revision": 1, "transcript": transcript, "quality_report": report, "glossary": glossary(profile, custom_glossary), "cues": cues(transcript.get("words") or []), "templates": TEMPLATES, "recommended_template": recommend(profile, report), "audit_trail": [], "undo_stack": [], "redo_stack": [], "updated_at": time.time()}
+    return {"schema_version": SCHEMA_VERSION, "revision": 1, "transcript": transcript, "quality_report": report,
+            "glossary": glossary(profile, custom_glossary), "cues": cues(transcript.get("words") or []),
+            "layers": [{"role": "video", "active": True}, {"role": "hook", "active": False},
+                       {"role": "spoken-caption", "active": True}, {"role": "emoji", "active": False}],
+            "caption_layers": 1, "source_has_burned_captions": "unknown", "templates": TEMPLATES,
+            "recommended_template": recommend(profile, report), "audit_trail": [], "undo_stack": [],
+            "redo_stack": [], "updated_at": time.time()}

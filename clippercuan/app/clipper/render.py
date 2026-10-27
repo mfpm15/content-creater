@@ -161,6 +161,8 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     sub_keys = [[round(remap(t, plan), 2), x] for t, x in keys] if (cut and keys) else keys
 
     ass_name = f"{cid}.ass"
+    if cfg.get("source_has_burned_captions") == "yes":
+        cfg = {**cfg, "caption": {**cfg["caption"], "enabled": False}}
     (work / ass_name).write_text(captions.build_ass(sub_words, clip.get("title", ""), cfg, size, out_dur), "utf-8")
     (work / f"{cid}.srt").write_text(captions.build_srt(sub_words, int(cfg["caption"].get("words_per_line", 3))), "utf-8")
 
@@ -288,7 +290,12 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     return {"file": out.name, "thumb": f"{cid}.jpg", "srt": f"{cid}.srt", "crop_keys": keys, "words": cw,
             "duration": round(out_dur, 2), "cut_saved": round(dur - out_dur, 2), "emojis": [e["code"] for e in emojis],
             "caption_cues": len(captions.chunk_words(sub_words, int(cfg["caption"].get("words_per_line", 3)))),
+            "caption_layers": 1, "caption_provenance": "ASS:spoken-caption",
+            "hook_provenance": "ASS:hook" if cfg["title"].get("enabled") else None,
+            "source_has_burned_captions": cfg.get("source_has_burned_captions", "unknown"),
             "crop_confidence": round(crop_confidence, 2),
             "resolution": f"{size[0]}x{size[1]}", "encoder": enc, "upscale": round(up, 2),
             "render_warnings": (["Crop confidence rendah — cek framing di Crop studio"] if smart and crop_confidence < .5 else [])
+            + (["Potensi subtitle ganda: status caption bawaan sumber belum diketahui"]
+               if cfg.get("source_has_burned_captions", "unknown") == "unknown" else [])
             + _quality_warning(up, pr, size)}

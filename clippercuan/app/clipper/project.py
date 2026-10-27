@@ -594,7 +594,13 @@ def save_caption_workspace(pid: str, payload: dict, expected_revision: int | Non
         current["redo_stack"] = []
         current["revision"] = int(current.get("revision", 0)) + 1
         current["updated_at"] = time.time()
-        validation = caption_workspace.validate_cues(current.get("cues") or [])
+        current["cues"] = caption_workspace.normalize_cues(current.get("cues") or [])
+        current["caption_layers"] = 1
+        current["layers"] = [{"role": "video", "active": True},
+                             {"role": "hook", "active": bool((load(pid).get("settings", {}).get("title") or {}).get("enabled"))},
+                             {"role": "spoken-caption", "active": True},
+                             {"role": "emoji", "active": bool((load(pid).get("settings", {}).get("emoji") or {}).get("enabled"))}]
+        validation = caption_workspace.validate_cues(current["cues"])
         current["validation"] = validation
         caption_workspace.atomic_json(pdir(pid) / "caption-workspace.json", current)
         p = load(pid)
@@ -881,7 +887,9 @@ def recover_interrupted() -> None:
 
 def retry(pid: str) -> dict:
     _CANCEL.discard(pid)
-    p = update(pid, status="queued", progress=0.0, message="Menunggu antrean", error=None, owner=os.getpid())
+    p = load(pid)
+    p["settings"]["caption_layers"] = 1
+    p = update(pid, settings=p["settings"], status="queued", progress=0.0, message="Menunggu antrean", error=None, owner=os.getpid())
     _JOBS.put(("pipeline", pid, {}))
     return p
 

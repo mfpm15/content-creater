@@ -105,6 +105,12 @@ def chunk_words(words: list[dict], per_line: int, max_chars: int = 24) -> list[l
 def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], duration: float) -> str:
     W, H = size
     cap, ttl, wm = cfg["caption"], cfg["title"], cfg["watermark"]
+    if int(cfg.get("caption_layers", 1)) != 1:
+        raise ValueError("Satu spoken-caption layer wajib aktif per render")
+    if cap.get("role", "spoken-caption") != "spoken-caption":
+        raise ValueError("Caption transcript harus memakai role spoken-caption")
+    if ttl.get("enabled") and ttl.get("role", "hook") != "hook":
+        raise ValueError("Title overlay harus memakai role hook")
     font, italic = FONT_PRESETS.get(cap["font"], (cap["font"], 0))
     scale = W / 1080
     fs = int(cap["size"] * scale)
@@ -209,15 +215,15 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
                         glow_layer(s0, e0, " ".join(_esc(up(x["w"])) for x in line))
                     add(1, s0, e0, "Cap", head() + " ".join(word_text(j, x, j == k) for j, x in enumerate(line)))
 
-    # ---- judul pembuka
+    # ---- hook/title: area atas, role berbeda, maksimal lima detik
     if ttl["enabled"] and title.strip():
         preset = ttl.get("preset", "bar")
-        t_end = duration if not ttl.get("duration") else min(float(ttl["duration"]), duration)
+        t_end = min(max(float(ttl.get("duration") or 3), .5), duration, 5.0)
         if preset == "duo":  # baris pengantar putih miring + punchline besar berwarna, keduanya bercahaya
             first, second = _title_lines(title)
             acc = _ass_color(ttl.get("accent") or "#3DE0A0")
             gl = _ass_color(ttl.get("glow") or "#C6FF3D")
-            y1 = int(H * 0.12)
+            y1 = int(H * max(.08, min(.28, float(ttl.get("y_pct", 12)) / 100)))
             sharp = rf"\shad0\bord{max(int(3 * scale), 2)}\3c&H00101010&"
             glow = rf"\1a&HFF&\shad0\bord{max(int(8 * scale), 4)}\blur{max(int(8 * scale), 4)}\3a&H40&"
             if first:
@@ -253,6 +259,7 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
 
     head = (
         "[Script Info]\nScriptType: v4.00+\nWrapStyle: 0\nScaledBorderAndShadow: yes\n"
+        "Role: spoken-caption\nRole: hook\nCaptionLayers: 1\n"
         f"PlayResX: {W}\nPlayResY: {H}\nYCbCr Matrix: TV.709\n\n"
         "[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, "

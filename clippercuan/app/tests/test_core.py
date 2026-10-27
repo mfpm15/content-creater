@@ -49,7 +49,8 @@ def test_caption_lines_never_overlap():
 
 def test_box_layer_matches_text_layer():
     words = _words("satu dua tiga empat lima enam")
-    ass = captions.build_ass(words, "", DEFAULTS, (1080, 1920), 5)
+    cfg = deep_merge(DEFAULTS, {"caption": {"style": "box", "box": True}})
+    ass = captions.build_ass(words, "", cfg, (1080, 1920), 5)
     text, box = _events(ass, "Cap"), _events(ass, "CapBox")
     assert len(text) == len(box) > 0
     strip = lambda s: re.sub(r"\{[^}]*\}", "", s)  # noqa: E731
@@ -222,7 +223,8 @@ def test_caption_phrase_boundaries_safe_area_and_readability():
 def test_backward_compatible_defaults_and_security_redaction():
     old = {"clip_count": 2, "caption": {"style": "clean"}}
     migrated = deep_merge(DEFAULTS, old)
-    assert migrated["duration_preset"] == "auto" and migrated["caption"]["preset"] == "bold-viral"
+    assert migrated["duration_preset"] == "auto" and migrated["caption"]["preset"] == "clean-pro"
+    assert migrated["caption_layers"] == 1 and migrated["caption"]["role"] == "spoken-caption"
     public = llm.public_settings()
     assert public["llm"]["api_key"] in ("", "••••") and public["asr"]["api_key"] in ("", "••••")
 
