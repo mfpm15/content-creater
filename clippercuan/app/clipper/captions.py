@@ -146,7 +146,7 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
         if style in {"karaoke", "box"} and not word_timing:
             style = "clean"  # phrase timing tidak boleh membuat highlight kata palsu
         up = (lambda s: s.upper()) if cap.get("uppercase") else (lambda s: s)
-        pop = cap.get("animation") == "pop"
+        pop = cap.get("animation") in {"pop", "subtle-pop", "word-focus"}
         glow = cap.get("effect") == "glow"
         glow_col = _ass_color(cap.get("glow_color") or cap["highlight"])
         pos = ""
@@ -171,7 +171,7 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
                 end = words[i + 1]["s"] if i + 1 < len(words) and words[i + 1]["s"] - w["e"] < 0.4 else w["e"]
                 if i + 1 < len(words):
                     end = min(end, words[i + 1]["s"])
-                anim = r"\fscx92\fscy92\t(0,120,\fscx104\fscy104)\t(120,220,\fscx100\fscy100)" if pop else ""
+                anim = r"\fad(45,55)\fscx72\fscy72\t(0,90,\fscx116\fscy116)\t(90,180,\fscx100\fscy100)" if pop else ""
                 t = _esc(up(w["w"]))
                 glow_layer(w["s"], end, t)
                 add(1, w["s"], end, "Cap", head(anim + r"\c" + hl) + t)
@@ -201,13 +201,13 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
                 if not per_word:
                     plain = " ".join(_esc(up(x["w"])) for x in line)
                     glow_layer(line[0]["s"], l_end, plain)
-                    anim = r"\fad(80,0)" if pop else ""
+                    anim = r"\fad(60,70)\fscx88\fscy88\t(0,110,\fscx106\fscy106)\t(110,210,\fscx100\fscy100)" if pop else ""
                     add(1, line[0]["s"], l_end, "Cap", head(anim) + " ".join(word_text(j, x, False) for j, x in enumerate(line)))
                     continue
                 for k, w in enumerate(line):
                     s0 = w["s"] if k else line[0]["s"]
                     e0 = line[k + 1]["s"] if k + 1 < len(line) else l_end
-                    grow = r"\t(0,120,\fscx104\fscy104)\t(120,220,\fscx100\fscy100)" if pop else ""
+                    grow = r"\fscx88\fscy88\t(0,90,\fscx116\fscy116)\t(90,180,\fscx100\fscy100)" if pop else ""
                     if box_on:  # lapis bawah: (glow) + kotak solid hanya di kata aktif
                         glow_layer(s0, e0, " ".join(_esc(up(x["w"])) for x in line))
                         box_parts = []
@@ -220,7 +220,8 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
                         add(0, s0, e0, "CapBox", head() + " ".join(box_parts))
                     else:
                         glow_layer(s0, e0, " ".join(_esc(up(x["w"])) for x in line))
-                    add(1, s0, e0, "Cap", head() + " ".join(word_text(j, x, j == k) for j, x in enumerate(line)))
+                    active_anim = grow if pop else ""
+                    add(1, s0, e0, "Cap", head(active_anim) + " ".join(word_text(j, x, j == k) for j, x in enumerate(line)))
 
     # ---- hook/title: area atas, role berbeda, maksimal lima detik
     if ttl["enabled"] and title.strip():

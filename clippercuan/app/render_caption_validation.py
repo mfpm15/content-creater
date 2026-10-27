@@ -15,6 +15,7 @@ if str(APP_DIR) not in sys.path:
 
 from clipper import media, render
 from clipper.config import DEFAULTS, FFMPEG, deep_merge
+from clipper.recipes import RECIPES
 
 PROJECT = Path(os.environ.get(
     "CLIPPER_VALIDATION_PROJECT",
@@ -39,46 +40,28 @@ def load_words() -> list[dict]:
 
 
 def validation_configs() -> dict[str, dict]:
+    """Resolve A/B variants from production recipes; only runtime-neutral controls are overridden."""
     common = {
-        "layout": "portrait",
-        "smart_crop": False,
-        "cut_silence": False,
-        "caption_layers": 1,
-        "source_has_burned_captions": "no",
+        "layout": "portrait", "smart_crop": False, "cut_silence": False,
+        "caption_layers": 1, "source_has_burned_captions": "no",
         "quality": {"output": "1080", "encoder": "cpu", "sharpen": True},
-        "title": {"enabled": False},
-        "emoji": {"enabled": False},
-        "progress_bar": {"enabled": False},
-        "cta": {"enabled": False},
+        "title": {"enabled": False}, "emoji": {"enabled": False},
+        "progress_bar": {"enabled": False}, "cta": {"enabled": False},
         "watermark": {"enabled": False},
         "composition": {"subtle_punch_in": False, "scene_aware": False},
     }
-    return {
-        "raw": deep_merge(DEFAULTS, deep_merge(common, {"caption": {"enabled": False}})),
-        "baseline": deep_merge(DEFAULTS, deep_merge(common, {
-            "caption": {
-                "enabled": True, "role": "spoken-caption", "preset": "clean-pro",
-                "style": "clean", "font": "Barlow Condensed", "size": 64,
-                "outline": 3, "shadow": 0, "color": "#FFFFFF",
-                "highlight": "#FFD166", "uppercase": False,
-                "words_per_line": 4, "max_chars": 28, "safe_area": 0.18,
-                "position": "bottom", "y_pct": 78, "animation": "none",
-                "box": False, "effect": "none",
-            }
-        })),
-        "enhanced_v2": deep_merge(DEFAULTS, deep_merge(common, {
-            "caption": {
-                "enabled": True, "role": "spoken-caption", "preset": "clean-focus",
-                "style": "keyword", "font": "Barlow Condensed", "size": 66,
-                "outline": 3, "shadow": 0, "color": "#FFFFFF",
-                "highlight": "#FFD166", "uppercase": False,
-                "words_per_line": 4, "max_chars": 28, "safe_area": 0.18,
-                "position": "bottom", "y_pct": 76, "animation": "none",
-                "box": False, "effect": "none", "accent_font": "Barlow Condensed",
-                "accent_mode": "color", "accent_scale": 108,
-            }
-        })),
-    }
+    out = {"raw_measurement_reference": deep_merge(DEFAULTS, deep_merge(common, {
+        "caption": {"enabled": False, "template_id": "none/raw", "preset": "none/raw"}
+    }))}
+    for label, recipe_id in (("viral_pop", "recommended"),
+                             ("box_punch", "clean-focus"),
+                             ("neon_karaoke", "minimal-medium")):
+        cfg = deep_merge(DEFAULTS, RECIPES[recipe_id]["settings"])
+        cfg = deep_merge(cfg, common)
+        cfg["recipe"] = recipe_id
+        cfg["recipe_applied"] = recipe_id
+        out[label] = cfg
+    return out
 
 
 def extract_frames(video: Path, frame_dir: Path, duration: float) -> list[dict]:
@@ -140,12 +123,13 @@ def main() -> int:
         }
 
     report = {
-        "project": str(PROJECT),
-        "audit": str(audit),
-        "source": str(source),
+        "schema_version": 2,
+        "render_path": "clipper.render.render_clip (production)",
+        "configuration_source": "clipper.recipes.RECIPES",
+        "measurement_reference": "raw_measurement_reference is not an A/B candidate",
+        "project": str(PROJECT), "audit": str(audit), "source": str(source),
         "clip": {"id": original.get("id"), "start": original["start"], "end": original["end"]},
-        "frame_count_per_output": len(TIMES),
-        "results": results,
+        "frame_count_per_output": len(TIMES), "results": results,
     }
     (audit / "validation-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), "utf-8")
     print(f"AUDIT_DIR={audit}")

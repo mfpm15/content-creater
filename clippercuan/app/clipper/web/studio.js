@@ -89,15 +89,22 @@ function titleHTML(ttl, cap, title) {
   }
   return `<div class="tt ${p}" style="font-family:${f};--hl:${cap.highlight}">${esc(p === 'clean' ? title : String(title).toUpperCase())}</div>`;
 }
-/* Pasang overlay caption & judul di elemen phone; skala mengikuti tinggi preview (1920 px render). */
+const CAPTION_SIZES = { small: 64, medium: 72, large: 84, xlarge: 96 };
+const CAPTION_SIZE_LABELS = { small: 'Kecil', medium: 'Sedang', large: 'Besar', xlarge: 'Sangat Besar' };
+/* ASS size is width-relative. Preview uses same 1080-wide coordinate system. */
 function paintOverlay(phone, cfg, words, t, title) {
-  const cap = cfg.caption, H = phone.clientHeight || 640, k = H / 1920;
+  const cap = cfg.caption, W = phone.clientWidth || 360, k = W / 1080;
   const c = $('.cc-cap', phone), tt = $('.cc-title', phone);
   c.style.fontFamily = ffam(cap.font); c.style.fontStyle = fitalic(cap.font) ? 'italic' : 'normal';
-  c.style.fontSize = Math.round(cap.size * k) + 'px'; c.style.color = cap.color;
+  c.style.fontSize = (cap.size * k).toFixed(2) + 'px'; c.style.lineHeight = cap.line_height || 1.12; c.style.color = cap.color;
+  c.dataset.height = `~${((cap.size * (cap.line_height || 1.12) + 2 * (cap.outline || 0)) / 1920 * 100).toFixed(1)}% tinggi output`;
   const y = cap.y_pct != null && cap.y_pct !== '' ? +cap.y_pct : { bottom: 76, middle: 50, top: 20 }[cap.position || 'bottom'];
   c.style.top = y + '%';
-  c.classList.toggle('glow', cap.effect === 'glow'); c.style.setProperty('--glow', cap.glow_color || cap.highlight);
+  c.classList.toggle('glow', cap.effect === 'glow');
+  c.classList.toggle('pop', ['pop', 'subtle-pop', 'word-focus'].includes(cap.animation));
+  c.classList.toggle('box-punch', cap.style === 'box' || !!cap.box);
+  c.classList.toggle('word-focus', cap.style === 'karaoke');
+  c.style.setProperty('--glow', cap.glow_color || cap.highlight);
   c.innerHTML = captionHTML(cap, words, t);
   tt.style.fontSize = Math.round((cfg.title.size || 70) * k) + 'px';
   const tEnd = cfg.title.duration ? +cfg.title.duration : 1e9;
@@ -296,7 +303,7 @@ async function pageProject(pid) {
         <div class="row3"><label>Teks<input type="color" class="in color" id="pCol"></label><label>Sorotan/box<input type="color" class="in color" id="pHl"></label><label>Kata/baris<input type="number" class="in" id="pWpl" min="1" max="8"></label></div>
         <label>Font kata kunci (Subtract)<select class="in" id="pAcc">${['Instrument Serif Italic', 'Pinyon Script', 'Georgia Italic', 'Bangers', 'Anton'].map(f => `<option>${f}</option>`).join('')}</select></label>
         <label>Posisi vertikal <b id="pYv"></b><input type="range" id="pY" min="10" max="90"></label>
-        <label>Ukuran <b id="pSv"></b><input type="range" id="pSize" min="50" max="140"></label>
+        <label>Ukuran caption <span title="Mapping tetap: 64 / 72 / 84 / 96 ASS units. Preview memakai skala lebar yang sama dengan renderer.">ⓘ</span><select class="in" id="pSize"><option value="small">Kecil</option><option value="medium">Sedang</option><option value="large">Besar</option><option value="xlarge">Sangat Besar</option></select> <b id="pSv"></b></label>
         <div class="pn-row"><label class="check"><input type="checkbox" id="pUp"> HURUF BESAR</label><label class="check"><input type="checkbox" id="pPop"> Animasi pop</label><label class="check"><input type="checkbox" id="pOn"> Tampilkan</label></div></div>
       <div class="pn-sec advanced-only"><h4>Hook opsional · area atas</h4><div class="seg wrap" id="pTtl"><button data-v="duo">Dua baris aksen</button><button data-v="bar">Label warna</button><button data-v="outline">Outline</button><button data-v="neon">Neon</button><button data-v="clean">Teks bersih</button><button data-v="off">Tanpa hook</button></div>
         <label>Tampil (detik, 0 = sepanjang klip)<input type="number" class="in" id="pTd" min="0" max="120"></label></div>
@@ -316,10 +323,11 @@ async function pageProject(pid) {
       S.caption_layers = 1; c.role = 'spoken-caption';
       $('#sLayerBadge').textContent = S.source_has_burned_captions === 'yes' ? 'Caption sumber · tanpa tambahan' : '1 layer subtitle';
       $('#sLayerBadge').classList.toggle('warn', S.source_has_burned_captions === 'unknown');
-      $('#pSize', box).value = c.size; $('#pSv', box).textContent = c.size;
+      const sizeLevel = c.size_level || Object.keys(CAPTION_SIZES).find(k => CAPTION_SIZES[k] === +c.size) || 'large';
+      $('#pSize', box).value = sizeLevel; $('#pSv', box).textContent = `${CAPTION_SIZE_LABELS[sizeLevel]} · ${c.size} · ~${((c.size * (c.line_height || 1.12) + 2 * (c.outline || 0)) / 1920 * 100).toFixed(1)}% tinggi`;
       $('#pUp', box).checked = !!c.uppercase; $('#pPop', box).checked = c.animation === 'pop'; $('#pOn', box).checked = c.enabled; $('#pTd', box).value = S.title.duration || 0;
       const sample = [{ w: 'Ini', s: 0, e: .3 }, { w: 'rahasia', s: .3, e: .7 }, { w: 'cuan', s: .7, e: 1 }];
-      const cs = $('#capSample', box); cs.style.fontFamily = ffam(c.font); cs.style.color = c.color; cs.classList.toggle('glow', c.effect === 'glow'); cs.style.setProperty('--glow', c.glow_color || c.highlight);
+      const cs = $('#capSample', box); cs.style.fontFamily = ffam(c.font); cs.style.color = c.color; cs.classList.toggle('glow', c.effect === 'glow'); cs.classList.toggle('pop', ['pop', 'subtle-pop', 'word-focus'].includes(c.animation)); cs.classList.toggle('box-punch', c.style === 'box' || !!c.box); cs.style.setProperty('--glow', c.glow_color || c.highlight);
       cs.innerHTML = captionHTML({ ...c, enabled: true, words_per_line: 3, style: c.style === 'wbw' ? 'clean' : c.style }, sample, .4) || 'Contoh caption';
     };
     $$('[data-font]', box).forEach(b => b.onclick = () => { S.caption.font = b.dataset.font; markDirty(); sync(); });
@@ -332,7 +340,7 @@ async function pageProject(pid) {
     const bindIn = (id, fn) => $(id, box).addEventListener('input', e => { fn(e.target); markDirty(); sync(); });
     bindIn('#pCol', t => S.caption.color = t.value); bindIn('#pHl', t => { S.caption.highlight = t.value; if (S.caption.effect === 'glow') S.caption.glow_color = t.value; });
     bindIn('#pWpl', t => S.caption.words_per_line = Math.max(1, +t.value || 3)); bindIn('#pAcc', t => S.caption.accent_font = t.value);
-    bindIn('#pY', t => S.caption.y_pct = +t.value); bindIn('#pSize', t => S.caption.size = +t.value);
+    bindIn('#pY', t => S.caption.y_pct = +t.value); bindIn('#pSize', t => { S.caption.size_level = t.value; S.caption.size = CAPTION_SIZES[t.value]; });
     bindIn('#pUp', t => S.caption.uppercase = t.checked); bindIn('#pPop', t => S.caption.animation = t.checked ? 'pop' : 'none'); bindIn('#pOn', t => { S.caption.enabled = t.checked; S.caption_layers = 1; });
     bindIn('#pTd', t => S.title.duration = +t.value || 0);
     sync();
@@ -378,7 +386,7 @@ async function pageProject(pid) {
     const bd = c.breakdown || {}, labels = { hook: 'Hook', novelty: 'Novelty', emotion_humor: 'Emosi', standalone_clarity: 'Clarity', payoff: 'Payoff', quotability: 'Quotability', visual_activity: 'Visual', information_density: 'Density', clean_ending: 'Ending' };
     const post = c.post || {};
     box.innerHTML = `<div class="pn-sec"><div class="clip-head"><span class="sc ${isHot(c) ? 'hot' : ''}">${c.manual ? 'manual' : score10(c) + '/10'}</span><b>#${esc(String(c.rank || '–'))} · ${esc(statusLabel[c.status] || c.status)}</b><span class="muted">${fmt(c.start)}–${fmt(c.end)} · ${Math.round(c.end - c.start)} dtk</span></div>
-        ${c.resolution ? `<p class="ready-line"><small>HASIL</small> <b>${esc(c.resolution)}</b> <span class="muted">· ${esc(c.encoder || '')}${c.upscale > 1.3 ? ` · diperbesar ${c.upscale}×` : ''}</span></p>` : ''}
+        ${c.resolution ? `<p class="ready-line"><small>HASIL</small> <b>${esc(c.resolution)}</b> <span class="muted">· ${esc(c.encoder || '')}${c.upscale > 1.3 ? ` · diperbesar ${c.upscale}×` : ''}</span></p><p class="ready-line"><small>TEMPLATE YANG DIGUNAKAN</small> <b>${esc(c.template_name || 'Belum tercatat')}</b> <span class="muted">· ${esc(c.caption_render?.size_level || 'custom')} · ${esc(String(c.caption_render?.ass_size || '–'))} ASS · ${esc(String(c.effective_caption_height_pct || '–'))}% tinggi</span></p>` : ''}
         <p class="ready-line"><small>VIRAL READINESS</small> <b>${c.readiness ?? c.score ?? 0}/100</b> <span class="muted">· alat review, bukan jaminan viral · confidence ${Math.round((c.confidence ?? .5) * 100)}%</span></p>
         ${[...(c.warnings || []), ...(c.render_warnings || [])].length ? `<p class="warn">${esc([...(c.warnings || []), ...(c.render_warnings || [])].join(' · '))}</p>` : ''}
         ${c.error ? `<p class="err">${esc(c.error.slice(-400))}</p>` : ''}

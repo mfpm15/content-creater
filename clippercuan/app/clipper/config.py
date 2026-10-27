@@ -38,7 +38,7 @@ FFMPEG = _find_ffmpeg()
 
 # Default pipeline — semua bisa diubah dari UI per proyek.
 DEFAULTS: dict = {
-    "recipe": "recommended",     # default aman: satu spoken-caption bersih
+    "recipe": "recommended",     # default: Viral Pop, satu spoken-caption animated
     "caption_layers": 1,          # invariant: satu layer transcript aktif per timestamp
     "source_has_burned_captions": "unknown",  # unknown | yes | no; heuristik hanya warning
     "min_score": 45,             # render otomatis melewati kandidat di bawah skor ini (minimal 1 klip tetap dibuat)
@@ -68,24 +68,28 @@ DEFAULTS: dict = {
     "caption": {
         "enabled": True,
         "role": "spoken-caption",
-        "preset": "clean-pro",
-        "style": "clean",        # box | wbw | karaoke | clean | keyword
+        "preset": "viral-pop",
+        "template_id": "viral-pop",
+        "size_level": "large",
+        "style": "karaoke",      # box | wbw | karaoke | clean | keyword
         "font": "Barlow Condensed",
-        "size": 64,
-        "outline": 3,
+        "size": 84,
+        "outline": 5,
         "shadow": 0,
         "color": "#FFFFFF",
         "highlight": "#FFD166",
         "uppercase": False,
         "words_per_line": 4,
+        "max_lines": 2,
+        "line_height": 1.12,
         "position": "bottom",    # bottom | middle | top
         "safe_area": 0.18,
-        "max_chars": 28,
-        "animation": "none",     # pop | none
+        "max_chars": 27,
+        "animation": "pop",      # pop | none
         "box": False,            # kotak berwarna mengikuti kata aktif (bisa dipadu gaya apa pun)
-        "effect": "none",        # none | glow
-        "glow_color": "",
-        "y_pct": None,           # posisi vertikal bebas 8..92 (% tinggi frame); None = ikut "position"
+        "effect": "glow",        # none | glow
+        "glow_color": "#FFD166",
+        "y_pct": 72,             # posisi vertikal bebas 8..92 (% tinggi frame)
         "accent_font": "Barlow Condensed",  # font kata kunci; mode color mempertahankan font utama
         "accent_mode": "color",        # color | font
         "accent_scale": 108,            # pembesaran halus 100..115 agar layout tetap stabil

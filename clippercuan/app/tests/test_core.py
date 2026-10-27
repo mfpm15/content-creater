@@ -41,7 +41,7 @@ def _events(ass, style):
 def test_caption_lines_never_overlap():
     words = _words("kenapa banyak usaha kecil gagal di tahun pertama ini rahasia yang jarang dibahas orang", gap_every=4, gap=0.3)
     for style in ("box", "karaoke", "clean", "wbw"):
-        cfg = deep_merge(DEFAULTS, {"caption": {"style": style}})
+        cfg = deep_merge(DEFAULTS, {"caption": {"style": style, "animation": "none", "effect": "none"}})
         ev = sorted(_events(captions.build_ass(words, "Judul", cfg, (1080, 1920), 10), "Cap"))
         for (s1, e1, _), (s2, _, _) in zip(ev, ev[1:]):
             assert e1 <= s2 + 0.011, f"{style}: baris bertumpuk {e1} > {s2}"
@@ -49,7 +49,7 @@ def test_caption_lines_never_overlap():
 
 def test_box_layer_matches_text_layer():
     words = _words("satu dua tiga empat lima enam")
-    cfg = deep_merge(DEFAULTS, {"caption": {"style": "box", "box": True}})
+    cfg = deep_merge(DEFAULTS, {"caption": {"style": "box", "box": True, "animation": "none", "effect": "none"}})
     ass = captions.build_ass(words, "", cfg, (1080, 1920), 5)
     text, box = _events(ass, "Cap"), _events(ass, "CapBox")
     assert len(text) == len(box) > 0
@@ -214,7 +214,7 @@ def test_caption_phrase_boundaries_safe_area_and_readability():
     words = _words("Ini penting, karena hasil harus jelas. Lalu payoff selesai!", step=.35)
     chunks = captions.chunk_words(words, 5, 18)
     assert all(sum(len(w["w"]) for w in chunk) + len(chunk) - 1 <= 24 for chunk in chunks)
-    ass = captions.build_ass(words, "", deep_merge(DEFAULTS, {"caption": {"safe_area": .15}}), (1080, 1920), 5)
+    ass = captions.build_ass(words, "", deep_merge(DEFAULTS, {"caption": {"safe_area": .15, "style": "clean", "animation": "none", "effect": "none"}}), (1080, 1920), 5)
     assert "MarginL, MarginR, MarginV" in ass
     events = _events(ass, "Cap")
     assert all(a[1] <= b[0] + .011 for a, b in zip(events, events[1:]))
@@ -223,7 +223,12 @@ def test_caption_phrase_boundaries_safe_area_and_readability():
 def test_backward_compatible_defaults_and_security_redaction():
     old = {"clip_count": 2, "caption": {"style": "clean"}}
     migrated = deep_merge(DEFAULTS, old)
-    assert migrated["duration_preset"] == "auto" and migrated["caption"]["preset"] == "clean-pro"
+    assert migrated["duration_preset"] == "auto"
+    assert migrated["caption"]["preset"] == "viral-pop"
+    assert migrated["caption"]["template_id"] == "viral-pop"
+    assert migrated["caption"]["size_level"] == "large"
+    assert migrated["caption"]["animation"] == "pop"
+    assert migrated["caption"]["effect"] == "glow"
     assert migrated["caption_layers"] == 1 and migrated["caption"]["role"] == "spoken-caption"
     public = llm.public_settings()
     assert public["llm"]["api_key"] in ("", "••••") and public["asr"]["api_key"] in ("", "••••")

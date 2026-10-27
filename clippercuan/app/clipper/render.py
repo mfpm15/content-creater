@@ -5,6 +5,7 @@ from pathlib import Path
 
 from . import captions, effects, facetrack
 from .config import FONTS_DIR, SIZES
+from .recipes import RECIPES
 
 QUALITY = {"1080": 1.0, "1440": 4 / 3, "2160": 2.0}   # sisi pendek output: 1080p, 1440p (2K), 2160p (4K)
 
@@ -300,13 +301,32 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     grab_frame(out, min(1.0, out_dur / 2), work / f"{cid}.jpg", width=540)
     up = upscale_factor(layout, pr, cfg)
     smart = layout in ("portrait", "square") and cfg.get("smart_crop") and pr.width / pr.height > SIZES[layout][0] / SIZES[layout][1]
+    cap = cfg["caption"]
+    template_id = cap.get("template_id") or cap.get("preset") or ("none/raw" if not cap.get("enabled") else "custom")
+    template_name = next((r.get("template_name") or r["label"] for r in RECIPES.values()
+                          if r["settings"].get("caption", {}).get("template_id") == template_id),
+                         "Tanpa caption" if template_id == "none/raw" else "Konfigurasi kustom")
+    effective_units = int(float(cap.get("size", 0)) * size[0] / 1080) if cap.get("enabled") else 0
+    estimated_height = effective_units * float(cap.get("line_height", 1.12)) + 2 * int(float(cap.get("outline", 0)) * size[0] / 1080)
+    caption_meta = {"template_id": template_id, "template_name": template_name, "font": cap.get("font"),
+                    "size_level": cap.get("size_level", "custom"), "ass_size": cap.get("size"),
+                    "effective_ass_size": effective_units, "effective_caption_height_px_estimate": round(estimated_height, 1),
+                    "effective_caption_height_pct": round(estimated_height / size[1] * 100, 2),
+                    "position": cap.get("position"), "y_pct": cap.get("y_pct"), "max_lines": cap.get("max_lines", 2),
+                    "line_height": cap.get("line_height", 1.12), "style": cap.get("style"),
+                    "animation": cap.get("animation", "none"), "effect": cap.get("effect", "none"),
+                    "active_word": cap.get("style") in {"karaoke", "box"} or bool(cap.get("box")),
+                    "emphasis_mode": "box" if cap.get("style") == "box" or cap.get("box") else "active-word" if cap.get("style") == "karaoke" else cap.get("accent_mode") if cap.get("style") == "keyword" else "none",
+                    "caption_source": "transcript", "caption_layers": 1}
     crop_confidence = (0.0 if not keys else min(1.0, max(.35, len(keys) / max(out_dur / 4, 1)))) if smart else 1.0
     return {"file": out.name, "thumb": f"{cid}.jpg", "srt": f"subtitles/{cid}.srt",
             "ass": f"subtitles/{cid}.ass", "sidecar_autoload_safe": True,
             "crop_keys": keys, "words": cw,
             "duration": round(out_dur, 2), "cut_saved": round(dur - out_dur, 2), "emojis": [e["code"] for e in emojis],
             "caption_cues": len(captions.chunk_words(sub_words, int(cfg["caption"].get("words_per_line", 3)))),
-            "caption_layers": 1, "caption_provenance": "ASS:spoken-caption",
+            "caption_layers": 1, "caption_provenance": "ASS:spoken-caption", "caption_render": caption_meta,
+            "template_id": template_id, "template_name": template_name,
+            "effective_caption_height_pct": caption_meta["effective_caption_height_pct"],
             "hook_provenance": "ASS:hook" if cfg["title"].get("enabled") else None,
             "source_has_burned_captions": cfg.get("source_has_burned_captions", "unknown"),
             "crop_confidence": round(crop_confidence, 2),

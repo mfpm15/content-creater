@@ -6,37 +6,45 @@ Ini titik awal yang masuk akal, bukan jaminan viral: uji A/B dengan data unggaha
 """
 from __future__ import annotations
 
+CAPTION_SIZE_LEVELS = {"small": 64, "medium": 72, "large": 84, "xlarge": 96}
+
+
+def _clean_caption(template_id: str, size: int, style: str = "clean") -> dict:
+    return {"enabled": True, "role": "spoken-caption", "preset": template_id, "template_id": template_id,
+            "size_level": "large" if size == 84 else "medium", "style": style, "box": False, "effect": "none",
+            "font": "Barlow Condensed", "size": size, "outline": 4, "shadow": 0, "color": "#FFFFFF",
+            "highlight": "#FFD166", "uppercase": False, "words_per_line": 5, "max_chars": 30,
+            "max_lines": 2, "line_height": 1.12, "safe_area": .18, "position": "bottom", "y_pct": 74,
+            "animation": "none", "accent_font": "Barlow Condensed", "accent_mode": "color",
+            "accent_scale": 106 if style == "keyword" else 100}
+
+
+_BASE_CLEAN = {"content_profile": "auto", "duration_preset": "auto", "layout": "portrait", "smart_crop": True,
+               "cut_silence": False, "caption_layers": 1, "source_has_burned_captions": "unknown",
+               "title": {"enabled": False, "role": "hook", "preset": "clean", "duration": 3, "size": 58, "y_pct": 12},
+               "emoji": {"enabled": False}, "progress_bar": {"enabled": False}, "cta": {"enabled": False}}
+
 RECIPES: dict[str, dict] = {
     "recommended": {
-        "label": "Rekomendasi · Clean Pro", "niche": "auto", "badge": "Default aman",
-        "desc": "Satu layer subtitle utama yang bersih, maksimal dua baris, tanpa efek dekoratif otomatis.",
-        "settings": {
-            "content_profile": "auto", "duration_preset": "auto", "layout": "portrait", "smart_crop": True,
-            "cut_silence": False, "caption_layers": 1, "source_has_burned_captions": "unknown",
-            "caption": {"enabled": True, "role": "spoken-caption", "preset": "clean-pro", "style": "clean",
-                        "box": False, "effect": "none", "font": "Barlow Condensed", "size": 64,
-                        "outline": 3, "shadow": 0, "color": "#FFFFFF", "highlight": "#FFD166",
-                        "uppercase": False, "words_per_line": 4, "max_chars": 28,
-                        "safe_area": 0.18, "y_pct": 78, "animation": "none"},
-            "title": {"enabled": False, "role": "hook", "preset": "clean", "duration": 3, "size": 58, "y_pct": 12},
-            "emoji": {"enabled": False}, "progress_bar": {"enabled": False}, "cta": {"enabled": False},
-        },
+        "label": "Viral Pop", "template_name": "Viral Pop", "niche": "auto", "badge": "Default eye-catching",
+        "desc": "Caption besar dengan active-word kuning, punch scale per kata, outline tegas, dan glow ringan.",
+        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("viral-pop", 84, "karaoke"),
+            "animation": "pop", "effect": "glow", "glow_color": "#FFD166", "outline": 5,
+            "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
     },
     "clean-focus": {
-        "label": "Clean Focus · Keyword", "niche": "auto", "badge": "Menarik & aman",
-        "desc": "Baseline bersih dengan satu kata penting berwarna kuning dan pembesaran halus. Tanpa karaoke, glow, box aktif, atau pergantian font.",
-        "settings": {
-            "content_profile": "auto", "duration_preset": "auto", "layout": "portrait", "smart_crop": True,
-            "cut_silence": False, "caption_layers": 1, "source_has_burned_captions": "unknown",
-            "caption": {"enabled": True, "role": "spoken-caption", "preset": "clean-focus", "style": "keyword",
-                        "box": False, "effect": "none", "font": "Barlow Condensed", "size": 66,
-                        "outline": 3, "shadow": 0, "color": "#FFFFFF", "highlight": "#FFD166",
-                        "uppercase": False, "words_per_line": 4, "max_chars": 28,
-                        "safe_area": 0.18, "y_pct": 76, "animation": "none",
-                        "accent_font": "Barlow Condensed", "accent_mode": "color", "accent_scale": 108},
-            "title": {"enabled": False, "role": "hook", "preset": "clean", "duration": 3, "size": 58, "y_pct": 12},
-            "emoji": {"enabled": False}, "progress_bar": {"enabled": False}, "cta": {"enabled": False},
-        },
+        "label": "Box Punch", "template_name": "Box Punch", "niche": "auto", "badge": "Energetic",
+        "desc": "Kotak warna bergerak mengikuti kata aktif dengan punch scale dan kontras tinggi.",
+        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("box-punch", 84, "box"),
+            "box": True, "animation": "pop", "effect": "none", "highlight": "#FFC933",
+            "outline": 5, "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
+    },
+    "minimal-medium": {
+        "label": "Neon Karaoke", "template_name": "Neon Karaoke", "niche": "auto", "badge": "Stylized",
+        "desc": "Active-word cyan dengan glow neon dan transisi pop untuk tampilan teknologi.",
+        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("neon-karaoke", 82, "karaoke"),
+            "size_level": "large", "animation": "pop", "effect": "glow", "highlight": "#54E6E6",
+            "glow_color": "#54E6E6", "outline": 5, "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
     },
     "podcast-box": {
         "label": "Podcast · Box merah", "niche": "podcast", "badge": "Paling populer",

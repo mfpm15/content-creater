@@ -61,19 +61,19 @@ def test_cues_deduplicate_identical_overlap_without_dropping_words():
     assert caption_workspace.validate_cues(items)["valid"]
 
 
-def test_tech_review_default_is_recommended_clean_single_caption():
+def test_tech_review_default_is_viral_pop_single_caption():
     rid = recipes.PROFILE_DEFAULT["tech_review"]
     recipe = recipes.RECIPES[rid]
-    assert rid == "recommended"
-    assert recipe["settings"]["caption"]["style"] == "clean"
-    assert recipe["settings"]["caption"]["box"] is False
+    cap = recipe["settings"]["caption"]
+    assert rid == "recommended" and recipe["template_name"] == "Viral Pop"
+    assert cap["template_id"] == "viral-pop" and cap["size_level"] == "large"
+    assert cap["style"] == "karaoke" and cap["box"] is False
+    assert cap["animation"] == "pop" and cap["effect"] == "glow"
     assert recipe["settings"]["title"]["enabled"] is False
     assert recipe["settings"]["caption_layers"] == 1
-    assert recipe["settings"]["caption"]["size"] <= 64
-    assert recipe["settings"]["caption"]["outline"] <= 3
-    assert recipe["settings"]["caption"]["shadow"] == 0
-    assert recipe["settings"]["caption"]["words_per_line"] <= 4
-    assert recipe["settings"]["caption"]["max_chars"] <= 28
+    assert cap["size"] == recipes.CAPTION_SIZE_LEVELS["large"] > recipes.CAPTION_SIZE_LEVELS["medium"]
+    assert cap["max_lines"] == 2 and cap["line_height"] >= 1.1
+    assert cap["outline"] >= 5 and cap["words_per_line"] <= 4
 
 
 def test_clean_ass_uses_configured_thin_outline_without_shadow():
@@ -96,7 +96,7 @@ def test_render_exports_sidecars_outside_mp4_directory_basename_contract():
 def test_clean_focus_uses_same_font_and_subtle_keyword_scale():
     cfg = deep_merge(DEFAULTS, {"caption": {"style": "keyword", "accent_mode": "color",
                                              "accent_font": "Barlow Condensed", "accent_scale": 108,
-                                             "highlight": "#FFD166"}})
+                                             "highlight": "#FFD166", "animation": "none", "effect": "none"}})
     ass = captions.build_ass(_words("ini rahasia caption yang tetap bersih"), "", cfg, (1080, 1920), 8)
     dialogue = "\n".join(line for line in ass.splitlines() if line.startswith("Dialogue:"))
     assert "\\fscx108\\fscy108" in dialogue
@@ -107,13 +107,31 @@ def test_clean_focus_uses_same_font_and_subtle_keyword_scale():
     assert all(line.count(captions._ass_color("#FFD166")) == 1 for line in events)
 
 
-def test_clean_focus_recipe_is_opt_in_and_keeps_single_layer_contract():
+def test_box_punch_recipe_is_opt_in_and_keeps_single_layer_contract():
     recipe = recipes.RECIPES["clean-focus"]["settings"]
     cap = recipe["caption"]
-    assert cap["style"] == "keyword" and cap["accent_mode"] == "color"
-    assert cap["font"] == cap["accent_font"] == "Barlow Condensed"
-    assert cap["accent_scale"] == 108 and cap["box"] is False and cap["effect"] == "none"
+    assert cap["template_id"] == "box-punch"
+    assert cap["style"] == "box" and cap["box"] is True
+    assert cap["animation"] == "pop" and cap["effect"] == "none"
     assert recipe["caption_layers"] == 1 and recipe["title"]["enabled"] is False
+
+
+def test_all_primary_templates_have_identity_and_two_line_contract():
+    for rid in ("recommended", "clean-focus", "minimal-medium"):
+        recipe = recipes.RECIPES[rid]
+        cap = recipe["settings"]["caption"]
+        assert recipe["template_name"] and cap["template_id"]
+        assert cap["max_lines"] == 2 and cap["line_height"] >= 1.1
+        assert cap["animation"] == "pop"
+        assert cap["style"] in {"karaoke", "box"}
+        assert recipe["settings"]["caption_layers"] == 1
+
+
+def test_render_manifest_contract_contains_identity_and_effective_metric():
+    source = Path(render.__file__).read_text("utf-8")
+    for field in ("template_id", "template_name", "effective_caption_height_pct", "caption_render", "animation", "active_word"):
+        assert field in source
+    assert source.count("ass=filename=") == 1
 
 
 def test_duo_is_hook_style_not_duplicate_transcript():

@@ -13,7 +13,7 @@ This document separates externally verifiable facts from product heuristics and 
 - FFmpeg provides subtitle rendering, loudness, scaling, cropping, and related media filters used by the final renderer.
 - Social Visuals Pro publicly markets link-to-clip automation, viral hooks, reusable dashboard workflows, and one-time pricing. Marketing claims are treated as competitor positioning, not independently measured quality.
 
-Sources audited on 26 October 2026:
+Sources re-audited on 27 October 2026:
 
 - https://support.google.com/youtube/answer/2734796
 - https://www.w3.org/WAI/media/av/captions/
@@ -21,6 +21,35 @@ Sources audited on 26 October 2026:
 - https://github.com/SYSTRAN/faster-whisper
 - https://ffmpeg.org/ffmpeg-filters.html
 - https://socialvisuals.pro/
+
+## Diagnosis record: caption scale and template provenance
+
+Observed facts for `validation_enhanced_v2.mp4` (27 October 2026):
+
+- The artifact was 1080x1920 and its ASS declared `PlayResX: 1080`, `PlayResY: 1920`, Barlow Condensed ExtraBold at size 66, outline 3, and a centered position at 76 percent frame height.
+- The validation script called the production `render.render_clip` function but injected an ad-hoc `enhanced_v2` dictionary. It did not resolve a named production recipe.
+- The browser preview scaled the nominal caption size from preview height while ASS sizing is derived from output width. Equal nominal values at 1080x1920 therefore did not establish CSS/libass glyph parity.
+- The old manifest did not identify the rendered template or expose an effective-height estimate.
+
+Ranked hypotheses before implementation:
+
+1. Size 66 was too small for the selected condensed face in phone playback.
+2. The ad-hoc validator obscured template provenance.
+3. CSS and libass font metrics made preview confidence unreliable.
+4. Four-word lines and thin outline reduced perceived prominence.
+5. Placement at 76 percent competed with scene and platform UI.
+
+Implemented response:
+
+- Animated production templates: Viral Pop (default), Box Punch, and Neon Karaoke.
+- Deterministic size levels: Small 64, Medium 72, Large 84, Extra Large 96 ASS units at a 1080-wide output.
+- Every render result now records template ID/name, font, nominal and effective ASS size, estimated caption height, placement, line budget, emphasis mode, source, and layer count.
+- Studio preview now scales from width, matching the renderer's 1080-wide coordinate basis.
+- The validation harness resolves production recipes and labels its caption-free output as a measurement reference, not an A/B candidate.
+
+Rendered-frame validation on 27 October 2026 used twelve timestamps from the same 20.47-second source interval and a caption-free render as the pixel-difference reference. Eleven timestamps contained visible captions. Viral Pop measured a median 79 pixels (4.11 percent of 1920-pixel frame height), Box Punch measured 104 pixels (5.42 percent), and Neon Karaoke measured 77 pixels (4.01 percent). Minimum bottom clearance was 24.06 percent across all animated variants. The comparison sheet and representative full-resolution frames showed active-word emphasis, no clipping, no third line, no duplicate transcript layer, and stable placement. Viral Pop was selected as the production default after direct video review because its yellow active word, restrained glow, and pop transition supplied visual energy without the larger box footprint of Box Punch.
+
+These measurements describe this font, source, and sample interval. They are product validation evidence, not a universal accessibility threshold. Final acceptance still requires rendered-frame inspection because glyph shape, language, and scene content vary.
 
 ## Implemented product heuristics
 
@@ -38,13 +67,15 @@ These thresholds are editable product rules, not universal accessibility standar
 
 ## Reusable templates
 
-1. Clean Pro
-2. Bold Viral
-3. Karaoke Focus
-4. Podcast Quote
-5. Tech Review
-6. Gaming Energy
-7. Minimal Lower Third
+1. Viral Pop (default)
+2. Box Punch
+3. Neon Karaoke
+4. Bold Viral
+5. Karaoke Focus
+6. Podcast Quote
+7. Tech Review
+8. Gaming Energy
+9. Minimal Lower Third
 
 Each template stores font, size, weight, line height, foreground, background, highlight, stroke, shadow, placement, animation, safe area, line budget, and compatible content profiles.
 

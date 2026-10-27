@@ -46,8 +46,10 @@ def load(pid: str) -> dict:
         return p
 
 
-_RENDER_FIELDS = ("status", "file", "thumb", "srt", "words", "crop_keys", "overrides", "post", "title", "start", "end",
-                  "duration", "version", "error", "cut_saved", "emojis", "caption_cues", "crop_confidence", "render_warnings", "manual")
+_RENDER_FIELDS = ("status", "file", "thumb", "srt", "ass", "words", "crop_keys", "overrides", "post", "title", "start", "end",
+                  "duration", "version", "error", "cut_saved", "emojis", "caption_cues", "caption_layers",
+                  "caption_provenance", "caption_render", "template_id", "template_name", "effective_caption_height_pct",
+                  "sidecar_autoload_safe", "crop_confidence", "render_warnings", "manual")
 
 
 def _unify_clips(p: dict) -> None:
@@ -433,6 +435,10 @@ def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.P
             src = seg
         res = render.render_clip(work, src, pr, clip, cfg, words)
         _set_clip(pid, cid, status="done", error=None, version=int(time.time()), **res)
+        with _LOCK:
+            latest = load(pid)
+            _write_manifest(latest)
+            save(latest)
     except Exception as e:
         _set_clip(pid, cid, status="error", error=str(e)[-1500:])
         raise
@@ -685,6 +691,12 @@ def rerender_all(pid: str, settings: dict) -> dict:
 def _write_manifest(p: dict) -> None:
     data = candidates.manifest(p.get("candidates", []), p.get("content_profile", "podcast"), p.get("source", ""),
                                int(p.get("manifest_revision", 0)) + 1)
+    cap = p.get("settings", {}).get("caption", {})
+    data["render_settings"] = {"template_id": cap.get("template_id") or cap.get("preset") or "none/raw",
+                               "font": cap.get("font"), "size_level": cap.get("size_level", "custom"),
+                               "ass_size": cap.get("size"), "position": cap.get("position"), "y_pct": cap.get("y_pct"),
+                               "max_lines": cap.get("max_lines", 2), "emphasis_mode": cap.get("accent_mode") if cap.get("style") == "keyword" else "none",
+                               "caption_source": p.get("transcript_source", "transcript"), "caption_layers": 1}
     p["rankings"], p["rights_checklist"] = data["rankings"], data["rights_checklist"] | p.get("rights_checklist", {})
     p["manifest_revision"] = data["revision"]
     (pdir(p["id"]) / "candidate-manifest.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), "utf-8")
