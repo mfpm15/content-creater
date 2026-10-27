@@ -83,7 +83,7 @@ async function pageResults() { await pageHistory('c'); }
 async function pageAdvanced() {
   const projects = await api('/api/projects');
   const ready = projects.filter(p => (p.clips || 0) > 0 || ['candidates_ready', 'done'].includes(p.status));
-  view.innerHTML = `<section class="page"><header class="page-h"><h1>Studio Lanjutan</h1><p>Pilih proyek dengan kandidat atau hasil untuk membuka editor.</p></header><div class="project-picker">${ready.length ? ready.map(p => `<a class="picker-row" href="#/p/${esc(p.id)}"><div><b>${esc(p.title || p.id)}</b><span>${p.clips || 0} klip · ${esc(p.status)}</span></div><span>Buka studio</span></a>`).join('') : '<div class="empty"><b>Belum ada proyek untuk diedit</b><span>Buat kandidat dari Produksi Baru terlebih dahulu.</span><a class="btn sm" href="#/new">Produksi Baru</a></div>'}</div></section>`;
+  view.innerHTML = `<section class="page studio-picker-page"><header class="page-h proj-h"><div><p class="eyebrow">EDITOR LANJUTAN</p><h1>Studio</h1><p>Buka kandidat, rapikan caption dan crop, lalu siapkan render final.</p></div><a class="btn ghost sm" href="#/new">Buat proyek</a></header><div class="studio-picker-grid">${ready.length ? ready.map((p, index) => `<a class="studio-project-card" href="#/p/${esc(p.id)}"><span class="studio-project-art art-${index % 4}"><i>${p.clips || 0}</i><small>KLIP</small></span><div><em class="status-badge ${esc(p.status)}">${esc(p.status === 'candidates_ready' ? 'Kandidat siap' : p.status === 'done' ? 'Siap diedit' : p.status)}</em><b>${esc(p.title || p.id)}</b><span>${new Date(p.created * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span><strong>Buka Studio <span aria-hidden="true">→</span></strong></div></a>`).join('') : '<div class="empty"><b>Belum ada proyek untuk diedit</b><span>Buat kandidat dari halaman Buat Klip terlebih dahulu.</span><a class="btn sm" href="#/new">Buat Klip</a></div>'}</div></section>`;
 }
 
 /* ================= PROYEK BARU ================= */
@@ -94,6 +94,22 @@ async function pageNew(override) {
   const cfg = merge(INFO.defaults, override || store.get('lastSettings', {}));
   if (homeRecipe) cfg.recipe = homeRecipe;
   let srcMode = store.get('srcMode', 'link'), upload = null;
+  const draft = store.get('productionDraft', {});
+  const projectName = $('#projectName');
+  projectName.value = draft.name || '';
+  let draftTimer;
+  const saveDraft = () => {
+    store.set('productionDraft', { name: projectName.value.trim(), url: $('#url')?.value || '', saved: Date.now() });
+    const label = $('#draftState span:last-child');
+    if (label) label.textContent = 'Draft tersimpan';
+  };
+  const queueDraft = () => {
+    const label = $('#draftState span:last-child');
+    if (label) label.textContent = 'Menyimpan...';
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveDraft, 450);
+  };
+  projectName.addEventListener('input', queueDraft);
 
   // template
   const sel = $('#tplSel');
@@ -109,7 +125,28 @@ async function pageNew(override) {
   const setSrc = m => { srcMode = m; store.set('srcMode', m); $('#srcLink').hidden = m !== 'link'; $('#srcFile').hidden = m !== 'file'; };
   chipGroup($('#srcTabs'), srcMode, setSrc, 'src'); setSrc(srcMode);
   const links = () => $('#url').value.split(/\s+/).map(s => s.trim()).filter(Boolean);
-  $('#url').oninput = () => { const n = links().length; $('#urlCount').textContent = n > 1 ? `${n} link → ${n} proyek akan dibuat dan diproses berurutan` : ''; };
+  const recentSources = store.get('recentSources', []).slice(0, 3);
+  if (recentSources.length) {
+    $('#recentSources').hidden = false;
+    $('#recentSources div').innerHTML = recentSources.map(source => `<button type="button" title="${esc(source)}">${esc(source.replace(/^https?:\/\//, '').slice(0, 42))}</button>`).join('');
+    $$('#recentSources button').forEach((button, index) => button.onclick = () => {
+      $('#url').value = recentSources[index];
+      $('#url').dispatchEvent(new Event('input'));
+    });
+  }
+  $('#url').value = draft.url || '';
+  $('#url').oninput = () => {
+    const values = links();
+    const invalid = values.some(source => !/^https?:\/\//i.test(source));
+    $('#urlCount').textContent = values.length > 1 ? `${values.length} sumber akan dibuat sebagai proyek terpisah` : '';
+    $('#urlError').textContent = invalid ? 'URL harus diawali http:// atau https://' : '';
+    $('#url').setAttribute('aria-invalid', String(invalid));
+    $('#sourceMeta').innerHTML = values.length && !invalid
+      ? `<div><span>SUMBER ONLINE</span><b>${esc(values[0].replace(/^https?:\/\//, '').split('/')[0])}</b><small>${values.length > 1 ? `${values.length} URL dalam antrean` : 'Siap mengambil metadata saat analisis'}</small></div>`
+      : '<div><span>SUMBER</span><b>Belum dipilih</b><small>Metadata muncul setelah sumber valid</small></div>';
+    queueDraft();
+  };
+  $('#url').dispatchEvent(new Event('input'));
 
   // unggah file
   const drop = $('#drop'), fileIn = $('#file');
@@ -193,6 +230,29 @@ async function pageNew(override) {
     + (Q.source === 'auto' ? 'Sumber otomatis: resolusi terbaik sampai 4K (mode hemat) atau 1440p (unduh penuh) — portrait dari video landscape butuh sumber besar agar tidak burik.' : Q.source === '1080' ? 'Sumber 1080p: crop portrait akan diperbesar ±1,8× (kurang tajam).' : `Sumber maks ${Q.source === '2160' ? '4K' : '1440p'}.`)
     + ' GPU dipakai otomatis bila ada.'; };
   chipGroup($('#qOut'), String(Q.output), v => { Q.output = v; qTxt(); }); chipGroup($('#qSrc'), String(Q.source), v => { Q.source = v; qTxt(); }); qTxt();
+  const qualityMap = {
+    fast: { model: 'tiny', output: '1080', label: 'Cepat · 1080p' },
+    balanced: { model: 'small', output: '1080', label: 'Seimbang · 1080p' },
+    max: { model: 'medium', output: '1440', label: 'Maksimal · 1440p' },
+  };
+  $$('#qualityPreset button').forEach(button => button.onclick = () => {
+    const preset = qualityMap[button.dataset.quality];
+    $$('#qualityPreset button').forEach(item => item.classList.toggle('on', item === button));
+    $('#model').value = preset.model;
+    Q.output = preset.output;
+    $$('#qOut button').forEach(item => item.classList.toggle('on', item.dataset.v === Q.output));
+    $('#summaryQuality').textContent = preset.label;
+    qTxt();
+    queueDraft();
+  });
+  const syncSummary = () => {
+    const profileLabel = $(`#contentProfile button[data-v="${contentProfile}"] b`);
+    $('#summaryProfile').textContent = profileLabel?.textContent || 'Deteksi otomatis';
+    $('#summaryLanguage').textContent = $('#language').selectedOptions[0]?.textContent || 'Auto-detect';
+  };
+  $('#language').addEventListener('change', syncSummary);
+  $$('#contentProfile button').forEach(button => button.addEventListener('click', () => setTimeout(syncSummary)));
+  syncSummary();
   getRecipes().then(rs => {
     const box = $('#recipes'), experimental = $('#experimentalRecipes'); if (!box) return;
     const prof = cfg.content_profile || 'auto';
@@ -291,16 +351,26 @@ async function pageNew(override) {
     if (settings.min_sec >= settings.max_sec) return toast('Durasi minimum harus lebih kecil dari maksimum', true);
     if (settings.candidate_count < 5) return toast('Jumlah kandidat minimal 5', true);
     const all = collect(); store.set('lastSettings', { ...all, watermark: { ...all.watermark, image: '' } });
+    if (sources[0] && srcMode === 'link') store.set('recentSources', [sources[0], ...store.get('recentSources', []).filter(source => source !== sources[0])].slice(0, 5));
+    saveDraft();
     try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch {}
     const start = $('#start'); start.disabled = true; start.classList.add('is-loading'); start.querySelector('span').textContent = 'Menyiapkan proyek…';
     try {
       let last;
-      for (const source of sources) last = await api('/api/projects', { method: 'POST', body: { source, settings } });
+      for (const source of sources) {
+        const body = { source, settings };
+        if (projectName.value.trim()) body.title = projectName.value.trim();
+        last = await api('/api/projects', { method: 'POST', body });
+      }
       location.hash = sources.length > 1 ? '#/history' : '#/p/' + last.id;
       if (sources.length > 1) toast(`${sources.length} proyek masuk antrean`);
     } catch (e) { toast(e.message, true); start.disabled = false; start.classList.remove('is-loading'); start.querySelector('span').textContent = '▶ Run pipeline'; }
   };
 
+  api('/api/projects').then(projects => {
+    const recent = projects.slice(0, 4);
+    $('#recentProjectStrip').innerHTML = recent.length ? `<div class="strip-label"><span>TERAKHIR DIKERJAKAN</span><a href="#/history">Lihat semua</a></div><div class="strip-projects">${recent.map(project => `<a href="#/p/${esc(project.id)}"><span class="mini-thumb ${esc(project.status)}"></span><div><b>${esc(project.title || 'Tanpa judul')}</b><small>${project.clips || 0} klip · ${esc(project.status)}</small></div></a>`).join('')}</div>` : '';
+  }).catch(() => {});
   const productionOrder = ['source', 'profile', 'analysis', 'candidates', 'style', 'preview', 'render'];
   const setProductionStage = stage => {
     const at = productionOrder.indexOf(stage);
@@ -403,23 +473,31 @@ async function loadCaptionWorkspace(pid) {
 
 /* ================= RIWAYAT ================= */
 async function pageHistory(initialTab = 'p') {
-  view.innerHTML = '<section class="page"><header class="page-h proj-h"><div><h1>Riwayat</h1><p>Semua proyek dan semua klip hasil render, dalam satu galeri.</p></div><div class="acts"><div class="seg" id="hTab"><button data-v="p" class="on">Proyek</button><button data-v="c">Galeri klip</button></div><input class="in" id="hq" placeholder="Cari judul…" style="max-width:260px"></div></header><div class="hist" id="hl"></div></section>';
+  const isResults = initialTab === 'c';
+  view.innerHTML = `<section class="page history-page"><header class="page-h proj-h"><div><p class="eyebrow">${isResults ? 'OUTPUT PRODUKSI' : 'PUSTAKA KERJA'}</p><h1>${isResults ? 'Hasil' : 'Proyek'}</h1><p>${isResults ? 'Tinjau output siap pakai, proses render, dan kegagalan dari satu tempat.' : 'Cari, lanjutkan, dan kelola seluruh produksi.'}</p></div><a class="btn sm" href="#/new">Buat Klip</a></header><div class="library-toolbar"><div class="seg" id="hTab"><button data-v="p">Proyek</button><button data-v="c">Hasil klip</button></div><label class="library-search"><span aria-hidden="true">⌕</span><input class="in" id="hq" placeholder="Cari judul atau proyek"></label><select class="in" id="hStatus" aria-label="Filter status"><option value="">Semua status</option><option value="active">Aktif</option><option value="ready">Siap</option><option value="error">Gagal</option></select><select class="in" id="hSort" aria-label="Urutkan"><option value="new">Terbaru</option><option value="old">Terlama</option><option value="clips">Klip terbanyak</option></select></div><div class="result-tabs" id="resultTabs" ${isResults ? '' : 'hidden'}><button class="on" data-result="ready">Ready</button><button data-result="processing">Processing</button><button data-result="failed">Failed</button></div><div class="hist" id="hl"></div></section>`;
   let list = await api('/api/projects');
   const hl = $('#hl');
   const label = { done: 'selesai', running: 'diproses', queued: 'antre', error: 'gagal', cancelled: 'dibatalkan', candidates_ready: 'kandidat siap', rendering: 'render' };
-  let tab = initialTab, clips = null;
+  let tab = initialTab, clips = null, resultState = 'ready';
+  const projectStatusGroup = p => ['queued', 'running', 'rendering'].includes(p.status) ? 'active' : ['done', 'candidates_ready'].includes(p.status) ? 'ready' : ['error', 'cancelled'].includes(p.status) ? 'error' : '';
   const drawClips = async () => {
     clips = clips || await api('/api/clips').catch(() => []);
-    const q = $('#hq').value.toLowerCase(), items = clips.filter(c => `${c.title} ${c.project_title}`.toLowerCase().includes(q));
+    const q = $('#hq').value.toLowerCase();
+    const projectById = Object.fromEntries(list.map(project => [project.id, project]));
+    let items = clips.filter(c => `${c.title} ${c.project_title}`.toLowerCase().includes(q));
+    if ($('#resultTabs') && !$('#resultTabs').hidden) items = items.filter(c => {
+      const status = projectById[c.project_id]?.status || 'done';
+      return resultState === 'ready' ? status === 'done' : resultState === 'processing' ? ['queued', 'running', 'rendering'].includes(status) : ['error', 'cancelled'].includes(status);
+    });
     hl.className = 'gal';
     if (!items.length) { hl.innerHTML = '<div class="empty">Belum ada klip yang dirender.</div>'; return; }
     hl.replaceChildren(...items.map(c => {
-      const a = document.createElement('a'); a.className = 'gcard'; a.href = '#/p/' + c.project_id;
-      a.innerHTML = `<video muted loop playsinline preload="none"></video><span class="sc">${Math.round((c.score || 0) / 10)}/10</span><span class="du">${fmt(c.duration)}</span><b></b><small></small>`;
+      const a = document.createElement('article'); a.className = 'gcard output-card';
+      a.innerHTML = `<a class="output-preview" href="#/p/${esc(c.project_id)}"><video muted loop playsinline preload="none"></video><span class="sc">${Math.round((c.score || 0) / 10)}/10</span><span class="du">${fmt(c.duration)}</span></a><div class="output-body"><b></b><small></small><div class="output-actions"><a href="#/p/${esc(c.project_id)}">Studio</a><a href="/files/${esc(c.project_id)}/${esc(c.file)}" download>Download</a></div></div>`;
       const v = $('video', a); if (c.thumb) v.poster = `/files/${c.project_id}/${c.thumb}?v=${c.version}`;
       a.onmouseenter = () => { if (!v.src) v.src = `/files/${c.project_id}/${c.file}?v=${c.version}`; v.play().catch(() => {}); };
       a.onmouseleave = () => v.pause();
-      $('b', a).textContent = c.title || c.id; $('small', a).textContent = c.project_title || '';
+      $('.output-body b', a).textContent = c.title || c.id; $('.output-body small', a).textContent = c.project_title || '';
       return a;
     }));
   };
@@ -427,13 +505,13 @@ async function pageHistory(initialTab = 'p') {
   const draw = () => {
     if (tab === 'c') return drawClips();
     hl.className = 'hist';
-    const q = $('#hq').value.toLowerCase();
-    const items = list.filter(p => (p.title || '').toLowerCase().includes(q));
+    const q = $('#hq').value.toLowerCase(), status = $('#hStatus').value, sort = $('#hSort').value;
+    const items = list.filter(p => (p.title || '').toLowerCase().includes(q) && (!status || projectStatusGroup(p) === status)).sort((a, b) => sort === 'old' ? a.created - b.created : sort === 'clips' ? (b.clips || 0) - (a.clips || 0) : b.created - a.created);
     if (!items.length) { hl.innerHTML = '<div class="empty">Belum ada proyek. <a href="#/new" style="color:var(--acc)">Buat proyek baru →</a></div>'; return; }
     hl.replaceChildren(...items.map(p => {
-      const a = document.createElement('a'); a.className = 'hcard'; a.href = '#/p/' + p.id;
-      a.innerHTML = `<div class="hthumb"></div><div class="hbody"><b></b><div class="hrow"><span class="tag ${p.status}">${label[p.status] || p.status}${p.status === 'running' ? ' ' + Math.round(p.progress * 100) + '%' : ''}</span><span>${p.clips} klip</span><button class="del" title="Hapus">🗑</button></div><span class="muted" style="font-size:12px">${new Date(p.created * 1000).toLocaleString('id-ID')}</span></div>`;
-      $('b', a).textContent = p.title || p.id;
+      const a = document.createElement('article'); a.className = 'hcard project-row';
+      a.innerHTML = `<a class="hthumb" href="#/p/${esc(p.id)}"><span>${(p.title || 'P').slice(0, 1).toUpperCase()}</span></a><div class="hbody"><div class="project-main"><b></b><span class="muted">${new Date(p.created * 1000).toLocaleString('id-ID')}</span></div><div class="project-progress"><span style="width:${Math.max(4, Math.round((p.progress || (p.status === 'done' ? 1 : 0)) * 100))}%"></span></div><div class="hrow"><span class="tag ${p.status}">${label[p.status] || p.status}${p.status === 'running' ? ' ' + Math.round(p.progress * 100) + '%' : ''}</span><span>${p.clips || 0} klip</span></div></div><div class="project-actions"><a class="btn ghost sm" href="#/p/${esc(p.id)}">${p.status === 'done' || p.status === 'candidates_ready' ? 'Buka Studio' : 'Lanjutkan'}</a><button class="del" title="Hapus proyek" aria-label="Hapus ${esc(p.title || p.id)}">Hapus</button></div>`;
+      $('.project-main b', a).textContent = p.title || p.id;
       // Keep project cards stable when an older manifest references a thumbnail
       // that has already been cleaned from disk. Candidate previews remain
       // available inside Studio, while this list uses its neutral placeholder.
@@ -442,7 +520,9 @@ async function pageHistory(initialTab = 'p') {
       return a;
     }));
   };
-  $('#hq').oninput = draw; $$('#hTab button').forEach(b => b.classList.toggle('on', b.dataset.v === tab)); draw();
+  $('#hq').oninput = draw; $('#hStatus').onchange = draw; $('#hSort').onchange = draw;
+  $$('#resultTabs button').forEach(button => button.onclick = () => { resultState = button.dataset.result; $$('#resultTabs button').forEach(item => item.classList.toggle('on', item === button)); draw(); });
+  $$('#hTab button').forEach(b => b.classList.toggle('on', b.dataset.v === tab)); draw();
   pollT = setInterval(async () => { if (list.some(p => ['queued', 'running'].includes(p.status))) { list = await api('/api/projects'); draw(); } }, 3000);
 }
 

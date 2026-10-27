@@ -149,7 +149,7 @@ async function pageProject(pid) {
       </aside>
     </div>
     <section class="st-strip">
-      <div class="st-strip-h"><div class="st-count"><small>KANDIDAT</small><b id="sCount">0</b><span id="sCountTxt" class="muted"></span></div>
+      <div class="st-strip-h"><div class="st-count"><small>KANDIDAT</small><b id="sCount">0</b><span id="sCountTxt" class="muted"></span><button class="btn ghost sm" id="sCompare" disabled>Bandingkan pilihan</button></div>
         <div class="acts"><div class="seg sm" id="sFilter"><button data-f="all" class="on">Semua</button><button data-f="hot">Skor tinggi</button><button data-f="sel">Terpilih</button><button data-f="done">Dirender</button></div>
           <select class="in sm" id="sGoal" aria-label="Urutkan"><option value="best_overall">Urut: skor terbaik</option><option value="strongest_hook">Hook terkuat</option><option value="densest_insight">Insight terpadat</option><option value="most_emotional">Paling emosional</option><option value="easiest_to_understand">Mudah dipahami</option><option value="series_potential">Potensi seri</option><option value="time">Waktu sumber</option></select>
           <input class="in sm" id="sSearch" type="search" placeholder="Cari…" aria-label="Cari klip">
@@ -266,11 +266,21 @@ async function pageProject(pid) {
     const done = P.clips.filter(c => c.status === 'done').length, hot = P.clips.filter(isHot).length, sel = P.clips.filter(c => c.selected).length;
     $('#sCount').textContent = P.clips.length; $('#sCountTxt').textContent = `${P.clips.length} ditemukan · ${done} dirender · ${hot} hot · ${sel} dipilih`;
     $('#sHot').textContent = hot;
+    const chosen = P.clips.filter(c => c.selected).length;
+    $('#sCompare').disabled = chosen < 2;
+    $('#sCompare').textContent = chosen >= 2 ? `Bandingkan (${Math.min(chosen, 3)})` : 'Bandingkan pilihan';
     const todo = P.clips.filter(c => c.selected && !['done', 'queued', 'rendering'].includes(c.status)).length;
     $('#sRender').textContent = todo ? `Render terpilih (${todo})` : sel ? 'Semua terpilih sudah dirender' : 'Pilih klip untuk dirender';
     $('#sRender').disabled = !todo;
   }
   $$('#sFilter button').forEach(b => b.onclick = () => { filter = b.dataset.f; $$('#sFilter button').forEach(x => x.classList.toggle('on', x === b)); drawStrip(); });
+  $('#sCompare').onclick = () => {
+    const chosen = P.clips.filter(c => c.selected).slice(0, 3);
+    if (chosen.length < 2) return toast('Pilih minimal dua kandidat untuk dibandingkan', true);
+    openDlg(body => {
+      body.innerHTML = `<h2>Bandingkan kandidat</h2><p class="muted">Bandingkan hook, skor, durasi, dan alasan sebelum render.</p><div class="compare-grid">${chosen.map(c => `<article><b>${esc(c.title || c.id)}</b><strong>${score10(c)}/10</strong><span>${fmt(c.duration || c.end - c.start)}</span><p>${esc(c.reason || c.text || 'Kandidat dipilih berdasarkan ranking keseluruhan.')}</p></article>`).join('')}</div>`;
+    });
+  };
   $('#sGoal').onchange = drawStrip; $('#sSearch').oninput = drawStrip;
   const selectTop = n => api(`/api/projects/${pid}/candidates/top/${n}`, { method: 'POST' }).then(load).catch(e => toast(e.message, true));
   $('#sTop3').onclick = () => selectTop(3); $('#sTop5').onclick = () => selectTop(5);

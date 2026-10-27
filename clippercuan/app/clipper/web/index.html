@@ -6,6 +6,7 @@
 <title>ClipperCuan Studio</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ffc933'/%3E%3Cpath d='M24 18l22 14-22 14z' fill='%2307080a'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="premium.css">
 </head>
 <body>
 <a class="skip-link" href="#view">Lewati ke konten utama</a>
@@ -28,15 +29,18 @@
 <!-- ================= TEMPLATES ================= -->
 <template id="tpl-new">
   <section class="page new-project">
-    <header class="page-h wizard-heading"><div><p class="eyebrow">WORKSPACE PRODUKSI</p><h1>Buat klip dari satu workspace</h1><p>Masukkan sumber. Pilihan berikutnya terbuka saat dibutuhkan.</p></div></header>
-    <ol class="production-flow" id="productionFlow" aria-label="Tahap produksi"><li class="on" data-phase="source">Sumber</li><li data-phase="profile">Bahasa & profil</li><li data-phase="analysis">Analisis Video</li><li data-phase="candidates">Kandidat</li><li data-phase="style">Gaya</li><li data-phase="preview">Preview</li><li data-phase="render">Render</li></ol>
+    <header class="page-h wizard-heading"><div><p class="eyebrow">WORKSPACE PRODUKSI</p><h1>Satu video. Beberapa klip terbaik.</h1><p>Tentukan sumber dan arah produksi. Clipper Cuan menyiapkan kandidat untuk ditinjau sebelum render.</p></div><div class="draft-state" id="draftState" role="status"><span class="status-dot"></span><span>Draft tersimpan</span></div></header>
+    <ol class="production-flow" id="productionFlow" aria-label="Tahap produksi"><li class="on" data-phase="source"><span>1</span>Sumber</li><li data-phase="analysis"><span>2</span>Analisis</li><li data-phase="candidates"><span>3</span>Kurasi</li><li data-phase="render"><span>4</span>Render</li></ol>
     <div class="production-workspace"><div class="wizard-content">
 
-    <div class="card source-card">
-      <div class="section-title"><span class="step-number">01</span><div><h2>Pilih sumber video</h2><p>Gunakan URL publik atau unggah file dari perangkat.</p></div></div>
-      <div class="seg" id="srcTabs"><button class="on" data-src="link">Link video</button><button data-src="file">File lokal</button></div>
+    <div class="source-card">
+      <div class="section-title"><div><span class="section-kicker">MULAI DARI SUMBER</span><h2>Video apa yang ingin dipotong?</h2><p>Tempel tautan atau pilih file. Draft tersimpan otomatis di perangkat ini.</p></div></div>
+      <label class="project-name-field">Nama proyek <input id="projectName" class="in" maxlength="80" placeholder="Contoh: Podcast finansial episode 12"></label>
+      <div class="seg source-tabs" id="srcTabs"><button class="on" data-src="link">Tempel URL</button><button data-src="file">Pilih file</button></div>
       <div id="srcLink" class="src-pane">
-        <div class="url-row"><textarea id="url" class="in big" rows="2" placeholder="Tempel URL YouTube, TikTok, atau Instagram&#10;Satu URL per baris" autocomplete="off" spellcheck="false"></textarea><button class="btn big" type="button" id="startTop">Lanjut</button></div>
+        <div class="url-row"><textarea id="url" class="in big" rows="2" placeholder="https://youtube.com/watch?v=..." aria-describedby="urlHelp urlError" autocomplete="off" spellcheck="false"></textarea><button class="btn big source-analyze" type="button" id="startTop"><span>Analisis Video</span><small>Cari momen terbaik</small></button></div>
+        <div class="source-feedback"><p class="hint" id="urlHelp">YouTube, TikTok, Instagram, atau URL video publik.</p><p class="field-error" id="urlError" role="alert"></p></div>
+        <div class="recent-sources" id="recentSources" hidden><span>Terakhir dipakai</span><div></div></div>
         <p class="hint" id="urlCount"></p>
         <div class="fx-row lite-row"><div><b>Hemat disk — jangan unduh video penuh</b><span>Momen terbaik dicari dari subtitle YouTube (tanpa unduh apa pun) atau dari audio saja. Yang diunduh hanya potongan klip terpilih, lalu langsung dihapus setelah dirender. Butuh internet saat render.</span><span class="lite-est" id="liteEst"></span></div><label class="sw"><input type="checkbox" id="storage_lite"><span></span></label></div>
       </div>
@@ -203,8 +207,15 @@
       </div>
     </div></details>
 
-    <div class="go sticky-action contextual-render-bar progressive-panel" data-stage="render"><div><b>Siap membuat kandidat?</b><span class="hint" id="startHint">Sistem mengunduh, membuat subtitle, lalu meranking kandidat.</span></div><button class="btn big" id="start"><span>Buat Kandidat</span><small>Belum merender video</small></button></div>
-    </div></div>
+    <div class="go sticky-action contextual-render-bar progressive-panel" data-stage="render"><div><b>Siap dianalisis</b><span class="hint" id="startHint">Transkripsi, scoring, dan rekomendasi gaya berjalan lebih dulu. Video belum dirender.</span></div><button class="btn big" id="start"><span>Analisis Video</span><small>Lanjut ke kandidat</small></button></div>
+    </div><aside class="production-preview" aria-label="Preview dan ringkasan produksi">
+      <div class="preview-heading"><div><span class="section-kicker">OUTPUT PREVIEW</span><h2>Siap untuk format vertikal</h2></div><span class="preview-ratio">9:16</span></div>
+      <div class="preview-phone" id="sourcePreview"><div class="preview-art"><span class="preview-orbit"></span><div class="preview-caption"><small>CONTOH HASIL</small><strong>Momen terbaik,<br><em>siap dibagikan.</em></strong></div><div class="preview-subtitle"><span>Caption otomatis</span><b>tepat pada momennya</b></div></div></div>
+      <div class="preview-meta" id="sourceMeta"><div><span>SUMBER</span><b>Belum dipilih</b><small>Metadata muncul setelah sumber valid</small></div></div>
+      <div class="workflow-summary"><div class="summary-line"><span>Profil</span><b id="summaryProfile">Deteksi otomatis</b></div><div class="summary-line"><span>Bahasa subtitle</span><b id="summaryLanguage">Auto-detect</b></div><div class="summary-line"><span>Kualitas</span><b id="summaryQuality">Seimbang · 1080p</b></div><div class="summary-line"><span>Output</span><b id="summaryOutput">Kandidat dulu, render setelah review</b></div></div>
+      <div class="quality-presets" id="qualityPreset" aria-label="Preset kualitas"><button type="button" data-quality="fast"><b>Cepat</b><small>Tiny · 1080p</small></button><button type="button" data-quality="balanced" class="on"><b>Seimbang</b><small>Small · 1080p</small></button><button type="button" data-quality="max"><b>Maksimal</b><small>Medium · 1440p</small></button></div>
+    </aside></div>
+    <section class="recent-project-strip" id="recentProjectStrip" aria-label="Proyek terbaru"></section>
   </section>
 </template>
 
