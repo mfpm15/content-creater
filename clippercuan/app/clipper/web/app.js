@@ -40,12 +40,16 @@ function notify(title, body) {
 async function route() {
   clearInterval(pollT);
   const h = location.hash.replace(/^#\/?/, '') || 'new';
-  const [page, id] = h.split('/');
-  const titles = { home: ['WORKSPACE', 'Buat Klip'], history: ['PROYEK', 'Semua proyek'], new: ['PRODUKSI', 'Buat Klip'], queue: ['HASIL', 'Antrean'], results: ['HASIL', 'Hasil & antrean'], advanced: ['EDITOR', 'Studio'], settings: ['SISTEM', 'Pengaturan'] };
+  let [page, id] = h.split('/');
+  const aliases = { home: 'new', queue: 'results' };
+  if (aliases[page]) { location.replace(`#/${aliases[page]}`); return; }
+  const publicRoutes = new Set(['new', 'history', 'results', 'advanced', 'settings', 'p']);
+  if (!publicRoutes.has(page) || (page === 'p' && !id)) { location.replace('#/new'); return; }
+  const titles = { history: ['PROYEK', 'Semua proyek'], new: ['PRODUKSI', 'Buat Klip'], results: ['HASIL', 'Hasil & antrean'], advanced: ['EDITOR', 'Studio'], settings: ['SISTEM', 'Pengaturan'] };
   const title = titles[page] || ['CLIPPER CUAN', 'Workspace'];
   if ($('#pageContext')) $('#pageContext').textContent = title[0];
   if ($('#pageTitle')) $('#pageTitle').textContent = title[1];
-  $$('.side [data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === page || (page === 'p' && a.dataset.nav === 'history')));
+  $$('.side [data-nav]').forEach(a => { const active = a.dataset.nav === page || (page === 'p' && a.dataset.nav === 'history'); a.classList.toggle('on', active); if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $$('[data-mobile-nav]').forEach(a => { const active = a.dataset.mobileNav === page || (page === 'p' && a.dataset.mobileNav === 'history'); a.classList.toggle('on', active); if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   document.body.classList.toggle('studio-mode', page === 'p' && !!id);
   if (!INFO) { [INFO, SETTINGS, HEALTH] = await Promise.all([api('/api/info'), api('/api/settings'), api('/api/health')]); $('#sideFoot').textContent = 'Data lokal siap'; paintAiHealth(); }
@@ -516,7 +520,7 @@ async function pageHistory(initialTab = 'p') {
       // that has already been cleaned from disk. Candidate previews remain
       // available inside Studio, while this list uses its neutral placeholder.
       $('.hthumb', a).classList.toggle('has-output', Boolean(p.clips));
-      $('.del', a).onclick = async e => { e.preventDefault(); if (!confirm('Hapus proyek ini beserta semua klipnya?')) return; await api('/api/projects/' + p.id, { method: 'DELETE' }); list = list.filter(x => x !== p); draw(); badge(); };
+      $('.del', a).onclick = async e => { e.preventDefault(); const restoreIndex = items.indexOf(p); if (!confirm('Hapus proyek ini beserta semua klipnya?')) { e.currentTarget.focus(); return; } await api('/api/projects/' + p.id, { method: 'DELETE' }); list = list.filter(x => x !== p); draw(); badge(); const controls = $$('.project-actions .del', hl); (controls[Math.min(restoreIndex, controls.length - 1)] || $('#hq'))?.focus(); };
       return a;
     }));
   };
@@ -659,8 +663,8 @@ async function pageSettings() {
 
 addEventListener('DOMContentLoaded', () => {
   const sideToggle = $('#sideToggle');
-  sideToggle.onclick = () => { const compact = document.body.classList.toggle('side-compact'); sideToggle.setAttribute('aria-expanded', String(!compact)); store.set('clipperSideCompact', compact); };
-  if (store.get('clipperSideCompact', false)) document.body.classList.add('side-compact');
+  sideToggle.onclick = () => { const compact = document.body.classList.toggle('side-compact'); sideToggle.setAttribute('aria-expanded', String(!compact)); sideToggle.setAttribute('aria-label', compact ? 'Perluas sidebar' : 'Ringkas sidebar'); store.set('clipperSideCompact', compact); };
+  if (store.get('clipperSideCompact', false)) { document.body.classList.add('side-compact'); sideToggle.setAttribute('aria-expanded', 'false'); sideToggle.setAttribute('aria-label', 'Perluas sidebar'); }
   addEventListener('keydown', e => { if (e.key === 'Escape') { const d = $('dialog[open]'); if (d) d.close(); } });
   route().catch(e => { view.innerHTML = `<section class="page"><div class="empty">Gagal memuat: ${esc(e.message)}</div></section>`; });
 });
