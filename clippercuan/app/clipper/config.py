@@ -104,7 +104,8 @@ DEFAULTS: dict = {
         "accent": "#3DE0A0",     # preset duo: warna baris punchline
         "glow": "#C6FF3D",
     },
-    "emoji": {"enabled": False, "size": 1.0},
+    "decoration": {"mode": "none", "provenance": None, "max_active": 1},  # none | smart_emoji | light_illustration
+    "emoji": {"enabled": False, "size": 1.0, "provenance": "keyword"},
     "progress_bar": {"enabled": False, "color": "#FFC933", "height": 12, "position": "bottom"},
     "cta": {"enabled": False, "text": "Follow untuk part berikutnya!", "duration": 3},
     "music": {"enabled": False, "file": "", "volume": 0.15, "duck": True},

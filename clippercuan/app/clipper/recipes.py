@@ -57,12 +57,13 @@ RECIPES: dict[str, dict] = {
             "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
     },
     "box-punch": {
-        "label": "Box Punch · Eksperimental", "template_name": "Box Punch", "niche": "advanced", "badge": "Advanced · Eksperimental",
-        "tier": "advanced", "experimental": True,
-        "desc": "Kotak mengikuti kata aktif dan animasi pop. Hanya opt-in; tidak pernah dipilih otomatis.",
-        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("box-punch", 84, "box"),
-            "box": True, "animation": "pop", "highlight": "#FFC933", "outline": 5,
-            "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
+        "label": "Box Punch V2", "template_name": "Box Punch V2", "niche": "advanced", "badge": "Rekomendasi kreatif · Production",
+        "tier": "advanced", "experimental": False, "status": "Production",
+        "desc": "Satu caption besar, maksimal dua baris, satu frasa ditekankan, masuk halus, dekorasi semantik opsional.",
+        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("box-punch-v2", 84, "box"),
+            "box": True, "animation": "subtle-pop", "animation_ms": 180, "highlight": "#F4B942", "outline": 4,
+            "box_padding": 10, "words_per_line": 4, "max_chars": 27, "max_lines": 2, "y_pct": 72},
+            "decoration": {"mode": "none", "provenance": None, "max_active": 1}},
     },
     "neon-karaoke": {
         "label": "Neon Karaoke · Eksperimental", "template_name": "Neon Karaoke", "niche": "advanced", "badge": "Advanced · Eksperimental",
@@ -109,17 +110,18 @@ RECIPES: dict[str, dict] = {
         },
     },
     "tech-review": {
-        "label": "Review tech · Fokus biru", "niche": "tech_review", "badge": "Opt-in",
+        "label": "Review / Tech Review", "niche": "tech_review", "badge": "Production", "status": "Production",
         "desc": "Satu caption dengan penekanan biru terkendali. Hook opsional tiga detik, produk tetap terlihat.",
         "settings": {
             "content_profile": "tech_review", "duration_preset": "25-40", "layout": "portrait", "smart_crop": True,
             "cut_silence": True, "caption_layers": 1,
-            "caption": {"enabled": True, "role": "spoken-caption", "preset": "tech", "style": "karaoke", "box": False,
-                        "effect": "none", "font": "Barlow Condensed", "size": 78, "color": "#F8FAFC",
+            "caption": {"enabled": True, "role": "spoken-caption", "preset": "tech", "style": "keyword", "box": False,
+                        "effect": "none", "font": "Barlow Condensed", "size": 84, "color": "#F8FAFC",
                         "highlight": "#38BDF8", "uppercase": False, "words_per_line": 5, "max_chars": 32,
                         "safe_area": 0.15, "y_pct": 74, "animation": "none"},
             "title": {"enabled": False, "role": "hook", "preset": "clean", "duration": 3, "size": 56, "y_pct": 12},
-            "emoji": {"enabled": False}, "progress_bar": {"enabled": False},
+            "product_label": {"enabled": False, "role": "source-callout"},
+            "decoration": {"mode": "none", "max_active": 1}, "emoji": {"enabled": False}, "progress_bar": {"enabled": False},
         },
     },
     "ml-hype": {
@@ -149,10 +151,10 @@ RECIPES: dict[str, dict] = {
         },
     },
     "edukasi-wbw": {
-        "label": "Edukasi · Word by word", "niche": "podcast", "badge": "Tips & tutorial",
+        "label": "Educational / Explainer", "niche": "educational", "badge": "Beta", "status": "Beta",
         "desc": "Satu kata satu penekanan di tengah layar. Tempo cepat untuk tips, fakta, dan tutorial singkat.",
         "settings": {
-            "content_profile": "auto", "duration_preset": "25-40", "layout": "portrait", "smart_crop": True, "cut_silence": True,
+            "content_profile": "educational", "duration_preset": "25-40", "layout": "portrait", "smart_crop": True, "cut_silence": True,
             "caption": {"preset": "wbw", "style": "wbw", "box": False, "effect": "glow", "glow_color": "#000000", "font": "Anton",
                         "size": 110, "color": "#FFFFFF", "highlight": "#FFE14D", "uppercase": True, "words_per_line": 1,
                         "y_pct": 55, "animation": "pop"},
@@ -175,10 +177,12 @@ RECIPES: dict[str, dict] = {
     },
 }
 
-AUTO = {"id": "auto", "label": "Otomatis sesuai konten", "niche": "auto", "badge": "Lanjutan",
-        "desc": "Deteksi konten tetap tersedia, tetapi gaya dekoratif tidak lagi dipilih otomatis untuk podcast atau review teknologi."}
+AUTO = {"id": "auto", "label": "Auto", "niche": "auto", "badge": "Production", "status": "Production",
+        "desc": "Klasifikasi mode dengan confidence dan alasan. Confidence rendah selalu memakai Clean Large tanpa dekorasi."}
 
-PROFILE_DEFAULT = {"podcast": "recommended", "tech_review": "recommended", "mobile_legends": "ml-hype"}
+PROFILE_DEFAULT = {"podcast": "recommended", "interview": "recommended", "tech_review": "recommended",
+                   "review": "recommended", "educational": "recommended", "gaming": "ml-hype",
+                   "mobile_legends": "ml-hype"}
 
 
 def public() -> dict:

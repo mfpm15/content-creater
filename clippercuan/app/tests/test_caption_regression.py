@@ -107,14 +107,17 @@ def test_clean_focus_uses_same_font_and_subtle_keyword_scale():
     assert all(line.count(captions._ass_color("#FFD166")) == 1 for line in events)
 
 
-def test_box_punch_recipe_is_opt_in_and_keeps_single_layer_contract():
+def test_box_punch_v2_is_opt_in_production_and_keeps_single_layer_contract():
     entry = recipes.RECIPES["box-punch"]
-    assert entry["tier"] == "advanced" and entry["experimental"] is True
+    assert entry["tier"] == "advanced" and entry["experimental"] is False
+    assert entry["status"] == "Production"
     recipe = entry["settings"]
     cap = recipe["caption"]
-    assert cap["template_id"] == "box-punch"
+    assert cap["template_id"] == "box-punch-v2"
     assert cap["style"] == "box" and cap["box"] is True
-    assert cap["animation"] == "pop" and cap["effect"] == "none"
+    assert cap["animation"] == "subtle-pop" and cap["animation_ms"] <= 200
+    assert cap["effect"] == "none" and cap["max_lines"] == 2
+    assert recipe["decoration"]["mode"] == "none"
     assert recipe["caption_layers"] == 1 and recipe["title"]["enabled"] is False
 
 
@@ -131,13 +134,16 @@ def test_all_primary_templates_have_identity_and_two_line_contract():
         assert recipe["settings"]["caption_layers"] == 1
 
 
-def test_experimental_templates_are_never_automatic():
+def test_advanced_templates_are_never_automatic():
     automatic = {"recommended", *recipes.PROFILE_DEFAULT.values()}
     for rid in ("viral-pop", "box-punch", "neon-karaoke"):
         recipe = recipes.RECIPES[rid]
         assert rid not in automatic
-        assert recipe["tier"] == "advanced" and recipe["experimental"] is True
-        assert "Eksperimental" in recipe["label"]
+        assert recipe["tier"] == "advanced"
+    assert recipes.RECIPES["box-punch"]["status"] == "Production"
+    for rid in ("viral-pop", "neon-karaoke"):
+        assert recipes.RECIPES[rid]["experimental"] is True
+        assert "Eksperimental" in recipes.RECIPES[rid]["label"]
 
 
 def test_size_mapping_is_deterministic_and_large_exceeds_medium():
@@ -172,3 +178,35 @@ def test_retry_preserves_settings_without_adding_layers():
     after = project.load(p["id"])["settings"]
     assert after["caption"]["style"] == before["caption"]["style"] == "clean"
     assert after["caption_layers"] == before["caption_layers"] == 1
+
+
+def test_decoration_planner_has_provenance_and_never_overlaps():
+    from clipper import effects
+
+    words = _words("uang penting uang")
+    planned = effects.plan_emojis(words, 5, min_gap=0, provenance="keyword")
+    assert all(item["provenance"] == "keyword" and item["keyword"] for item in planned)
+    assert all(a["e"] <= b["s"] for a, b in zip(planned, planned[1:]))
+
+
+def test_decoration_safe_zone_protects_mobile_legends_hud():
+    from clipper import effects
+
+    zones = effects.safe_zones("mobile_legends", "blur", 76)
+    assert {z["kind"] for z in zones} >= {"spoken-caption", "minimap", "score", "controls", "kill-feed"}
+    decision = effects.decoration_layout("mobile_legends", "blur", 76)
+    assert "reason" in decision and "blocked" in decision
+
+
+def test_review_product_and_podcast_face_safe_zones():
+    from clipper import effects
+
+    assert "product" in {z["kind"] for z in effects.safe_zones("tech_review", "portrait")}
+    assert "face" in {z["kind"] for z in effects.safe_zones("podcast", "portrait")}
+
+
+def test_auto_profile_defaults_remain_clean_when_not_gaming():
+    for profile in ("podcast", "interview", "tech_review", "review", "educational"):
+        assert recipes.PROFILE_DEFAULT[profile] == "recommended"
+    cap = recipes.RECIPES["recommended"]["settings"]["caption"]
+    assert cap["template_id"] == "clean-large" and cap["animation"] == "none"

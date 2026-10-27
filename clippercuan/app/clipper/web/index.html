@@ -8,7 +8,8 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<aside class="side">
+<a class="skip-link" href="#view">Lewati ke konten utama</a>
+<aside class="side" aria-label="Navigasi utama">
   <a class="brand" href="http://127.0.0.1:3210" title="Kembali ke Creator Control Center"><span class="logo">C</span><span class="brand-copy"><b>Creator</b><small>Clipper Cuan</small></span></a>
   <nav>
     <a href="#/new" data-nav="new">＋ Proyek baru</a>
@@ -64,14 +65,16 @@
       <button class="btn ghost sm" id="tplSave" type="button">Simpan sebagai template</button>
     </div>
 
-    <div class="section-divider"><span class="step-number">02</span><div><h2>Atur kandidat konten</h2><p>Pilih profil hasil, jumlah opsi, durasi, dan format. Kandidat tidak dirender sebelum kamu memilih.</p></div></div>
+    <ol class="production-flow" aria-label="Alur produksi"><li class="on">1 · Sumber</li><li>2 · Mode</li><li>3 · Kandidat</li><li>4 · Bandingkan</li><li>5 · Gaya & crop</li><li>6 · Preview</li><li>7 · Render</li><li>8 · Review</li></ol>
+    <div class="section-divider"><span class="step-number">02</span><div><h2>Pilih mode konten</h2><p>Mode mengatur safe zone dan kepadatan visual. Auto menjelaskan pilihan dan kembali ke Clean Large saat confidence rendah.</p></div></div>
     <div class="card profile-card">
       <h3>Content profile</h3>
       <div class="preset-cards profile-presets" id="contentProfile">
-        <button type="button" data-v="auto"><b>Auto</b><small>Deteksi dari transkrip, metadata, dan aktivitas</small></button>
-        <button type="button" data-v="podcast"><b>Podcast</b><small>Hot take, cerita mini, tanya-jawab, insight mandiri</small></button>
-        <button type="button" data-v="tech_review"><b>Review teknologi</b><small>Demo, perbandingan, verdict, value dengan konteks</small></button>
-        <button type="button" data-v="mobile_legends"><b>Mobile Legends</b><small>Clutch, outplay, team fight, tip, reaksi</small></button>
+        <button type="button" data-v="auto"><span class="status-pill production">Production</span><b>✨ Auto</b><small>Deteksi mode, confidence, alasan, fallback Clean Large</small></button>
+        <button type="button" data-v="mobile_legends"><span class="status-pill production">Production</span><b>🎮 Gaming</b><small>Gameplay, facecam, split, HUD dan minimap terlindungi</small></button>
+        <button type="button" data-v="tech_review"><span class="status-pill production">Production</span><b>📦 Review</b><small>Produk dan tangan prioritas, dekorasi dikurangi</small></button>
+        <button type="button" data-v="podcast"><span class="status-pill production">Production</span><b>🎙 Podcast</b><small>Readable, speaker-aware bila diarization tersedia</small></button>
+        <button type="button" data-v="educational"><span class="status-pill beta">Beta</span><b>💡 Educational</b><small>Keyword, chapter hook, ikon ringan relevan</small></button>
       </div>
       <p class="hint">Auto dapat dioverride. Sistem tidak membuat spesifikasi, harga, atau event game yang tidak didukung sumber.</p>
     </div>
@@ -171,10 +174,12 @@
       </div>
     </div></details>
 
-    <details class="advanced advanced-only"><summary><span><b>04 · Efek & audio</b><small>Emoji, progress, CTA, dan musik</small></span><em>Opsional</em></summary><div class="advanced-body grid2">
+    <details class="advanced advanced-only"><summary><span><b>04 · Dekorasi & audio</b><small>Opt-in, maksimal satu dekorasi aktif, safe-zone guarded</small></span><em>Opsional</em></summary><div class="advanced-body grid2">
       <div class="card">
         <h3>Efek visual</h3>
-        <div class="fx-row"><div><b>Emoji otomatis</b><span>Emoji muncul saat kata kunci diucapkan (uang 💰, rahasia 🤫, kaget 😱…)</span></div><label class="sw"><input type="checkbox" id="emoji_on"><span></span></label></div>
+        <fieldset class="decoration-choice"><legend>Dekorasi</legend><label><input type="radio" name="decoration_mode" value="none" checked> Tanpa dekorasi</label><label><input type="radio" name="decoration_mode" value="smart_emoji"> Emoji cerdas</label><label><input type="radio" name="decoration_mode" value="light_illustration"> Ilustrasi ringan</label></fieldset>
+        <p class="hint">Berbasis keyword, saran LLM, atau manual. Otomatis dibatalkan bila wajah, produk, HUD, atau caption tidak menyisakan area aman.</p>
+        <div class="fx-row"><div><b>Emoji cerdas</b><span>Muncul singkat hanya untuk event semantik relevan</span></div><label class="sw"><input type="checkbox" id="emoji_on" aria-label="Aktifkan emoji cerdas"><span></span></label></div>
         <label id="emojiSizeRow">Ukuran emoji <input type="range" id="emoji_size" min="60" max="160"></label>
         <div class="fx-row"><div><b>Progress bar</b><span>Garis tipis yang berjalan, bikin penonton bertahan sampai akhir</span></div><label class="sw"><input type="checkbox" id="pb_on"><span></span></label></div>
         <div class="row2" id="pbRow"><label>Warna<input type="color" id="pb_color" class="in color"></label><label>Posisi<select id="pb_pos" class="in"><option value="bottom">Bawah</option><option value="top">Atas</option></select></label></div>

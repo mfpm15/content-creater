@@ -182,12 +182,20 @@ async function pageNew(override) {
     try { const r = await api('/api/upload', { method: 'POST', body: fd }); wmImage = r.path; $('#wmName').textContent = f.name; $('#wm_enabled').checked = true; toast('Logo watermark siap'); } catch (err) { toast(err.message, true); }
   };
 
-  // efek visual
+  // efek visual: dekorasi opt-in; checkbox lama tetap tersinkron untuk kompatibilitas proyek lama
   const fxBind = (sw, row) => { const f = () => $(row).classList.toggle('dim', !$(sw).checked); $(sw).addEventListener('change', f); f(); };
-  $('#emoji_on').checked = !!cfg.emoji.enabled; $('#emoji_size').value = Math.round((cfg.emoji.size || 1) * 100);
+  let decorationMode = cfg.decoration?.mode || (cfg.emoji.enabled ? 'smart_emoji' : 'none');
+  const syncDecoration = () => {
+    $$('input[name="decoration_mode"]').forEach(r => r.checked = r.value === decorationMode);
+    $('#emoji_on').checked = decorationMode === 'smart_emoji';
+    $('#emojiSizeRow').classList.toggle('dim', decorationMode !== 'smart_emoji');
+  };
+  $$('input[name="decoration_mode"]').forEach(r => r.onchange = () => { if (r.checked) { decorationMode = r.value; syncDecoration(); } });
+  $('#emoji_on').checked = decorationMode === 'smart_emoji'; $('#emoji_size').value = Math.round((cfg.emoji.size || 1) * 100);
+  $('#emoji_on').onchange = e => { decorationMode = e.target.checked ? 'smart_emoji' : 'none'; syncDecoration(); };
   $('#pb_on').checked = !!cfg.progress_bar.enabled; $('#pb_color').value = cfg.progress_bar.color; $('#pb_pos').value = cfg.progress_bar.position;
   $('#cta_on').checked = !!cfg.cta.enabled; $('#cta_text').value = cfg.cta.text; $('#cta_dur').value = cfg.cta.duration;
-  fxBind('#emoji_on', '#emojiSizeRow'); fxBind('#pb_on', '#pbRow'); fxBind('#cta_on', '#ctaRow');
+  syncDecoration(); fxBind('#pb_on', '#pbRow'); fxBind('#cta_on', '#ctaRow');
 
   // musik latar
   $('#mu_on').checked = !!cfg.music.enabled; $('#mu_vol').value = Math.round(cfg.music.volume * 100); $('#mu_duck').checked = cfg.music.duck !== false;
@@ -219,7 +227,8 @@ async function pageNew(override) {
       title: { ...cfg.title, enabled: $('#ttl_enabled').checked, preset: ttlPreset, duration: +$('#ttl_duration').value },
       quality: { ...Q }, recipe: recipeId, storage: srcMode === 'link' && $('#storage_lite').checked ? 'lite' : 'full', crop: cfg.crop,
       watermark: { enabled: $('#wm_enabled').checked, text: $('#wm_text').value, image: wmImage, position: wmPos, opacity: +$('#wm_opacity').value / 100, size: cfg.watermark.size },
-      emoji: { enabled: $('#emoji_on').checked, size: +$('#emoji_size').value / 100 },
+      decoration: { mode: decorationMode, provenance: decorationMode === 'none' ? null : 'keyword', max_active: 1 },
+      emoji: { enabled: decorationMode === 'smart_emoji', size: +$('#emoji_size').value / 100, provenance: 'keyword' },
       progress_bar: { enabled: $('#pb_on').checked, color: $('#pb_color').value, position: $('#pb_pos').value, height: cfg.progress_bar.height },
       cta: { enabled: $('#cta_on').checked, text: $('#cta_text').value, duration: +$('#cta_dur').value || 3 },
       music: { enabled: $('#mu_on').checked && !!$('#mu_file').value, file: $('#mu_file').value, volume: +$('#mu_vol').value / 100, duck: $('#mu_duck').checked },
@@ -228,7 +237,7 @@ async function pageNew(override) {
 
   const forSubmit = st => {   // resep otomatis: gaya dipilih server sesuai konten → jangan kirim gaya dari form
     if (st.recipe !== 'auto') return st;
-    const o = { ...st }; ['caption', 'title', 'emoji', 'progress_bar', 'layout', 'smart_crop', 'cut_silence', 'split', 'content_profile'].forEach(k => delete o[k]);
+    const o = { ...st }; ['caption', 'title', 'decoration', 'emoji', 'progress_bar', 'layout', 'smart_crop', 'cut_silence', 'split', 'content_profile'].forEach(k => delete o[k]);
     if (o.duration_preset === 'auto') { delete o.min_sec; delete o.max_sec; }
     if (contentProfile !== 'auto') o.content_profile = contentProfile;
     return o;

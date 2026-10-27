@@ -81,9 +81,43 @@ def emoji_for(word: str) -> str | None:
     return None
 
 
+def safe_zones(profile: str, layout: str, caption_y_pct: float = 74) -> list[dict]:
+    """Area terlarang ternormalisasi untuk dekorasi: caption, wajah/produk, dan HUD umum."""
+    zones = [{"kind": "spoken-caption", "rect": [0.08, max(.05, caption_y_pct / 100 - .1), .84, .2]}]
+    if profile in {"gaming", "mobile_legends"}:
+        zones += [{"kind": "minimap", "rect": [0, 0, .3, .3]},
+                  {"kind": "score", "rect": [.32, 0, .36, .16]},
+                  {"kind": "controls", "rect": [.62, .62, .38, .38]},
+                  {"kind": "kill-feed", "rect": [.66, .14, .34, .25]}]
+    elif profile in {"review", "tech_review"}:
+        zones += [{"kind": "product", "rect": [.18, .28, .64, .5]}]
+    elif profile in {"podcast", "interview"}:
+        zones += [{"kind": "face", "rect": [.18, .08, .64, .5]}]
+    if layout == "split":
+        zones.append({"kind": "facecam", "rect": [0, 0, 1, .38]})
+    return zones
+
+
+def _overlaps(a: list[float], b: list[float]) -> bool:
+    return a[0] < b[0] + b[2] and a[0] + a[2] > b[0] and a[1] < b[1] + b[3] and a[1] + a[3] > b[1]
+
+
+def decoration_layout(profile: str, layout: str, caption_y_pct: float = 74) -> dict:
+    """Pilih satu posisi konservatif; nonaktif bila semua posisi berbenturan."""
+    blocked = safe_zones(profile, layout, caption_y_pct)
+    candidates = [("top-right", [.74, .34, .18, .18]), ("top-left", [.08, .34, .18, .18]),
+                  ("center-top", [.41, .18, .18, .18])]
+    for name, rect in candidates:
+        collisions = [z["kind"] for z in blocked if _overlaps(rect, z["rect"])]
+        if not collisions:
+            return {"enabled": True, "position": name, "rect": rect, "blocked": blocked, "reason": "safe-area tersedia"}
+    return {"enabled": False, "position": None, "rect": None, "blocked": blocked,
+            "reason": "dekorasi dibatalkan: tidak ada area aman"}
+
+
 def plan_emojis(words: list[dict], duration: float, max_count: int = 10, min_gap: float = 2.2,
-                show: float = 1.3) -> list[dict]:
-    """[{code, s, e, file}] — maksimal satu emoji per ~2 detik, tidak berulang berturut-turut."""
+                show: float = 1.3, provenance: str = "keyword") -> list[dict]:
+    """Rencana semantik; interval tidak tumpang tindih dan setiap item punya provenance."""
     out: list[dict] = []
     last_t, last_code = -99.0, None
     for w in words:
@@ -94,7 +128,11 @@ def plan_emojis(words: list[dict], duration: float, max_count: int = 10, min_gap
         if not f.is_file():
             continue
         s = max(0.0, w["s"] - 0.05)
-        out.append({"code": code, "s": round(s, 2), "e": round(min(s + show, duration), 2), "file": str(f)})
+        e = min(s + show, duration)
+        if out and s < out[-1]["e"]:
+            continue
+        out.append({"code": code, "s": round(s, 2), "e": round(e, 2), "file": str(f),
+                    "provenance": provenance, "keyword": w["w"]})
         last_t, last_code = w["s"], code
         if len(out) >= max_count:
             break

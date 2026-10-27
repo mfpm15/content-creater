@@ -207,22 +207,24 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
                   f"[{last}][wm]overlay={pos}[wmo]")
         last = "wmo"
 
-    # emoji otomatis dari kata kunci (PNG di atas caption, muncul halus)
-    emojis = effects.plan_emojis(sub_words, out_dur) if cfg.get("emoji", {}).get("enabled") else []
+    # Dekorasi opt-in. Guard konservatif melindungi caption, wajah/produk, dan HUD.
+    profile = cfg.get("content_profile", "auto")
+    decoration = cfg.get("decoration") or {}
+    decoration_mode = decoration.get("mode", "smart_emoji" if cfg.get("emoji", {}).get("enabled") else "none")
+    decoration_layout = effects.decoration_layout(profile, layout, float(cfg["caption"].get("y_pct", 74)))
+    wants_emoji = decoration_mode == "smart_emoji" or cfg.get("emoji", {}).get("enabled")
+    emojis = (effects.plan_emojis(sub_words, out_dur, provenance=cfg.get("emoji", {}).get("provenance", "keyword"))
+              if wants_emoji and decoration_layout["enabled"] else [])
     if emojis:
-        es = int(170 * W / 1080 * float(cfg["emoji"].get("size", 1.0)))
-        cap_pos = cfg["caption"].get("position", "bottom")
-        if cfg["caption"].get("y_pct") not in (None, ""):   # emoji tepat di atas caption yang diposisikan bebas
-            cap_fs = int(float(cfg["caption"].get("size", 82)) * W / 1080)
-            ey = max(0, int(H * float(cfg["caption"]["y_pct"]) / 100) - int(cap_fs * 0.9) - es)
-        else:
-            ey = {"bottom": int(H * 0.60), "middle": int(H * 0.36), "top": int(H * 0.30)}[cap_pos] - es
+        es = int(150 * W / 1080 * float(cfg["emoji"].get("size", 1.0)))
+        rect = decoration_layout["rect"]
+        ex, ey = int(rect[0] * W), int(rect[1] * H)
         for k, em in enumerate(emojis):
             idx = add_input(["-loop", "1", "-framerate", "30", "-t", f"{em['e'] + 0.2:.2f}", "-i", em["file"]])
             d = em["e"] - em["s"]
             graph += (f";[{idx}:v]scale={es}:{es},format=rgba,fade=t=in:st={em['s']:.2f}:d=0.15:alpha=1,"
                       f"fade=t=out:st={em['s'] + d - 0.2:.2f}:d=0.2:alpha=1[em{k}];"
-                      f"[{last}][em{k}]overlay=x=(W-w)/2:y={ey}:eof_action=pass:enable='between(t,{em['s']:.2f},{em['e']:.2f})'[e{k}]")
+                      f"[{last}][em{k}]overlay=x={ex}:y={ey}:eof_action=pass:enable='between(t,{em['s']:.2f},{em['e']:.2f})'[e{k}]")
             last = f"e{k}"
 
     # progress bar tipis yang berjalan sepanjang klip
@@ -325,6 +327,11 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
             "ass": f"subtitles/{cid}.ass", "sidecar_autoload_safe": True,
             "crop_keys": keys, "words": cw,
             "duration": round(out_dur, 2), "cut_saved": round(dur - out_dur, 2), "emojis": [e["code"] for e in emojis],
+            "mode": profile, "recipe": cfg.get("recipe_applied") or cfg.get("recipe"),
+            "layer_stack": ["Video", "Crop", "Spoken Caption"] + (["Speaker Label"] if cfg.get("speaker_label", {}).get("enabled") else []) + (["Decoration"] if emojis else []) + (["Hook"] if cfg["title"].get("enabled") else []),
+            "decorations": [{k: v for k, v in e.items() if k != "file"} for e in emojis],
+            "decoration_mode": decoration_mode, "safe_zone_decision": decoration_layout,
+            "decoration_cancel_reason": None if emojis or decoration_mode == "none" else decoration_layout["reason"],
             "caption_cues": len(captions.chunk_words(sub_words, int(cfg["caption"].get("words_per_line", 3)))),
             "caption_layers": 1, "caption_provenance": "ASS:spoken-caption",
             "caption_size_preset": caption_meta["caption_size_preset"],

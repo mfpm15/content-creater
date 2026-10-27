@@ -41,14 +41,18 @@ Ranked hypotheses before implementation:
 
 Implemented response:
 
-- Production templates are Clean Large (default), Clean Focus Large, and Minimal Medium. They are stable, single-layer caption treatments with no pop animation, glow, moving box, or active-word karaoke.
-- Viral Pop, Box Punch, and Neon Karaoke remain available only under Advanced as explicitly experimental, opt-in templates. No automatic content profile selects them.
+- Production templates are Clean Large (default), Clean Focus Large, Minimal Medium, and the opt-in Box Punch V2 creative treatment. All preserve one transcript-derived spoken-caption layer.
+- Box Punch V2 replaces the old aggressive moving box with a maximum two-line composition, one emphasized phrase at a time, four-pixel outline, ten-unit box padding, and a restrained 180 ms subtle-pop entrance. It is never selected automatically.
+- Viral Pop and Neon Karaoke remain Advanced Experimental. No automatic content profile selects any decorative treatment.
+- Decoration is an independent opt-in layer: None, Smart Emoji, or Light Illustration. The renderer records provenance and safe-zone decisions, allows at most one active decoration, and cancels it when caption, face/product, minimap, score, controls, kill-feed, or facecam zones leave no safe placement.
 - Deterministic size levels are Small 64, Medium 72, Large 84, and Extra Large 96 ASS units at a 1080-wide output.
 - Every render result records template ID/name, caption-size preset, font, nominal and effective ASS size, estimated caption height, placement, line budget, emphasis mode, caption source, burned-in state, sidecar safety, and layer count.
 - Studio preview scales from width, matching the renderer's 1080-wide coordinate basis, and the result card displays the template, human-readable size, font, and one-layer status.
 - The validation harness resolves production recipes and invokes the same `clipper.render.render_clip` entry point used by the application. Its only overrides are runtime-neutral controls such as CPU encoding, fixed resolution, disabled smart crop, and disabled optional overlays. It records `caption_style_overrides: false` and labels its caption-free output as a measurement reference rather than an A/B candidate.
 
 Rendered-frame validation completed on 27 October 2026 in `caption_clean_validation_20261027_103235`. It used twelve timestamps from the same 20.47-second source interval and a caption-free render as the pixel-difference reference. Clean Large measured a median 67 pixels (3.49 percent of the 1920-pixel frame height), Clean Focus Large measured 68 pixels (3.54 percent), and Minimal Medium measured 57 pixels (2.97 percent). Minimum bottom clearance was 23.70 percent across the three production variants. Every result reported one caption layer, safe sidecar placement, twelve full frames plus twelve caption crops, no active-word mode, and no style override in the validation harness. Large therefore measured clearly larger than Medium while all three retained the configured two-line ceiling.
+
+Box Punch V2 validation completed on 27 October 2026 in `box_punch_v2_validation_20261027_114336` using candidate `candidate_01` from project `20261027-091810-aba0`. The harness rendered clean, Smart Emoji, and Light Illustration variants through the production renderer, plus a caption-free measurement reference. All four outputs were 1080x1920, 24 fps, and 8.67 seconds, with twelve full-frame samples and twelve caption crops each. The three Box Punch V2 variants each generated 34 ASS dialogue events, retained one transcript-derived spoken-caption layer, reported safe sidecar placement, and left zero subtitle sidecars beside the root videos. Smart Emoji produced three keyword-provenanced decoration events and added Decoration to the recorded layer stack. Light Illustration produced no active event for this clip and recorded a safe cancellation rather than inventing an illustration. Visual review of the 36 styled frame samples confirmed centered captions, a maximum two-line composition, restrained phrase emphasis, preserved mobile-edge clearance, and no decoration-caption collision. The clean and Smart Emoji contact sheets differed only when a validated semantic decoration event was active, while the Light Illustration output correctly matched the clean composition when no eligible event existed.
 
 These measurements describe this font, source, and sample interval. They are product validation evidence, not a universal accessibility threshold. Final acceptance still requires rendered-frame inspection because glyph shape, language, and scene content vary.
 
@@ -74,11 +78,11 @@ Primary production templates:
 2. Clean Focus Large
 3. Minimal Medium
 
-Advanced experimental templates:
+Advanced creative templates:
 
-1. Viral Pop
-2. Box Punch
-3. Neon Karaoke
+1. Box Punch V2 — Production, explicit opt-in
+2. Viral Pop — Experimental
+3. Neon Karaoke — Experimental
 
 Additional niche recipes remain opt-in and are not substitutes for the production caption baseline.
 

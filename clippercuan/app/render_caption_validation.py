@@ -34,32 +34,44 @@ def choose_clip() -> dict:
     return next((item for item in clips if item.get("id") == "candidate_01"), clips[0])
 
 
-def load_words() -> list[dict]:
+def load_words(clip: dict) -> list[dict]:
+    """Prefer candidate-local words when validating an already rendered remote-project artifact."""
+    if clip.get("words"):
+        return clip["words"]
     payload = load_json(PROJECT / "transcript.json")
     return payload.get("words", payload if isinstance(payload, list) else [])
 
 
 def validation_configs() -> dict[str, dict]:
-    """Resolve requested variants from production recipes; overrides affect runtime only, never caption style."""
+    """Resolve Box Punch V2 variants from the production recipe with runtime-neutral overrides."""
     common = {
         "layout": "portrait", "smart_crop": False, "cut_silence": False,
         "caption_layers": 1, "source_has_burned_captions": "no",
         "quality": {"output": "1080", "encoder": "cpu", "sharpen": True},
-        "title": {"enabled": False}, "emoji": {"enabled": False},
+        "title": {"enabled": False},
         "progress_bar": {"enabled": False}, "cta": {"enabled": False},
         "watermark": {"enabled": False},
         "composition": {"subtle_punch_in": False, "scene_aware": False},
     }
     out = {"raw_measurement_reference": deep_merge(DEFAULTS, deep_merge(common, {
-        "caption": {"enabled": False, "template_id": "none/raw", "preset": "none/raw"}
+        "caption": {"enabled": False, "template_id": "none/raw", "preset": "none/raw"},
+        "decoration": {"mode": "none", "provenance": None, "max_active": 1},
+        "emoji": {"enabled": False},
     }))}
-    for label, recipe_id in (("clean_large", "recommended"),
-                             ("clean_focus_large", "clean-focus"),
-                             ("minimal_medium", "minimal-medium")):
-        cfg = deep_merge(DEFAULTS, RECIPES[recipe_id]["settings"])
+    variants = {
+        "box_punch_v2_clean": {"decoration": {"mode": "none", "provenance": None, "max_active": 1},
+                               "emoji": {"enabled": False, "provenance": "keyword"}},
+        "box_punch_v2_smart_emoji": {"decoration": {"mode": "smart_emoji", "provenance": "keyword", "max_active": 1},
+                                     "emoji": {"enabled": True, "size": 1.0, "provenance": "keyword"}},
+        "box_punch_v2_light_illustration": {"decoration": {"mode": "light_illustration", "provenance": "manual", "max_active": 1},
+                                            "emoji": {"enabled": False, "provenance": "manual"}},
+    }
+    for label, variant in variants.items():
+        cfg = deep_merge(DEFAULTS, RECIPES["box-punch"]["settings"])
         cfg = deep_merge(cfg, common)
-        cfg["recipe"] = recipe_id
-        cfg["recipe_applied"] = recipe_id
+        cfg = deep_merge(cfg, variant)
+        cfg["recipe"] = "box-punch"
+        cfg["recipe_applied"] = "box-punch"
         out[label] = cfg
     return out
 
@@ -86,16 +98,23 @@ def extract_frames(video: Path, frame_dir: Path, duration: float) -> list[dict]:
 def main() -> int:
     if not PROJECT.is_dir():
         raise FileNotFoundError(f"Project tidak ditemukan: {PROJECT}")
+    original = choose_clip()
     source = PROJECT / "source.mkv"
+    using_candidate_source = not source.is_file()
+    if using_candidate_source:
+        source = PROJECT / (original.get("file") or "candidate_01.mp4")
     if not source.is_file():
         raise FileNotFoundError(f"Source tidak ditemukan: {source}")
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    audit = PROJECT / f"caption_clean_validation_{stamp}"
+    audit = PROJECT / f"box_punch_v2_validation_{stamp}"
     audit.mkdir(parents=True, exist_ok=False)
     probe = media.probe(source)
-    original = choose_clip()
-    words = load_words()
+    words = load_words(original)
+    if using_candidate_source:
+        source_probe = media.probe(source)
+        duration = float(source_probe.duration or max((w.get("e", 0) for w in words), default=0))
+        original = {**original, "start": 0.0, "end": duration, "words": words}
     results = {}
 
     for label, cfg in validation_configs().items():
@@ -125,10 +144,12 @@ def main() -> int:
     report = {
         "schema_version": 2,
         "render_path": "clipper.render.render_clip (same production entrypoint used by API/UI)",
-        "configuration_source": "clipper.recipes.RECIPES; orchestration overrides are runtime-neutral",
+        "configuration_source": "clipper.recipes.RECIPES['box-punch']; orchestration overrides are runtime-neutral",
         "caption_style_overrides": False,
         "measurement_reference": "raw_measurement_reference is not an A/B candidate",
+        "validation_scope": "Box Punch V2 clean, smart emoji, and light illustration modes",
         "project": str(PROJECT), "audit": str(audit), "source": str(source),
+        "source_kind": "candidate-local-render" if using_candidate_source else "original-source",
         "clip": {"id": original.get("id"), "start": original["start"], "end": original["end"]},
         "frame_count_per_output": len(TIMES), "results": results,
     }
