@@ -39,13 +39,19 @@ function notify(title, body) {
 /* ---------------- router ---------------- */
 async function route() {
   clearInterval(pollT);
-  const h = location.hash.replace(/^#\/?/, '') || 'new';
+  const h = location.hash.replace(/^#\/?/, '') || 'home';
   const [page, id] = h.split('/');
+  const titles = { home: ['WORKSPACE', 'Beranda'], history: ['PROYEK', 'Semua proyek'], new: ['PRODUKSI', 'Produksi Baru'], queue: ['PRODUKSI', 'Antrean'], results: ['PUSTAKA', 'Hasil'], advanced: ['EDITOR', 'Studio Lanjutan'], settings: ['SISTEM', 'Pengaturan'] };
+  const title = titles[page] || ['CLIPPER CUAN', 'Workspace'];
+  if ($('#pageContext')) $('#pageContext').textContent = title[0];
+  if ($('#pageTitle')) $('#pageTitle').textContent = title[1];
+  document.body.classList.remove('nav-open');
+  $('#navScrim')?.setAttribute('hidden', '');
   $$('.side nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === page || (page === 'p' && a.dataset.nav === 'history')));
   document.body.classList.toggle('studio-mode', page === 'p' && !!id);
   if (!INFO) { [INFO, SETTINGS, HEALTH] = await Promise.all([api('/api/info'), api('/api/settings'), api('/api/health')]); $('#sideFoot').textContent = 'Data lokal siap'; paintAiHealth(); }
   if (page === 'p' && id) return pageProject(id);
-  const pages = { history: pageHistory, captions: pageCaptions, settings: pageSettings, templates: pageTemplates, system: pageSystem, help: pageHelp, agent: pageAgent };
+  const pages = { home: pageHome, history: pageHistory, queue: pageQueue, results: pageResults, advanced: pageAdvanced, captions: pageCaptions, settings: pageSettings, templates: pageTemplates, system: pageSystem, help: pageHelp, agent: pageAgent };
   return (pages[page] || (() => pageNew()))();
 }
 addEventListener('hashchange', route);
@@ -53,11 +59,41 @@ addEventListener('hashchange', route);
 async function badge() { try { const l = await api('/api/projects'); const n = l.filter(p => ['queued', 'running', 'rendering'].includes(p.status)).length; const b = $('#runBadge'); b.hidden = !n; b.textContent = n; } catch {} }
 setInterval(badge, 4000); badge();
 
+/* ================= BERANDA ================= */
+async function pageHome() {
+  const [projects, recipes, system] = await Promise.all([api('/api/projects').catch(() => []), getRecipes().catch(() => ({})), api('/api/system').catch(() => null)]);
+  const recent = projects.slice(0, 4), busy = projects.filter(p => ['queued', 'running', 'rendering'].includes(p.status));
+  const done = projects.filter(p => p.status === 'done');
+  const primary = Object.values(recipes).filter(r => r.surface === 'primary').slice(0, 3);
+  const statusLabel = { done: 'Selesai', running: 'Diproses', rendering: 'Render', queued: 'Menunggu', error: 'Gagal', candidates_ready: 'Kandidat siap', cancelled: 'Dibatalkan' };
+  view.innerHTML = `<section class="page home-page">
+    <section class="home-hero"><div><span class="kicker">WORKSPACE VIDEO</span><h1>Ubah video panjang menjadi klip yang siap ditinjau.</h1><p>Mulai produksi baru atau lanjutkan proyek terakhir. Semua pemrosesan berjalan dari service lokal.</p><div class="hero-actions"><a class="btn" href="#/new">Mulai dari video</a>${recent[0] ? `<a class="btn ghost" href="#/p/${esc(recent[0].id)}">Lanjutkan proyek</a>` : ''}</div></div><div class="hero-stat"><small>HASIL SIAP</small><strong>${done.reduce((n, p) => n + (+p.clips || 0), 0)}</strong><span>klip dari ${done.length} proyek</span></div></section>
+    <div class="home-grid"><section class="home-section recent-section"><div class="section-head"><div><h2>Proyek terbaru</h2><p>Lanjutkan dari status terakhir.</p></div><a href="#/history">Lihat semua</a></div><div class="recent-list">${recent.length ? recent.map(p => `<a class="recent-item" href="#/p/${esc(p.id)}"><div class="recent-thumb" ${p.thumb ? `style="background-image:url('/files/${esc(p.id)}/${esc(p.thumb)}')"` : ''}></div><div><b>${esc(p.title || 'Proyek tanpa judul')}</b><span>${new Date(p.created * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} · ${p.clips || 0} klip</span></div><em class="status-badge ${esc(p.status)}">${statusLabel[p.status] || esc(p.status)}</em></a>`).join('') : '<div class="empty compact"><b>Belum ada proyek</b><span>Mulai dari URL atau file video.</span><a class="btn sm" href="#/new">Buat klip pertama</a></div>'}</div></section>
+    <aside class="home-section queue-section"><div class="section-head"><div><h2>Antrean</h2><p>Status produksi saat ini.</p></div><a href="#/queue">Buka</a></div>${busy.length ? `<div class="queue-list">${busy.slice(0, 3).map(p => `<a href="#/p/${esc(p.id)}"><span class="status-dot busy"></span><div><b>${esc(p.title || 'Memproses video')}</b><small>${Math.round((p.progress || 0) * 100)}% · ${esc(p.message || 'Menunggu')}</small></div></a>`).join('')}</div>` : '<div class="quiet-state"><span class="status-dot ok"></span><div><b>Tidak ada proses aktif</b><small>Antrean siap menerima produksi baru.</small></div></div>'}</aside></div>
+    <section class="home-section preset-section"><div class="section-head"><div><h2>Preset populer</h2><p>Tiga gaya utama untuk mulai cepat.</p></div></div><div class="popular-presets">${primary.map(r => `<a href="#/new" data-home-recipe="${esc(r.id)}"><span>${esc(r.category || 'Preset')}</span><b>${esc(r.label)}</b><small>${esc(r.desc)}</small></a>`).join('')}</div></section>
+    <footer class="service-strip"><span><i class="status-dot ok"></i> Service lokal aktif</span><span>Storage ${system ? esc(String(system.disk_free_gb)) + ' GB tersedia' : 'siap'}</span><span>Clipper Cuan ${esc(INFO.version)}</span></footer>
+  </section>`;
+  $$('[data-home-recipe]').forEach(a => a.onclick = () => store.set('homeRecipe', a.dataset.homeRecipe));
+}
+
+async function pageQueue() {
+  const projects = (await api('/api/projects')).filter(p => ['queued', 'running', 'rendering', 'error', 'cancelled'].includes(p.status));
+  view.innerHTML = `<section class="page"><header class="page-h"><h1>Antrean produksi</h1><p>Proses aktif, gagal, dan yang dapat dilanjutkan.</p></header><div class="queue-page">${projects.length ? projects.map(p => `<a class="queue-row" href="#/p/${esc(p.id)}"><span class="status-dot ${p.status === 'error' ? 'bad' : ['running','rendering','queued'].includes(p.status) ? 'busy' : ''}"></span><div><b>${esc(p.title || p.id)}</b><small>${esc(p.message || p.status)}</small></div><strong>${Math.round((p.progress || 0) * 100)}%</strong></a>`).join('') : '<div class="empty"><b>Antrean kosong</b><span>Tidak ada proses aktif atau gagal.</span></div>'}</div></section>`;
+}
+async function pageResults() { location.hash = '#/history'; setTimeout(() => { const tab = $('#hTab [data-v="c"]'); if (tab) tab.click(); }, 0); }
+async function pageAdvanced() {
+  const projects = await api('/api/projects');
+  const ready = projects.filter(p => (p.clips || 0) > 0 || ['candidates_ready', 'done'].includes(p.status));
+  view.innerHTML = `<section class="page"><header class="page-h"><h1>Studio Lanjutan</h1><p>Pilih proyek dengan kandidat atau hasil untuk membuka editor.</p></header><div class="project-picker">${ready.length ? ready.map(p => `<a class="picker-row" href="#/p/${esc(p.id)}"><div><b>${esc(p.title || p.id)}</b><span>${p.clips || 0} klip · ${esc(p.status)}</span></div><span>Buka studio</span></a>`).join('') : '<div class="empty"><b>Belum ada proyek untuk diedit</b><span>Buat kandidat dari Produksi Baru terlebih dahulu.</span><a class="btn sm" href="#/new">Produksi Baru</a></div>'}</div></section>`;
+}
+
 /* ================= PROYEK BARU ================= */
 async function pageNew(override) {
   view.replaceChildren(tpl('tpl-new'));
   const templates = await api('/api/templates').catch(() => ({}));
+  const homeRecipe = store.get('homeRecipe', ''); store.set('homeRecipe', '');
   const cfg = merge(INFO.defaults, override || store.get('lastSettings', {}));
+  if (homeRecipe) cfg.recipe = homeRecipe;
   let srcMode = store.get('srcMode', 'link'), upload = null;
 
   // template
@@ -265,6 +301,39 @@ async function pageNew(override) {
       if (sources.length > 1) toast(`${sources.length} proyek masuk antrean`);
     } catch (e) { toast(e.message, true); start.disabled = false; start.classList.remove('is-loading'); start.querySelector('span').textContent = '▶ Run pipeline'; }
   };
+
+  let wizardStep = Math.max(1, Math.min(6, store.get('clipperWizardStep', 1)));
+  const stepGroups = {
+    1: ['.source-card'],
+    2: ['.primary-settings .card:first-child'],
+    3: ['.section-divider', '.profile-card'],
+    4: ['.auto-card'],
+    5: ['.recipe-card', '#capCard'],
+    6: ['.tpl-bar', '.go']
+  };
+  const allWizardSelectors = [...new Set(Object.values(stepGroups).flat())];
+  const syncSummary = () => {
+    $('#sumSource').textContent = srcMode === 'link' ? (links()[0] ? 'Link video' : 'Link belum diisi') : (upload ? 'File siap' : 'File lokal');
+    $('#sumLanguage').textContent = ({ auto: 'Otomatis ID/EN', id: 'Indonesia', en: 'English' })[$('#language').value] || $('#language').value;
+    $('#sumProfile').textContent = contentProfile === 'auto' ? 'Auto' : contentProfile.replace('_', ' ');
+    $('#sumCandidates').textContent = `${$('#candidate_count').value || 15} kandidat`;
+    const selectedRecipe = $('[data-r].on b'); $('#sumStyle').textContent = selectedRecipe?.textContent || 'Clean Large';
+  };
+  const paintWizard = () => {
+    allWizardSelectors.forEach(sel => $$(sel).forEach(el => el.classList.add('wizard-hidden')));
+    (stepGroups[wizardStep] || []).forEach(sel => $$(sel).forEach(el => el.classList.remove('wizard-hidden')));
+    $$('#wizardStepper li').forEach(li => { const n = +li.dataset.step; li.classList.toggle('on', n === wizardStep); li.classList.toggle('done', n < wizardStep); });
+    $('#wizardBack').disabled = wizardStep === 1;
+    $('#wizardNext').hidden = wizardStep === 6;
+    $('#wizardProgress').textContent = `Tahap ${wizardStep} dari 6`;
+    store.set('clipperWizardStep', wizardStep); syncSummary(); scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  $('#wizardBack').onclick = () => { wizardStep--; paintWizard(); };
+  $('#wizardNext').onclick = () => { wizardStep++; paintWizard(); };
+  $$('#wizardStepper button').forEach(button => button.onclick = () => { const target = +button.parentElement.dataset.step; if (target <= wizardStep + 1) { wizardStep = target; paintWizard(); } });
+  $('#summaryToggle').onclick = () => { const body = $('.summary-body', $('#wizardSummary')); body.hidden = !body.hidden; $('#summaryToggle').setAttribute('aria-expanded', String(!body.hidden)); };
+  view.addEventListener('input', syncSummary); view.addEventListener('change', syncSummary); view.addEventListener('click', e => { if (e.target.closest('[data-r], #contentProfile button')) setTimeout(syncSummary); });
+  paintWizard();
 }
 
 /* ---------------- dialog umum ---------------- */
@@ -527,4 +596,12 @@ async function pageSettings() {
   };
 }
 
-addEventListener('DOMContentLoaded', () => route().catch(e => { view.innerHTML = `<section class="page"><div class="empty">Gagal memuat: ${esc(e.message)}</div></section>`; }));
+addEventListener('DOMContentLoaded', () => {
+  const sideToggle = $('#sideToggle'), mobileMenu = $('#mobileMenu'), scrim = $('#navScrim');
+  sideToggle.onclick = () => { const compact = document.body.classList.toggle('side-compact'); sideToggle.setAttribute('aria-expanded', String(!compact)); store.set('clipperSideCompact', compact); };
+  if (store.get('clipperSideCompact', false)) document.body.classList.add('side-compact');
+  mobileMenu.onclick = () => { document.body.classList.add('nav-open'); scrim.hidden = false; };
+  scrim.onclick = () => { document.body.classList.remove('nav-open'); scrim.hidden = true; };
+  addEventListener('keydown', e => { if (e.key === 'Escape') { document.body.classList.remove('nav-open'); scrim.hidden = true; const d = $('dialog[open]'); if (d) d.close(); } });
+  route().catch(e => { view.innerHTML = `<section class="page"><div class="empty">Gagal memuat: ${esc(e.message)}</div></section>`; });
+});

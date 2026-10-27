@@ -9,34 +9,43 @@
 </head>
 <body>
 <a class="skip-link" href="#view">Lewati ke konten utama</a>
-<aside class="side" aria-label="Navigasi utama">
-  <a class="brand" href="http://127.0.0.1:3210" title="Kembali ke Creator Control Center"><span class="logo">C</span><span class="brand-copy"><b>Creator</b><small>Clipper Cuan</small></span></a>
+<aside class=side aria-label=Navigasi utama>
+  <div class=side-head><a class=brand href=#/home aria-label=Clipper Cuan><span class=logo aria-hidden=true>C</span><span class=brand-copy><b>Clipper Cuan</b><small>Video workspace</small></span></a><button class=side-toggle id=sideToggle type=button aria-label=Ringkas sidebar aria-expanded=true><span aria-hidden=true>&lsaquo;</span></button></div>
   <nav>
-    <a href="#/new" data-nav="new">＋ Proyek baru</a>
-    <a href="#/history" data-nav="history">▤ Riwayat <span class="badge" id="runBadge" hidden></span></a>
-    <a href="#/captions" data-nav="captions">▣ Transcript & Caption</a>
-    <a href="#/templates" data-nav="templates">◧ Template gaya</a>
-    <a href="#/system" data-nav="system">◉ Cek sistem</a>
-    <a href="#/agent" data-nav="agent">⚡ AI Agent &amp; otomatisasi</a>
-    <a href="#/settings" data-nav="settings">⚙ Pengaturan</a>
-    <a href="#/help" data-nav="help">？ Bantuan</a>
+    <a href=#/home data-nav=home><i class=nav-icon nav-home aria-hidden=true></i><span>Beranda</span></a>
+    <a href=#/history data-nav=history><i class=nav-icon nav-projects aria-hidden=true></i><span>Proyek</span><span class=badge id=runBadge hidden></span></a>
+    <a href=#/new data-nav=new><i class=nav-icon nav-new aria-hidden=true></i><span>Produksi Baru</span></a>
+    <a href=#/queue data-nav=queue><i class=nav-icon nav-queue aria-hidden=true></i><span>Antrean</span></a>
+    <a href=#/results data-nav=results><i class=nav-icon nav-results aria-hidden=true></i><span>Hasil</span></a>
+    <a href=#/advanced data-nav=advanced><i class=nav-icon nav-studio aria-hidden=true></i><span>Studio Lanjutan</span></a>
+    <a href=#/settings data-nav=settings><i class=nav-icon nav-settings aria-hidden=true></i><span>Pengaturan</span></a>
   </nav>
-  <div class="side-foot"><div class="local-note"><span class="pulse"></span><div><b>Local-first</b><small id="sideFoot">Memuat sistem…</small></div></div></div>
+  <div class=side-foot><div class=local-note><span class=status-dot></span><div><b>Service lokal</b><small id=sideFoot>Memuat sistem...</small></div></div></div>
 </aside>
 
-<main><div class="topbar"><div><p class="eyebrow">CREATOR CONTROL CENTER / CLIPPER CUAN</p><strong>Studio repurpose video</strong></div><div class="ai-health" id="aiHealth" role="status" aria-live="polite"><span class="status-dot"></span><span>Memeriksa AI…</span></div></div><div id="view" aria-live="polite"><section class="page"><div class="loading-state"><span class="spin"></span><b>Menyiapkan studio…</b></div></section></div></main>
+<main><div class=topbar><div class=topbar-context><button class=mobile-menu id=mobileMenu type=button aria-label=Buka navigasi><span></span><span></span><span></span></button><div><p class=eyebrow id=pageContext>CLIPPER CUAN</p><strong id=pageTitle>Beranda</strong></div></div><div class=top-actions><div class=ai-health id=aiHealth role=status aria-live=polite><span class=status-dot></span><span>Memeriksa service...</span></div><a class=btn sm href=#/new>Buat Klip</a></div></div><div id=view aria-live=polite><section class=page><div class=loading-state><span class=spin></span><b>Menyiapkan workspace...</b></div></section></div></main>
+<div class=nav-scrim id=navScrim hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- ================= TEMPLATES ================= -->
 <template id="tpl-new">
   <section class="page new-project">
-    <header class="page-h hero-head compact"><div><p class="eyebrow">PROYEK BARU</p><h1>Satu link jadi puluhan klip siap upload.</h1><p>Tempel link atau pilih file, pilih resep gaya, lalu Run pipeline. Proses berjalan di perangkat ini.</p></div></header>
+    <header class="page-h wizard-heading"><div><p class="eyebrow">PRODUKSI BARU</p><h1>Buat klip dalam enam langkah</h1><p>Pilih keputusan penting satu per satu. Pengaturan tersimpan otomatis.</p></div></header>
+    <ol class="wizard-stepper" id="wizardStepper" aria-label="Tahap produksi">
+      <li class="on" data-step="1"><button type="button"><span>1</span><b>Sumber</b></button></li>
+      <li data-step="2"><button type="button"><span>2</span><b>Bahasa</b></button></li>
+      <li data-step="3"><button type="button"><span>3</span><b>Profil</b></button></li>
+      <li data-step="4"><button type="button"><span>4</span><b>Kandidat</b></button></li>
+      <li data-step="5"><button type="button"><span>5</span><b>Caption</b></button></li>
+      <li data-step="6"><button type="button"><span>6</span><b>Review</b></button></li>
+    </ol>
+    <div class="wizard-layout"><div class="wizard-content">
 
     <div class="card source-card">
       <div class="section-title"><span class="step-number">01</span><div><h2>Pilih sumber video</h2><p>Gunakan URL publik atau unggah file dari perangkat.</p></div></div>
       <div class="seg" id="srcTabs"><button class="on" data-src="link">Link video</button><button data-src="file">File lokal</button></div>
       <div id="srcLink" class="src-pane">
-        <div class="url-row"><textarea id="url" class="in big" rows="2" placeholder="https://youtube.com/watch?v=…  (YouTube, TikTok, IG, dll.)&#10;Bisa banyak link sekaligus — satu link per baris" autocomplete="off" spellcheck="false"></textarea><button class="btn big" type="button" id="startTop">▶ Run pipeline</button></div>
+        <div class="url-row"><textarea id="url" class="in big" rows="2" placeholder="Tempel URL YouTube, TikTok, atau Instagram&#10;Satu URL per baris" autocomplete="off" spellcheck="false"></textarea><button class="btn big" type="button" id="startTop">Lanjut</button></div>
         <p class="hint" id="urlCount"></p>
         <div class="fx-row lite-row"><div><b>Hemat disk — jangan unduh video penuh</b><span>Momen terbaik dicari dari subtitle YouTube (tanpa unduh apa pun) atau dari audio saja. Yang diunduh hanya potongan klip terpilih, lalu langsung dihapus setelah dirender. Butuh internet saat render.</span><span class="lite-est" id="liteEst"></span></div><label class="sw"><input type="checkbox" id="storage_lite"><span></span></label></div>
       </div>
@@ -44,7 +53,7 @@
         <label class="drop" id="drop"><input type="file" id="file" accept="video/*" hidden>
           <b>Tarik &amp; lepas video di sini</b><span>atau klik untuk memilih (mp4, mov, mkv, webm) · file dipindah ke proyek, tidak diduplikasi</span><em id="fileName"></em>
           <div class="bar" hidden id="upBar"><i></i></div></label>
-        <div class="url-row end"><button class="btn big" type="button" id="startTop2">▶ Run pipeline</button></div>
+        <div class="url-row end"><button class="btn big" type="button" id="startTop2">Lanjut</button></div>
       </div>
     </div>
 
@@ -66,7 +75,7 @@
       <button class="btn ghost sm" id="tplSave" type="button">Simpan sebagai template</button>
     </div>
 
-    <ol class="production-flow" aria-label="Alur produksi"><li class="on">1 · Sumber</li><li>2 · Profil & gaya</li><li>3 · Kandidat</li><li>4 · Bandingkan</li><li>5 · Gaya & crop</li><li>6 · Preview</li><li>7 · Render</li><li>8 · Review</li></ol>
+    <div class="production-flow" hidden aria-hidden="true" data-workflow-contract="source-profile-candidates-compare-style-preview-render-review"></div>
     <div class="section-divider"><span class="step-number">03</span><div><h2>Pilih profil konten</h2><p>Profil backend mengatur scoring, durasi, crop, caption, hook, safe zone, dekorasi, dan kebijakan speaker. Auto menjelaskan pilihan dan memakai General saat confidence rendah.</p></div></div>
     <div class="card profile-card">
       <h3>Content profile</h3>
@@ -203,7 +212,9 @@
       </div>
     </div></details>
 
-    <div class="go sticky-action"><div><b>Siap membuat opsi konten?</b><span class="hint" id="startHint">Kandidat dibuat dan diranking sebelum render.</span></div><button class="btn big" id="start"><span>▶ Run pipeline</span><small>Unduh · transkripsi · cari momen · ranking</small></button></div>
+    <div class="go sticky-action"><div><b>Siap membuat kandidat?</b><span class="hint" id="startHint">Sistem mengunduh, membuat subtitle, lalu meranking kandidat.</span></div><button class="btn big" id="start"><span>Buat Kandidat</span><small>Belum merender video</small></button></div>
+    <div class="wizard-nav" aria-label="Navigasi tahap"><button class="btn ghost" id="wizardBack" type="button">Kembali</button><span id="wizardProgress">Tahap 1 dari 6</span><button class="btn" id="wizardNext" type="button">Lanjut</button></div>
+    </div><aside class="wizard-summary" id="wizardSummary"><button type="button" class="summary-toggle" id="summaryToggle" aria-expanded="true"><span>Ringkasan</span><span aria-hidden="true">⌄</span></button><div class="summary-body"><dl><dt>Sumber</dt><dd id="sumSource">Belum dipilih</dd><dt>Bahasa</dt><dd id="sumLanguage">Otomatis ID/EN</dd><dt>Profil</dt><dd id="sumProfile">Auto</dd><dt>Kandidat</dt><dd id="sumCandidates">15 kandidat</dd><dt>Gaya</dt><dd id="sumStyle">Clean Large</dd></dl><p>Semua pilihan dapat diubah sebelum kandidat dibuat.</p></div></aside></div>
   </section>
 </template>
 

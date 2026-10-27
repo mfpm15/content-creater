@@ -32,5 +32,8 @@ tmp/
 *.mp3
 *.wav
 
+# local visual audit artifacts
+.ui-audit/
+
 # huge macOS fonts (>50MB)
 creator-dashboard/apps/moneyprinterturbo/resource/fonts/STHeiti*.ttc
