@@ -118,10 +118,12 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
     safe = max(.08, min(.28, float(cap.get("safe_area", .12))))
     margin_v = int(H * (max(.18, safe) if align == 2 else safe if align == 8 else 0))
     white, hl = _ass_color(cap["color"]), _ass_color(cap["highlight"])
+    outline = max(int(float(cap.get("outline", 3)) * scale), 1)
+    shadow = max(int(float(cap.get("shadow", 0)) * scale), 0)
     tfs = int(ttl["size"] * scale)
 
     styles = [
-        f"Style: Cap,{font},{fs},{white},{white},&H00000000,&H64000000,0,{italic},0,0,100,100,0,0,1,{max(int(5 * scale), 2)},{int(2 * scale)},{align},60,60,{margin_v},1",
+        f"Style: Cap,{font},{fs},{white},{white},&H00000000,&H64000000,0,{italic},0,0,100,100,0,0,1,{outline},{shadow},{align},60,60,{margin_v},1",
         f"Style: CapBox,{font},{fs},&HFF000000,&HFF000000,{hl},&HFF000000,0,{italic},0,0,100,100,0,0,3,{max(int(10 * scale), 4)},0,{align},60,60,{margin_v},1",
         f"Style: TitleBar,{font},{tfs},&H00000000,&H00000000,{hl},&H00000000,0,0,0,0,100,100,0,0,3,{int(18 * scale)},0,8,90,90,{int(H * 0.10)},1",
         f"Style: TitleOutline,{font},{tfs},&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,{max(int(9 * scale), 4)},{max(int(4 * scale), 2)},8,90,90,{int(H * 0.10)},1",

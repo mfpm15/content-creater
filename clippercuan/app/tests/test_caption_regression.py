@@ -69,6 +69,28 @@ def test_tech_review_default_is_recommended_clean_single_caption():
     assert recipe["settings"]["caption"]["box"] is False
     assert recipe["settings"]["title"]["enabled"] is False
     assert recipe["settings"]["caption_layers"] == 1
+    assert recipe["settings"]["caption"]["size"] <= 64
+    assert recipe["settings"]["caption"]["outline"] <= 3
+    assert recipe["settings"]["caption"]["shadow"] == 0
+    assert recipe["settings"]["caption"]["words_per_line"] <= 4
+    assert recipe["settings"]["caption"]["max_chars"] <= 28
+
+
+def test_clean_ass_uses_configured_thin_outline_without_shadow():
+    cfg = deep_merge(DEFAULTS, {"caption": {"style": "clean", "outline": 3, "shadow": 0}})
+    ass = captions.build_ass(_words("caption bersih tidak boleh memiliki outline tebal"), "", cfg, (1080, 1920), 8)
+    cap_style = next(line for line in ass.splitlines() if line.startswith("Style: Cap,"))
+    fields = cap_style.split(",")
+    assert fields[16] == "3"
+    assert fields[17] == "0"
+
+
+def test_render_exports_sidecars_outside_mp4_directory_basename_contract():
+    source = Path(render.__file__).read_text("utf-8")
+    assert 'subtitle_dir = work / "subtitles"' in source
+    assert '"sidecar_autoload_safe": True' in source
+    assert '"srt": f"subtitles/{cid}.srt"' in source
+    assert '"ass": f"subtitles/{cid}.ass"' in source
 
 
 def test_duo_is_hook_style_not_duplicate_transcript():

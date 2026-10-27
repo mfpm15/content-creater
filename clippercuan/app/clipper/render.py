@@ -163,8 +163,12 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     ass_name = f"{cid}.ass"
     if cfg.get("source_has_burned_captions") == "yes":
         cfg = {**cfg, "caption": {**cfg["caption"], "enabled": False}}
-    (work / ass_name).write_text(captions.build_ass(sub_words, clip.get("title", ""), cfg, size, out_dur), "utf-8")
-    (work / f"{cid}.srt").write_text(captions.build_srt(sub_words, int(cfg["caption"].get("words_per_line", 3))), "utf-8")
+    # ASS harus berada di work selama FFmpeg berjalan. Ekspor subtitle dipindahkan
+    # sesudah render agar player tidak memuat sidecar bernama sama dengan MP4 burned-in.
+    ass_path = work / ass_name
+    srt_path = work / f"{cid}.srt"
+    ass_path.write_text(captions.build_ass(sub_words, clip.get("title", ""), cfg, size, out_dur), "utf-8")
+    srt_path.write_text(captions.build_srt(sub_words, int(cfg["caption"].get("words_per_line", 3))), "utf-8")
 
     wm = cfg["watermark"]
     use_img = wm["enabled"] and wm.get("image") and Path(wm["image"]).is_file()
@@ -283,11 +287,23 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
         enc, vargs = media.video_codec_args(size[1], "cpu")
         run(args + vargs + tail, cwd=work)
     tmp.replace(out)
+    subtitle_dir = work / "subtitles"
+    subtitle_dir.mkdir(exist_ok=True)
+    exported_ass = subtitle_dir / ass_name
+    exported_srt = subtitle_dir / f"{cid}.srt"
+    if exported_ass.exists():
+        exported_ass.unlink()
+    if exported_srt.exists():
+        exported_srt.unlink()
+    ass_path.replace(exported_ass)
+    srt_path.replace(exported_srt)
     grab_frame(out, min(1.0, out_dur / 2), work / f"{cid}.jpg", width=540)
     up = upscale_factor(layout, pr, cfg)
     smart = layout in ("portrait", "square") and cfg.get("smart_crop") and pr.width / pr.height > SIZES[layout][0] / SIZES[layout][1]
     crop_confidence = (0.0 if not keys else min(1.0, max(.35, len(keys) / max(out_dur / 4, 1)))) if smart else 1.0
-    return {"file": out.name, "thumb": f"{cid}.jpg", "srt": f"{cid}.srt", "crop_keys": keys, "words": cw,
+    return {"file": out.name, "thumb": f"{cid}.jpg", "srt": f"subtitles/{cid}.srt",
+            "ass": f"subtitles/{cid}.ass", "sidecar_autoload_safe": True,
+            "crop_keys": keys, "words": cw,
             "duration": round(out_dur, 2), "cut_saved": round(dur - out_dur, 2), "emojis": [e["code"] for e in emojis],
             "caption_cues": len(captions.chunk_words(sub_words, int(cfg["caption"].get("words_per_line", 3)))),
             "caption_layers": 1, "caption_provenance": "ASS:spoken-caption",

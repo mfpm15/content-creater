@@ -71,14 +71,16 @@ DEFAULTS: dict = {
         "preset": "clean-pro",
         "style": "clean",        # box | wbw | karaoke | clean | keyword
         "font": "Barlow Condensed",
-        "size": 76,
+        "size": 64,
+        "outline": 3,
+        "shadow": 0,
         "color": "#FFFFFF",
         "highlight": "#FFD166",
         "uppercase": False,
-        "words_per_line": 6,
+        "words_per_line": 4,
         "position": "bottom",    # bottom | middle | top
-        "safe_area": 0.15,
-        "max_chars": 34,
+        "safe_area": 0.18,
+        "max_chars": 28,
         "animation": "none",     # pop | none
         "box": False,            # kotak berwarna mengikuti kata aktif (bisa dipadu gaya apa pun)
         "effect": "none",        # none | glow
