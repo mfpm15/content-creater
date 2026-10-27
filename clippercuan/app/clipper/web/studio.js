@@ -132,7 +132,7 @@ async function pageProject(pid) {
   view.innerHTML = `<section class="studio">
     <header class="st-head">
       <div class="st-title"><a href="#/history" class="st-back" title="Kembali ke riwayat">←</a><div><small id="sMeta" class="muted"></small><h1 id="sTitle">Memuat…</h1></div></div>
-      <div class="acts"><button class="btn ghost sm" id="sFolder">Buka folder</button><button class="btn ghost sm" id="sRetry" hidden>Ulangi</button><button class="btn ghost sm danger" id="sCancel" hidden>Batalkan</button><a class="btn ghost sm" id="sManifest" target="_blank">Manifest</a><a class="btn sm" id="sZip">⬇ Download semua (ZIP)</a></div>
+      <div class="acts"><button class="btn ghost sm" id="sDetail">Detail</button><button class="btn ghost sm" id="sFolder">Buka folder</button><button class="btn ghost sm" id="sRetry" hidden>Ulangi</button><button class="btn ghost sm danger" id="sCancel" hidden>Batalkan</button><a class="btn ghost sm" id="sManifest" target="_blank">Manifest</a><a class="btn sm" id="sZip">Download ZIP</a></div>
     </header>
     <div class="st-progress" id="sProg"><i id="sBar"></i></div>
     <p class="warn" id="sWarn" hidden></p><p class="st-auto" id="sAuto" hidden></p>
@@ -140,23 +140,23 @@ async function pageProject(pid) {
     <div class="st-main">
       <div class="st-stage">
         <div class="st-phone" id="sPhone"><video playsinline preload="metadata"></video><img alt="" hidden><div class="cc-title"></div><div class="cc-cap"></div><div class="cc-decoration" hidden aria-hidden="true"></div><div class="cc-wm" hidden></div><div class="cc-pb" hidden></div><div class="safe" hidden></div><div class="layer-badge" id="sLayerBadge">1 layer subtitle</div><div class="st-empty" id="sEmpty"><span class="spin"></span><b>Menyiapkan kandidat…</b><small>Unduh · transkripsi · cari momen</small></div></div>
-        <div class="st-stage-bar"><button class="btn ghost sm" id="sPrev" title="Klip sebelumnya">‹</button><button class="btn sm st-play" id="sPlay">▶</button><button class="btn ghost sm" id="sNext" title="Klip berikutnya">›</button><span id="sTime" class="muted">0:00</span><span class="sp"></span><span class="st-mode" id="sMode"></span><label class="check sm"><input type="checkbox" id="sSafe"> Safe area</label></div>
+        <div class="st-stage-bar"><button class="btn ghost sm" id="sPrev" title="Klip sebelumnya" aria-label="Klip sebelumnya"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button class="btn sm st-play" id="sPlay" aria-label="Putar preview"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></svg></button><button class="btn ghost sm" id="sNext" title="Klip berikutnya" aria-label="Klip berikutnya"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button><span id="sTime" class="muted">0:00</span><span class="sp"></span><span class="st-mode" id="sMode"></span><label class="check sm"><input type="checkbox" id="sSafe"> Safe area</label></div>
       </div>
       <aside class="st-panel">
-        <div class="st-tabs" role="tablist"><button data-tab="style" class="on">Instant style</button><button data-tab="clip">Clip setting</button><button data-tab="brand">Branding & efek</button></div>
-        <div class="st-tab" data-tab="style"></div><div class="st-tab" data-tab="clip" hidden></div><div class="st-tab" data-tab="brand" hidden></div>
+        <div class="st-tabs" role="tablist" aria-label="Inspector"><button role="tab" aria-selected="true" data-tab="style" class="on">Caption</button><button role="tab" aria-selected="false" data-tab="clip">Frame</button><button role="tab" aria-selected="false" data-tab="brand">Dekorasi</button><button role="tab" aria-selected="false" data-tab="audio">Audio</button></div>
+        <div class="st-tab" role="tabpanel" data-tab="style"></div><div class="st-tab" role="tabpanel" data-tab="clip" hidden></div><div class="st-tab" role="tabpanel" data-tab="brand" hidden></div><div class="st-tab" role="tabpanel" data-tab="audio" hidden><div class="pn-sec"><h4>Audio</h4><p class="muted">Musik, volume, dan ducking mengikuti pengaturan proyek.</p></div></div>
         <div class="st-apply" id="sApply" hidden><span>Gaya diubah</span><button class="btn ghost sm" id="sSaveStyle">Simpan</button><button class="btn sm" id="sRestyle">Simpan & render ulang</button></div>
       </aside>
     </div>
     <section class="st-strip">
-      <div class="st-strip-h"><div class="st-count"><small>DETECTED CLIPS</small><b id="sCount">0</b><span id="sCountTxt" class="muted"></span></div>
-        <div class="acts"><div class="seg sm" id="sFilter"><button data-f="all" class="on">All</button><button data-f="hot">🔥 Hot</button><button data-f="sel">Terpilih</button><button data-f="done">Rendered</button></div>
+      <div class="st-strip-h"><div class="st-count"><small>KANDIDAT</small><b id="sCount">0</b><span id="sCountTxt" class="muted"></span></div>
+        <div class="acts"><div class="seg sm" id="sFilter"><button data-f="all" class="on">Semua</button><button data-f="hot">Skor tinggi</button><button data-f="sel">Terpilih</button><button data-f="done">Dirender</button></div>
           <select class="in sm" id="sGoal" aria-label="Urutkan"><option value="best_overall">Urut: skor terbaik</option><option value="strongest_hook">Hook terkuat</option><option value="densest_insight">Insight terpadat</option><option value="most_emotional">Paling emosional</option><option value="easiest_to_understand">Mudah dipahami</option><option value="series_potential">Potensi seri</option><option value="time">Waktu sumber</option></select>
           <input class="in sm" id="sSearch" type="search" placeholder="Cari…" aria-label="Cari klip">
           <button class="btn ghost sm" id="sTop3">Pilih top 3</button><button class="btn ghost sm" id="sTop5">Top 5</button><button class="btn ghost sm" id="sNone">Kosongkan</button><button class="btn ghost sm" id="sAdd">＋ Manual</button><button class="btn ghost sm" id="sSplit" hidden>Area split</button></div></div>
       <div class="st-cards" id="sCards"></div>
     </section>
-    <footer class="st-foot"><span class="status-dot" id="sDot"></span><b>Render</b><span id="sFootMsg" class="muted ell"></span><span class="sp"></span><span id="sFootPct"></span><span class="hot">🔥 <b id="sHot">0</b></span><button class="btn" id="sRender">Render terpilih</button><button class="btn ghost sm" id="sLog">Log</button></footer>
+    <footer class="st-foot"><span class="status-dot" id="sDot"></span><b>Render</b><span id="sFootMsg" class="muted ell"></span><span class="sp"></span><span id="sFootPct"></span><span class="hot">Skor tinggi <b id="sHot">0</b></span><button class="btn" id="sRender">Render terpilih</button><button class="btn ghost sm" id="sLog">Log</button></footer>
   </section>`;
 
   const phone = $('#sPhone'), vid = $('video', phone), img = $('img', phone);
@@ -165,6 +165,7 @@ async function pageProject(pid) {
 
   /* ---------- preview ---------- */
   const clipOf = id => P?.clips.find(c => c.id === id);
+  const previewTime = c => Number.isFinite(+c?.start) ? +c.start + 1 : 1;
   const rel = () => cur && cur.status === 'done' && cur.file ? vid.currentTime : vid.currentTime - (cur?.start || 0);
   const live = () => !(cur && cur.status === 'done' && cur.file);   // klip jadi = video hasil render (overlay sudah terbakar)
   function tick() {
@@ -206,7 +207,7 @@ async function pageProject(pid) {
       $('.cc-cap', phone).innerHTML = ''; $('.cc-title', phone).innerHTML = ''; $('.cc-wm', phone).hidden = true; $('.cc-pb', phone).hidden = true;
       $('#sMode').textContent = 'Hasil render'; $('#sMode').className = 'st-mode done';
     } else if (P.media.remote) {
-      vid.hidden = true; img.hidden = false; img.src = `/api/projects/${P.id}/frame?t=${(c.start + 1).toFixed(1)}`;
+      vid.hidden = true; img.hidden = false; img.src = `/api/projects/${P.id}/frame?t=${previewTime(c).toFixed(1)}`;
       $('#sMode').textContent = 'Preview gaya (mode hemat: frame)'; $('#sMode').className = 'st-mode';
       cropPreview(c, img); tick();
     } else {
@@ -247,8 +248,8 @@ async function pageProject(pid) {
       $('.ck input', el).onchange = e => api(`/api/projects/${P.id}/candidates/${c.id}/action`, { method: 'POST', body: { action: 'selected', value: e.target.checked } }).then(load).catch(err => toast(err.message, true));
       cardEls.set(c.id, el);
     }
-    const thumb = c.status === 'done' && c.thumb ? `/files/${P.id}/${c.thumb}?v=${c.version}` : `/api/projects/${P.id}/frame?t=${(c.start + 1).toFixed(1)}`;
-    const im = $('img', el); if (im.dataset.src !== thumb) { im.dataset.src = thumb; im.src = thumb; }
+    const thumb = c.status === 'done' && c.thumb ? `/files/${P.id}/${c.thumb}?v=${c.version}` : `/api/projects/${P.id}/frame?t=${previewTime(c).toFixed(1)}`;
+    const im = $('img', el); im.onerror = () => { im.onerror = null; im.removeAttribute('src'); }; if (im.dataset.src !== thumb) { im.dataset.src = thumb; im.src = thumb; }
     $('.no', el).textContent = c.rank ? '#' + String(c.rank).padStart(2, '0') : '··';
     $('.ck input', el).checked = !!c.selected;
     $('.sc', el).textContent = c.manual ? 'manual' : `${isHot(c) ? '🔥 ' : ''}${score10(c)}/10`; $('.sc', el).classList.toggle('hot', isHot(c));
@@ -280,6 +281,7 @@ async function pageProject(pid) {
     if (styleDirty) await saveStyle(false);
     api(`/api/projects/${pid}/batch-render`, { method: 'POST', body: { ids: [] } }).then(r => { toast('Render dimulai'); load(r); }).catch(e => toast(e.message, true));
   };
+  $('#sDetail').onclick = () => openDlg(b => { b.innerHTML = `<h2>Detail teknis</h2><dl class="kv"><dt>Proyek</dt><dd>${esc(P.id)}</dd><dt>Sumber</dt><dd>${esc(P.source)}</dd><dt>Status</dt><dd>${esc(P.status)}</dd><dt>Engine</dt><dd>${esc(P.engine || 'lokal')}</dd><dt>Pesan</dt><dd>${esc(P.message || 'Tidak ada')}</dd></dl>`; });
   $('#sFolder').onclick = () => api(`/api/projects/${pid}/open-folder`, { method: 'POST' }).then(r => toast('Folder: ' + r.path)).catch(e => toast(e.message, true));
   $('#sCancel').onclick = () => api(`/api/projects/${pid}/cancel`, { method: 'POST' }).then(() => toast('Membatalkan…'));
   $('#sRetry').onclick = () => api(`/api/projects/${pid}/retry`, { method: 'POST' }).then(load);
@@ -287,7 +289,7 @@ async function pageProject(pid) {
   $('#sLog').onclick = () => openDlg(b => { b.innerHTML = `<h2>Log proyek</h2><pre class="code">${esc([P.message, P.asr_warning, P.llm_warning, P.error, ...P.clips.filter(c => c.error).map(c => `${c.id}: ${c.error}`)].filter(Boolean).join('\n\n') || 'Tidak ada catatan.')}</pre>`; });
 
   /* ---------- panel: tab ---------- */
-  $$('.st-tabs button').forEach(b => b.onclick = () => { $$('.st-tabs button').forEach(x => x.classList.toggle('on', x === b)); $$('.st-tab').forEach(t => t.hidden = t.dataset.tab !== b.dataset.tab); });
+  $$('.st-tabs button').forEach(b => b.onclick = () => { $$('.st-tabs button').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', String(on)); }); $$('.st-tab').forEach(t => t.hidden = t.dataset.tab !== b.dataset.tab); });
   const markDirty = () => { styleDirty = true; $('#sApply').hidden = false; tick(); };
   async function saveStyle(rerender) {
     try { P = await api(`/api/projects/${pid}/settings`, { method: 'POST', body: { settings: S, rerender } }); styleDirty = false; $('#sApply').hidden = true; toast(rerender ? 'Render ulang dimulai' : 'Gaya disimpan untuk render berikutnya'); load(P); }

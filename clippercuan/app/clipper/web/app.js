@@ -39,15 +39,14 @@ function notify(title, body) {
 /* ---------------- router ---------------- */
 async function route() {
   clearInterval(pollT);
-  const h = location.hash.replace(/^#\/?/, '') || 'home';
+  const h = location.hash.replace(/^#\/?/, '') || 'new';
   const [page, id] = h.split('/');
-  const titles = { home: ['WORKSPACE', 'Beranda'], history: ['PROYEK', 'Semua proyek'], new: ['PRODUKSI', 'Produksi Baru'], queue: ['PRODUKSI', 'Antrean'], results: ['PUSTAKA', 'Hasil'], advanced: ['EDITOR', 'Studio Lanjutan'], settings: ['SISTEM', 'Pengaturan'] };
+  const titles = { home: ['WORKSPACE', 'Buat Klip'], history: ['PROYEK', 'Semua proyek'], new: ['PRODUKSI', 'Buat Klip'], queue: ['HASIL', 'Antrean'], results: ['HASIL', 'Hasil & antrean'], advanced: ['EDITOR', 'Studio'], settings: ['SISTEM', 'Pengaturan'] };
   const title = titles[page] || ['CLIPPER CUAN', 'Workspace'];
   if ($('#pageContext')) $('#pageContext').textContent = title[0];
   if ($('#pageTitle')) $('#pageTitle').textContent = title[1];
-  document.body.classList.remove('nav-open');
-  $('#navScrim')?.setAttribute('hidden', '');
-  $$('.side nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === page || (page === 'p' && a.dataset.nav === 'history')));
+  $$('.side [data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === page || (page === 'p' && a.dataset.nav === 'history')));
+  $$('[data-mobile-nav]').forEach(a => { const active = a.dataset.mobileNav === page || (page === 'p' && a.dataset.mobileNav === 'history'); a.classList.toggle('on', active); if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   document.body.classList.toggle('studio-mode', page === 'p' && !!id);
   if (!INFO) { [INFO, SETTINGS, HEALTH] = await Promise.all([api('/api/info'), api('/api/settings'), api('/api/health')]); $('#sideFoot').textContent = 'Data lokal siap'; paintAiHealth(); }
   if (page === 'p' && id) return pageProject(id);
@@ -80,7 +79,7 @@ async function pageQueue() {
   const projects = (await api('/api/projects')).filter(p => ['queued', 'running', 'rendering', 'error', 'cancelled'].includes(p.status));
   view.innerHTML = `<section class="page"><header class="page-h"><h1>Antrean produksi</h1><p>Proses aktif, gagal, dan yang dapat dilanjutkan.</p></header><div class="queue-page">${projects.length ? projects.map(p => `<a class="queue-row" href="#/p/${esc(p.id)}"><span class="status-dot ${p.status === 'error' ? 'bad' : ['running','rendering','queued'].includes(p.status) ? 'busy' : ''}"></span><div><b>${esc(p.title || p.id)}</b><small>${esc(p.message || p.status)}</small></div><strong>${Math.round((p.progress || 0) * 100)}%</strong></a>`).join('') : '<div class="empty"><b>Antrean kosong</b><span>Tidak ada proses aktif atau gagal.</span></div>'}</div></section>`;
 }
-async function pageResults() { location.hash = '#/history'; setTimeout(() => { const tab = $('#hTab [data-v="c"]'); if (tab) tab.click(); }, 0); }
+async function pageResults() { await pageHistory('c'); }
 async function pageAdvanced() {
   const projects = await api('/api/projects');
   const ready = projects.filter(p => (p.clips || 0) > 0 || ['candidates_ready', 'done'].includes(p.status));
@@ -302,38 +301,17 @@ async function pageNew(override) {
     } catch (e) { toast(e.message, true); start.disabled = false; start.classList.remove('is-loading'); start.querySelector('span').textContent = '▶ Run pipeline'; }
   };
 
-  let wizardStep = Math.max(1, Math.min(6, store.get('clipperWizardStep', 1)));
-  const stepGroups = {
-    1: ['.source-card'],
-    2: ['.primary-settings .card:first-child'],
-    3: ['.section-divider', '.profile-card'],
-    4: ['.auto-card'],
-    5: ['.recipe-card', '#capCard'],
-    6: ['.tpl-bar', '.go']
+  const productionOrder = ['source', 'profile', 'analysis', 'candidates', 'style', 'preview', 'render'];
+  const setProductionStage = stage => {
+    const at = productionOrder.indexOf(stage);
+    $$('[data-stage]').forEach(panel => { panel.hidden = productionOrder.indexOf(panel.dataset.stage) > at; });
+    $$('#productionFlow li').forEach((item, index) => { item.classList.toggle('on', index === at); item.classList.toggle('done', index < at); });
   };
-  const allWizardSelectors = [...new Set(Object.values(stepGroups).flat())];
-  const syncSummary = () => {
-    $('#sumSource').textContent = srcMode === 'link' ? (links()[0] ? 'Link video' : 'Link belum diisi') : (upload ? 'File siap' : 'File lokal');
-    $('#sumLanguage').textContent = ({ auto: 'Otomatis ID/EN', id: 'Indonesia', en: 'English' })[$('#language').value] || $('#language').value;
-    $('#sumProfile').textContent = contentProfile === 'auto' ? 'Auto' : contentProfile.replace('_', ' ');
-    $('#sumCandidates').textContent = `${$('#candidate_count').value || 15} kandidat`;
-    const selectedRecipe = $('[data-r].on b'); $('#sumStyle').textContent = selectedRecipe?.textContent || 'Clean Large';
-  };
-  const paintWizard = () => {
-    allWizardSelectors.forEach(sel => $$(sel).forEach(el => el.classList.add('wizard-hidden')));
-    (stepGroups[wizardStep] || []).forEach(sel => $$(sel).forEach(el => el.classList.remove('wizard-hidden')));
-    $$('#wizardStepper li').forEach(li => { const n = +li.dataset.step; li.classList.toggle('on', n === wizardStep); li.classList.toggle('done', n < wizardStep); });
-    $('#wizardBack').disabled = wizardStep === 1;
-    $('#wizardNext').hidden = wizardStep === 6;
-    $('#wizardProgress').textContent = `Tahap ${wizardStep} dari 6`;
-    store.set('clipperWizardStep', wizardStep); syncSummary(); scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  $('#wizardBack').onclick = () => { wizardStep--; paintWizard(); };
-  $('#wizardNext').onclick = () => { wizardStep++; paintWizard(); };
-  $$('#wizardStepper button').forEach(button => button.onclick = () => { const target = +button.parentElement.dataset.step; if (target <= wizardStep + 1) { wizardStep = target; paintWizard(); } });
-  $('#summaryToggle').onclick = () => { const body = $('.summary-body', $('#wizardSummary')); body.hidden = !body.hidden; $('#summaryToggle').setAttribute('aria-expanded', String(!body.hidden)); };
-  view.addEventListener('input', syncSummary); view.addEventListener('change', syncSummary); view.addEventListener('click', e => { if (e.target.closest('[data-r], #contentProfile button')) setTimeout(syncSummary); });
-  paintWizard();
+  const sourceReady = () => srcMode === 'file' ? !!upload : links().length > 0 && links().every(s => /^https?:\/\//i.test(s));
+  const revealFromSource = () => setProductionStage(sourceReady() ? 'render' : 'source');
+  $('#url').addEventListener('input', revealFromSource);
+  fileIn.addEventListener('change', () => setTimeout(revealFromSource));
+  revealFromSource();
 }
 
 /* ---------------- dialog umum ---------------- */
@@ -424,12 +402,12 @@ async function loadCaptionWorkspace(pid) {
 }
 
 /* ================= RIWAYAT ================= */
-async function pageHistory() {
+async function pageHistory(initialTab = 'p') {
   view.innerHTML = '<section class="page"><header class="page-h proj-h"><div><h1>Riwayat</h1><p>Semua proyek dan semua klip hasil render, dalam satu galeri.</p></div><div class="acts"><div class="seg" id="hTab"><button data-v="p" class="on">Proyek</button><button data-v="c">Galeri klip</button></div><input class="in" id="hq" placeholder="Cari judul…" style="max-width:260px"></div></header><div class="hist" id="hl"></div></section>';
   let list = await api('/api/projects');
   const hl = $('#hl');
   const label = { done: 'selesai', running: 'diproses', queued: 'antre', error: 'gagal', cancelled: 'dibatalkan', candidates_ready: 'kandidat siap', rendering: 'render' };
-  let tab = 'p', clips = null;
+  let tab = initialTab, clips = null;
   const drawClips = async () => {
     clips = clips || await api('/api/clips').catch(() => []);
     const q = $('#hq').value.toLowerCase(), items = clips.filter(c => `${c.title} ${c.project_title}`.toLowerCase().includes(q));
@@ -438,7 +416,7 @@ async function pageHistory() {
     hl.replaceChildren(...items.map(c => {
       const a = document.createElement('a'); a.className = 'gcard'; a.href = '#/p/' + c.project_id;
       a.innerHTML = `<video muted loop playsinline preload="none"></video><span class="sc">${Math.round((c.score || 0) / 10)}/10</span><span class="du">${fmt(c.duration)}</span><b></b><small></small>`;
-      const v = $('video', a); v.poster = `/files/${c.project_id}/${c.thumb}?v=${c.version}`;
+      const v = $('video', a); if (c.thumb) v.poster = `/files/${c.project_id}/${c.thumb}?v=${c.version}`;
       a.onmouseenter = () => { if (!v.src) v.src = `/files/${c.project_id}/${c.file}?v=${c.version}`; v.play().catch(() => {}); };
       a.onmouseleave = () => v.pause();
       $('b', a).textContent = c.title || c.id; $('small', a).textContent = c.project_title || '';
@@ -456,12 +434,15 @@ async function pageHistory() {
       const a = document.createElement('a'); a.className = 'hcard'; a.href = '#/p/' + p.id;
       a.innerHTML = `<div class="hthumb"></div><div class="hbody"><b></b><div class="hrow"><span class="tag ${p.status}">${label[p.status] || p.status}${p.status === 'running' ? ' ' + Math.round(p.progress * 100) + '%' : ''}</span><span>${p.clips} klip</span><button class="del" title="Hapus">🗑</button></div><span class="muted" style="font-size:12px">${new Date(p.created * 1000).toLocaleString('id-ID')}</span></div>`;
       $('b', a).textContent = p.title || p.id;
-      if (p.thumb) $('.hthumb', a).style.backgroundImage = `url('/files/${p.id}/${p.thumb}')`;
+      // Keep project cards stable when an older manifest references a thumbnail
+      // that has already been cleaned from disk. Candidate previews remain
+      // available inside Studio, while this list uses its neutral placeholder.
+      $('.hthumb', a).classList.toggle('has-output', Boolean(p.clips));
       $('.del', a).onclick = async e => { e.preventDefault(); if (!confirm('Hapus proyek ini beserta semua klipnya?')) return; await api('/api/projects/' + p.id, { method: 'DELETE' }); list = list.filter(x => x !== p); draw(); badge(); };
       return a;
     }));
   };
-  $('#hq').oninput = draw; draw();
+  $('#hq').oninput = draw; $$('#hTab button').forEach(b => b.classList.toggle('on', b.dataset.v === tab)); draw();
   pollT = setInterval(async () => { if (list.some(p => ['queued', 'running'].includes(p.status))) { list = await api('/api/projects'); draw(); } }, 3000);
 }
 
@@ -597,11 +578,9 @@ async function pageSettings() {
 }
 
 addEventListener('DOMContentLoaded', () => {
-  const sideToggle = $('#sideToggle'), mobileMenu = $('#mobileMenu'), scrim = $('#navScrim');
+  const sideToggle = $('#sideToggle');
   sideToggle.onclick = () => { const compact = document.body.classList.toggle('side-compact'); sideToggle.setAttribute('aria-expanded', String(!compact)); store.set('clipperSideCompact', compact); };
   if (store.get('clipperSideCompact', false)) document.body.classList.add('side-compact');
-  mobileMenu.onclick = () => { document.body.classList.add('nav-open'); scrim.hidden = false; };
-  scrim.onclick = () => { document.body.classList.remove('nav-open'); scrim.hidden = true; };
-  addEventListener('keydown', e => { if (e.key === 'Escape') { document.body.classList.remove('nav-open'); scrim.hidden = true; const d = $('dialog[open]'); if (d) d.close(); } });
+  addEventListener('keydown', e => { if (e.key === 'Escape') { const d = $('dialog[open]'); if (d) d.close(); } });
   route().catch(e => { view.innerHTML = `<section class="page"><div class="empty">Gagal memuat: ${esc(e.message)}</div></section>`; });
 });
