@@ -212,20 +212,36 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     decoration = cfg.get("decoration") or {}
     decoration_mode = decoration.get("mode", "smart_emoji" if cfg.get("emoji", {}).get("enabled") else "none")
     decoration_layout = effects.decoration_layout(profile, layout, float(cfg["caption"].get("y_pct", 74)))
-    wants_emoji = decoration_mode == "smart_emoji" or cfg.get("emoji", {}).get("enabled")
-    emojis = (effects.plan_emojis(sub_words, out_dur, provenance=cfg.get("emoji", {}).get("provenance", "keyword"))
+    wants_emoji = decoration_mode == "smart_emoji" or (decoration_mode != "light_illustration" and cfg.get("emoji", {}).get("enabled"))
+    emo_cfg = cfg.get("emoji", {})
+    emojis = (effects.plan_emojis(sub_words, out_dur, max_count=int(emo_cfg.get("max_count", decoration.get("budget", 10))),
+                                  provenance=emo_cfg.get("provenance", "keyword"), suggestions=emo_cfg.get("suggestions"))
               if wants_emoji and decoration_layout["enabled"] else [])
+    illustrations = (effects.plan_illustrations(sub_words, out_dur)
+                     if decoration_mode == "light_illustration" and decoration_layout["enabled"] else [])
+    rect = decoration_layout["rect"]
     if emojis:
-        es = int(150 * W / 1080 * float(cfg["emoji"].get("size", 1.0)))
-        rect = decoration_layout["rect"]
+        # ukuran proporsional lebar output, dibatasi kotak safe-area
+        es = int(min(150 * W / 1080 * float(emo_cfg.get("size", 1.0)), rect[2] * W))
+        es -= es % 2
         ex, ey = int(rect[0] * W), int(rect[1] * H)
+        a_in, a_out = effects.EMOJI_IN_MS / 1000, effects.EMOJI_OUT_MS / 1000
         for k, em in enumerate(emojis):
-            idx = add_input(["-loop", "1", "-framerate", "30", "-t", f"{em['e'] + 0.2:.2f}", "-i", em["file"]])
-            d = em["e"] - em["s"]
-            graph += (f";[{idx}:v]scale={es}:{es},format=rgba,fade=t=in:st={em['s']:.2f}:d=0.15:alpha=1,"
-                      f"fade=t=out:st={em['s'] + d - 0.2:.2f}:d=0.2:alpha=1[em{k}];"
-                      f"[{last}][em{k}]overlay=x={ex}:y={ey}:eof_action=pass:enable='between(t,{em['s']:.2f},{em['e']:.2f})'[e{k}]")
+            s, e = em["s"], em["e"]
+            idx = add_input(["-loop", "1", "-framerate", "30", "-t", f"{e + 0.2:.2f}", "-i", em["file"]])
+            # pop: 0.6 -> 1.12 -> 1.0 dalam a_in detik lalu diam; keluar fade alpha
+            z = (f"if(lt(t-{s:.2f},{a_in * .6:.3f}),0.6+0.52*(t-{s:.2f})/{a_in * .6:.3f},"
+                 f"if(lt(t-{s:.2f},{a_in:.3f}),1.12-0.12*(t-{s:.2f}-{a_in * .6:.3f})/{a_in * .4:.3f},1))")
+            graph += (f";[{idx}:v]format=rgba,scale=w='2*trunc({es}*max(0.6\\,{z})/2)':h=-2:eval=frame,"
+                      f"fade=t=out:st={e - a_out:.2f}:d={a_out:.2f}:alpha=1[em{k}];"
+                      f"[{last}][em{k}]overlay=x='{ex}+({es}-overlay_w)/2':y='{ey}+({es}-overlay_h)/2':eval=frame:"
+                      f"eof_action=pass:enable='between(t,{s:.2f},{e:.2f})'[e{k}]")
             last = f"e{k}"
+    for k, il in enumerate(illustrations):
+        x, y, w = int(rect[0] * W), int((rect[1] + rect[3] * .45) * H), int(rect[2] * W)
+        graph += (f";[{last}]drawbox=x={x}:y={y}:w={w}:h={max(int(10 * W / 1080), 4)}:color=0xF4B942@0.85:t=fill:"
+                  f"enable='between(t,{il['s']:.2f},{il['e']:.2f})'[il{k}]")
+        last = f"il{k}"
 
     # progress bar tipis yang berjalan sepanjang klip
     pb = cfg.get("progress_bar", {})
@@ -328,10 +344,12 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
             "crop_keys": keys, "words": cw,
             "duration": round(out_dur, 2), "cut_saved": round(dur - out_dur, 2), "emojis": [e["code"] for e in emojis],
             "mode": profile, "recipe": cfg.get("recipe_applied") or cfg.get("recipe"),
-            "layer_stack": ["Video", "Crop", "Spoken Caption"] + (["Speaker Label"] if cfg.get("speaker_label", {}).get("enabled") else []) + (["Decoration"] if emojis else []) + (["Hook"] if cfg["title"].get("enabled") else []),
-            "decorations": [{k: v for k, v in e.items() if k != "file"} for e in emojis],
+            "layer_stack": ["Video", "Crop", "Spoken Caption"] + (["Speaker Label"] if cfg.get("speaker_label", {}).get("enabled") else []) + (["Decoration"] if emojis or illustrations else []) + (["Hook"] if cfg["title"].get("enabled") else []),
+            "decorations": [{k: v for k, v in e.items() if k != "file"} for e in emojis] + illustrations,
             "decoration_mode": decoration_mode, "safe_zone_decision": decoration_layout,
-            "decoration_cancel_reason": None if emojis or decoration_mode == "none" else decoration_layout["reason"],
+            "decoration_cancel_reason": None if emojis or illustrations or decoration_mode == "none"
+            else (decoration_layout["reason"] if not decoration_layout["enabled"] else "tidak ada konteks semantik relevan"),
+            "caption_animation": {"name": cfg["caption"].get("animation", "none"), "ms": cfg["caption"].get("animation_ms")},
             "caption_cues": len(captions.chunk_words(sub_words, int(cfg["caption"].get("words_per_line", 3)))),
             "caption_layers": 1, "caption_provenance": "ASS:spoken-caption",
             "caption_size_preset": caption_meta["caption_size_preset"],

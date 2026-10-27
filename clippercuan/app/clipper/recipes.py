@@ -177,12 +177,34 @@ RECIPES: dict[str, dict] = {
     },
 }
 
+def _box_punch_profile(profile: str, emoji_budget: int, priority: str) -> dict:
+    base = RECIPES["box-punch"]
+    return {**base, "niche": profile, "tier": "primary", "badge": "Rekomendasi",
+            "label": f"Box Punch V2 · {'Podcast' if profile == 'podcast' else 'Review'}",
+            "recommended_for": [profile] + (["interview"] if profile == "podcast" else ["review"]),
+            "desc": ("Box Punch V2 + Emoji cerdas hemat (maks 1 aktif), tetap menjauhi wajah." if profile == "podcast"
+                     else "Box Punch V2 + Emoji cerdas; area produk diprioritaskan bebas dekorasi."),
+            "settings": {**base["settings"], "content_profile": profile,
+                         "decoration": {"mode": "smart_emoji", "provenance": "keyword", "max_active": 1,
+                                        "budget": emoji_budget, "priority": priority},
+                         "emoji": {"enabled": True, "size": 0.9, "provenance": "keyword", "max_count": emoji_budget}}}
+
+
+RECIPES["box-punch-podcast"] = _box_punch_profile("podcast", 3, "face")
+RECIPES["box-punch-review"] = _box_punch_profile("tech_review", 5, "product")
+
 AUTO = {"id": "auto", "label": "Auto", "niche": "auto", "badge": "Production", "status": "Production",
         "desc": "Klasifikasi mode dengan confidence dan alasan. Confidence rendah selalu memakai Clean Large tanpa dekorasi."}
 
-PROFILE_DEFAULT = {"podcast": "recommended", "interview": "recommended", "tech_review": "recommended",
-                   "review": "recommended", "educational": "recommended", "gaming": "ml-hype",
-                   "mobile_legends": "ml-hype"}
+# Gaming tidak berubah; profil tak dikenal / confidence rendah jatuh ke Clean Large.
+PROFILE_DEFAULT = {"podcast": "box-punch-podcast", "interview": "box-punch-podcast",
+                   "tech_review": "box-punch-review", "review": "box-punch-review",
+                   "educational": "recommended", "gaming": "ml-hype", "mobile_legends": "ml-hype"}
+FALLBACK = "recommended"
+
+
+def default_for(profile: str | None) -> str:
+    return PROFILE_DEFAULT.get(profile or "auto", FALLBACK)
 
 
 def public() -> dict:

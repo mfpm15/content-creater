@@ -160,7 +160,9 @@ async function pageNew(override) {
   chipGroup($('#qOut'), String(Q.output), v => { Q.output = v; qTxt(); }); chipGroup($('#qSrc'), String(Q.source), v => { Q.source = v; qTxt(); }); qTxt();
   getRecipes().then(rs => {
     const box = $('#recipes'); if (!box) return;
-    box.innerHTML = Object.values(rs).map(r => `<button type="button" data-r="${esc(r.id)}" class="${r.id === recipeId ? 'on' : ''}"><span class="rb">${esc(r.badge || '')}</span><b>${esc(r.label)}</b><small>${esc(r.desc)}</small></button>`).join('') + `<button type="button" data-r="" class="${recipeId ? '' : 'on'}"><span class="rb">Manual</span><b>Atur sendiri</b><small>Pakai pengaturan di bawah (Advanced) tanpa resep.</small></button>`;
+    const prof = cfg.content_profile || 'auto';
+    const badgeOf = r => (r.recommended_for || []).includes(prof) ? 'Rekomendasi' : (r.badge || '');
+    box.innerHTML = Object.values(rs).map(r => `<button type="button" data-r="${esc(r.id)}" class="${r.id === recipeId ? 'on' : ''}"><span class="rb">${esc(badgeOf(r))}</span><b>${esc(r.label)}</b><small>${esc(r.desc)}</small></button>`).join('') + `<button type="button" data-r="" class="${recipeId ? '' : 'on'}"><span class="rb">Manual</span><b>Atur sendiri</b><small>Pakai pengaturan di bawah (Advanced) tanpa resep.</small></button>`;
     $$('[data-r]', box).forEach(b => b.onclick = () => {
       try { sessionStorage.setItem('draftUrl', $('#url').value); } catch {}
       const r = rs[b.dataset.r], now = collect();

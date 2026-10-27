@@ -314,10 +314,13 @@ def _activity(p: dict, pr: media.Probe, src: Path | None, tr: dict, cfg: dict) -
 
 def _apply_auto_recipe(pid: str, cfg: dict, profile_name: str, classified: dict) -> dict:
     """Resep "auto": pilih resep sesuai konten. Untuk gaming, split bila facecam terdeteksi, selain itu blur."""
-    from .recipes import PROFILE_DEFAULT, RECIPES
+    from .recipes import FALLBACK, RECIPES, default_for
 
     if cfg.get("recipe") == "auto" and not cfg.get("recipe_applied"):   # Ulangi tidak menimpa gaya yang sudah diedit
-        rid = PROFILE_DEFAULT.get(profile_name, "podcast-box")
+        # confidence hanya relevan bila profil berasal dari klasifikasi otomatis
+        auto_profile = cfg.get("content_profile", "auto") == "auto"
+        low = auto_profile and float((classified or {}).get("confidence", 1.0) or 0) < 0.5
+        rid = FALLBACK if low else default_for(profile_name)
         look = {k: v for k, v in RECIPES[rid]["settings"].items() if k not in ("content_profile",)}
         if cfg.get("duration_preset") not in (None, "auto"):
             look.pop("duration_preset", None)

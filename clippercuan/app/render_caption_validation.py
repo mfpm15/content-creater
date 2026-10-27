@@ -59,19 +59,17 @@ def validation_configs() -> dict[str, dict]:
         "emoji": {"enabled": False},
     }))}
     variants = {
-        "box_punch_v2_clean": {"decoration": {"mode": "none", "provenance": None, "max_active": 1},
-                               "emoji": {"enabled": False, "provenance": "keyword"}},
-        "box_punch_v2_smart_emoji": {"decoration": {"mode": "smart_emoji", "provenance": "keyword", "max_active": 1},
-                                     "emoji": {"enabled": True, "size": 1.0, "provenance": "keyword"}},
-        "box_punch_v2_light_illustration": {"decoration": {"mode": "light_illustration", "provenance": "manual", "max_active": 1},
-                                            "emoji": {"enabled": False, "provenance": "manual"}},
+        "box_punch_v2_podcast": ("box-punch-podcast", {}),
+        "box_punch_v2_review": ("box-punch-review", {}),
+        "box_punch_v2_emoji_new": ("box-punch", {"decoration": {"mode": "smart_emoji", "provenance": "keyword", "max_active": 1},
+                                                 "emoji": {"enabled": True, "size": 1.0, "provenance": "keyword"}}),
     }
-    for label, variant in variants.items():
-        cfg = deep_merge(DEFAULTS, RECIPES["box-punch"]["settings"])
+    for label, (rid, variant) in variants.items():
+        cfg = deep_merge(DEFAULTS, RECIPES[rid]["settings"])
         cfg = deep_merge(cfg, common)
         cfg = deep_merge(cfg, variant)
-        cfg["recipe"] = "box-punch"
-        cfg["recipe_applied"] = "box-punch"
+        cfg["recipe"] = rid
+        cfg["recipe_applied"] = rid
         out[label] = cfg
     return out
 

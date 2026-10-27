@@ -100,6 +100,10 @@ function paintOverlay(phone, cfg, words, t, title) {
   c.dataset.height = `~${((cap.size * (cap.line_height || 1.12) + 2 * (cap.outline || 0)) / 1920 * 100).toFixed(1)}% tinggi output`;
   const y = cap.y_pct != null && cap.y_pct !== '' ? +cap.y_pct : { bottom: 76, middle: 50, top: 20 }[cap.position || 'bottom'];
   c.style.top = y + '%';
+  const popMs = Math.max(90, Math.min(300, +(cap.animation_ms || 180)));
+  const popPeak = Math.max(1.05, Math.min(1.16, 1 + Math.round(popMs / 30) / 100));
+  c.style.setProperty('--caption-pop-ms', `${popMs}ms`);
+  c.style.setProperty('--caption-pop-peak', popPeak);
   c.classList.toggle('glow', cap.effect === 'glow');
   c.classList.toggle('pop', ['pop', 'subtle-pop', 'word-focus'].includes(cap.animation));
   c.classList.toggle('box-punch', cap.style === 'box' || !!cap.box);

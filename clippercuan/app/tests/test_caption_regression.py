@@ -61,11 +61,83 @@ def test_cues_deduplicate_identical_overlap_without_dropping_words():
     assert caption_workspace.validate_cues(items)["valid"]
 
 
-def test_tech_review_default_is_clean_large_single_caption():
-    rid = recipes.PROFILE_DEFAULT["tech_review"]
+def test_profile_recommendations_box_punch_v2():
+    expect = {"podcast": "box-punch-podcast", "interview": "box-punch-podcast",
+              "tech_review": "box-punch-review", "review": "box-punch-review",
+              "gaming": "ml-hype", "mobile_legends": "ml-hype", "educational": "recommended",
+              "unknown": "recommended", None: "recommended"}
+    for profile, rid in expect.items():
+        assert recipes.default_for(profile) == rid
+    pod, rev = (recipes.RECIPES[r] for r in ("box-punch-podcast", "box-punch-review"))
+    for r in (pod, rev):
+        cap = r["settings"]["caption"]
+        assert r["badge"] == "Rekomendasi" and cap["template_id"] == "box-punch-v2"
+        assert cap["size_level"] == "large" and cap["max_lines"] == 2 and r["settings"]["caption_layers"] == 1
+        assert r["settings"]["decoration"]["mode"] == "smart_emoji" and r["settings"]["decoration"]["max_active"] == 1
+    assert pod["settings"]["emoji"]["max_count"] < rev["settings"]["emoji"]["max_count"]
+    assert rev["settings"]["decoration"]["priority"] == "product"
+
+
+def test_low_confidence_auto_falls_back_to_clean_large(monkeypatch):
+    monkeypatch.setattr(project, "load", lambda pid: {"user_settings": {}})
+    monkeypatch.setattr(project, "update", lambda pid, **kw: None)
+    base = {"recipe": "auto", "content_profile": "auto"}
+    out = project._apply_auto_recipe("x", deep_merge(DEFAULTS, base), "podcast", {"confidence": 0.35})
+    assert out["recipe_applied"] == "recommended"
+    out = project._apply_auto_recipe("x", deep_merge(DEFAULTS, base), "podcast", {"confidence": 0.9})
+    assert out["recipe_applied"] == "box-punch-podcast"
+
+
+def test_emoji_max_one_active_gap_and_local_assets():
+    from clipper import effects
+
+    plan = effects.plan_emojis(_words("uang cuan viral rahasia kaget sukses gagal penting ide bisnis"), 10, min_gap=1.0)
+    assert plan
+    assert all(b["s"] >= a["e"] + 1.0 - 1e-6 for a, b in zip(plan, plan[1:]))
+    assert all(Path(p["file"]).is_file() and p["animation"]["in_ms"] <= 300 for p in plan)
+    assert effects.emoji_for("baterai") is None
+
+
+def test_emoji_llm_suggestion_requires_local_asset():
+    from clipper import effects
+
+    plan = effects.plan_emojis(_words("produk ini sangat menarik"), 5, suggestions={"menarik": "2b50", "produk": "ffff"})
+    assert [p["provenance"] for p in plan] == ["llm"] and plan[0]["code"] == "2b50"
+
+
+def test_collision_guard_and_illustration_fallback():
+    from clipper import effects
+
+    for profile in ("podcast", "tech_review", "mobile_legends"):
+        d = effects.decoration_layout(profile, "portrait", 72)
+        if d["enabled"]:
+            assert not any(effects._overlaps(d["rect"], z["rect"]) for z in d["blocked"])
+    assert effects.plan_illustrations(_words("kalimat netral tanpa konteks"), 5) == []
+    assert effects.plan_illustrations(_words("ini rahasia cuan"), 5)[0]["asset"] == "generated:drawbox"
+
+
+def test_box_punch_events_never_overlap_on_same_layer():
+    cfg = deep_merge(DEFAULTS, recipes.RECIPES["box-punch-podcast"]["settings"])
+    ass = captions.build_ass(_words("satu dua tiga empat lima enam tujuh delapan sembilan sepuluh"), "", cfg, (1080, 1920), 6)
+    events = [e for e in _events(ass) if e["style"] == "Cap" and e["layer"] == 1]
+    assert events and all(a["end"] <= b["start"] for a, b in zip(events, events[1:]))
+
+
+def test_box_punch_animation_uses_configured_duration_and_subtle_peak():
+    cfg = deep_merge(DEFAULTS, recipes.RECIPES["box-punch-podcast"]["settings"])
+    cfg["caption"]["animation_ms"] = 180
+    ass = captions.build_ass(_words("rahasia cuan podcast"), "", cfg, (1080, 1920), 4)
+    dialogue = "\n".join(line for line in ass.splitlines() if line.startswith("Dialogue:"))
+    assert "\\t(0,90,\\fscx106\\fscy106)" in dialogue
+    assert "\\t(90,180,\\fscx100\\fscy100)" in dialogue
+    assert "\\fscx116\\fscy116" not in dialogue
+
+
+def test_clean_large_fallback_contract():
+    rid = recipes.default_for("auto")
     recipe = recipes.RECIPES[rid]
     cap = recipe["settings"]["caption"]
-    assert rid == "recommended" and recipe["template_name"] == "Clean Large"
+    assert rid == recipes.FALLBACK == "recommended" and recipe["template_name"] == "Clean Large"
     assert cap["template_id"] == "clean-large" and cap["size_level"] == "large"
     assert cap["style"] == "clean" and cap["box"] is False
     assert cap["animation"] == "none" and cap["effect"] == "none"
@@ -136,7 +208,7 @@ def test_all_primary_templates_have_identity_and_two_line_contract():
 
 def test_advanced_templates_are_never_automatic():
     automatic = {"recommended", *recipes.PROFILE_DEFAULT.values()}
-    for rid in ("viral-pop", "box-punch", "neon-karaoke"):
+    for rid in ("viral-pop", "neon-karaoke"):
         recipe = recipes.RECIPES[rid]
         assert rid not in automatic
         assert recipe["tier"] == "advanced"
@@ -205,8 +277,7 @@ def test_review_product_and_podcast_face_safe_zones():
     assert "face" in {z["kind"] for z in effects.safe_zones("podcast", "portrait")}
 
 
-def test_auto_profile_defaults_remain_clean_when_not_gaming():
-    for profile in ("podcast", "interview", "tech_review", "review", "educational"):
-        assert recipes.PROFILE_DEFAULT[profile] == "recommended"
+def test_auto_default_and_educational_remain_clean():
+    assert recipes.default_for("auto") == recipes.default_for("educational") == "recommended"
     cap = recipes.RECIPES["recommended"]["settings"]["caption"]
     assert cap["template_id"] == "clean-large" and cap["animation"] == "none"
