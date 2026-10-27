@@ -766,7 +766,8 @@ def _worker() -> None:
         kind, pid, extra = _JOBS.get()
         try:
             if kind == "pipeline":
-                _CANCEL.discard(pid)
+                if pid in _CANCEL:
+                    raise Cancelled()
                 update(pid, done_notified=False)
                 _pipeline(pid)
                 st = load(pid).get("status")
@@ -879,6 +880,7 @@ def recover_interrupted() -> None:
 
 
 def retry(pid: str) -> dict:
+    _CANCEL.discard(pid)
     p = update(pid, status="queued", progress=0.0, message="Menunggu antrean", error=None, owner=os.getpid())
     _JOBS.put(("pipeline", pid, {}))
     return p
