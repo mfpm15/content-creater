@@ -49,8 +49,9 @@
     </div>
 
     <div class="card recipe-card">
-      <div class="section-title"><span class="step-number">✦</span><div><h2>Resep gaya viral</h2><p>Satu klik: durasi, format, caption, judul, dan efek disetel untuk niche-mu. Semua tetap bisa diubah.</p></div></div>
-      <div class="recipe-grid" id="recipes"><span class="muted">Memuat resep…</span></div>
+      <div class="section-title"><span class="step-number">02</span><div><h2>Pilih gaya produksi</h2><p>Empat rekomendasi utama berdasarkan analisis media. Detail caption, crop, safe zone, hook, dan dekorasi dapat ditinjau sebelum render.</p></div></div>
+      <div class="recipe-grid" id="recipes"><span class="muted">Menganalisis rekomendasi…</span></div>
+      <details class="experimental-recipes"><summary>Experimental / Legacy</summary><div class="recipe-grid" id="experimentalRecipes"></div></details>
     </div>
     <div class="card auto-card">
       <div class="section-title"><span class="step-number">⚡</span><div><h2>Mode otomatis</h2><p>Setelah kandidat diranking, klip terbaik langsung dirender. Kandidat lain tetap bisa kamu pilih & render nanti di studio.</p></div><label class="sw"><input type="checkbox" id="auto_render"><span></span></label></div>
@@ -65,16 +66,20 @@
       <button class="btn ghost sm" id="tplSave" type="button">Simpan sebagai template</button>
     </div>
 
-    <ol class="production-flow" aria-label="Alur produksi"><li class="on">1 · Sumber</li><li>2 · Mode</li><li>3 · Kandidat</li><li>4 · Bandingkan</li><li>5 · Gaya & crop</li><li>6 · Preview</li><li>7 · Render</li><li>8 · Review</li></ol>
-    <div class="section-divider"><span class="step-number">02</span><div><h2>Pilih mode konten</h2><p>Mode mengatur safe zone dan kepadatan visual. Auto menjelaskan pilihan dan kembali ke Clean Large saat confidence rendah.</p></div></div>
+    <ol class="production-flow" aria-label="Alur produksi"><li class="on">1 · Sumber</li><li>2 · Profil & gaya</li><li>3 · Kandidat</li><li>4 · Bandingkan</li><li>5 · Gaya & crop</li><li>6 · Preview</li><li>7 · Render</li><li>8 · Review</li></ol>
+    <div class="section-divider"><span class="step-number">03</span><div><h2>Pilih profil konten</h2><p>Profil backend mengatur scoring, durasi, crop, caption, hook, safe zone, dekorasi, dan kebijakan speaker. Auto menjelaskan pilihan dan memakai General saat confidence rendah.</p></div></div>
     <div class="card profile-card">
       <h3>Content profile</h3>
       <div class="preset-cards profile-presets" id="contentProfile">
-        <button type="button" data-v="auto"><span class="status-pill production">Production</span><b>✨ Auto</b><small>Deteksi mode, confidence, alasan, fallback Clean Large</small></button>
-        <button type="button" data-v="mobile_legends"><span class="status-pill production">Production</span><b>🎮 Gaming</b><small>Gameplay, facecam, split, HUD dan minimap terlindungi</small></button>
-        <button type="button" data-v="tech_review"><span class="status-pill production">Production</span><b>📦 Review</b><small>Produk dan tangan prioritas, dekorasi dikurangi</small></button>
-        <button type="button" data-v="podcast"><span class="status-pill production">Production</span><b>🎙 Podcast</b><small>Readable, speaker-aware bila diarization tersedia</small></button>
-        <button type="button" data-v="educational"><span class="status-pill beta">Beta</span><b>💡 Educational</b><small>Keyword, chapter hook, ikon ringan relevan</small></button>
+        <button type="button" data-v="auto"><span class="status-pill production">Production</span><b>Auto</b><small>Deteksi profil, confidence, alasan, fallback General</small></button>
+        <button type="button" data-v="general"><span class="status-pill production">Production</span><b>General</b><small>Clean Large, face-aware, aman untuk berbagai konten</small></button>
+        <button type="button" data-v="podcast"><span class="status-pill production">Production</span><b>Podcast</b><small>Quote-aware dan speaker-aware</small></button>
+        <button type="button" data-v="interview"><span class="status-pill production">Production</span><b>Interview</b><small>Tanya-jawab utuh dan active-speaker crop</small></button>
+        <button type="button" data-v="review"><span class="status-pill production">Production</span><b>Review</b><small>Produk, perbandingan, dan verdict diprioritaskan</small></button>
+        <button type="button" data-v="tech_review"><span class="status-pill production">Production</span><b>Tech Review</b><small>Demo, spesifikasi, produk, dan tangan terlindungi</small></button>
+        <button type="button" data-v="gaming"><span class="status-pill production">Production</span><b>Gaming</b><small>Gameplay, facecam, dan HUD terlindungi</small></button>
+        <button type="button" data-v="mobile_legends"><span class="status-pill production">Production</span><b>Mobile Legends</b><small>Objective, minimap, score, dan controls terlindungi</small></button>
+        <button type="button" data-v="educational"><span class="status-pill production">Production</span><b>Educational</b><small>Keyword, learning outcome, dan ilustrasi ringan</small></button>
       </div>
       <p class="hint">Auto dapat dioverride. Sistem tidak membuat spesifikasi, harga, atau event game yang tidak didukung sumber.</p>
     </div>

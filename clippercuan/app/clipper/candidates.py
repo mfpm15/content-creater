@@ -5,54 +5,14 @@ import hashlib
 import re
 from collections import Counter
 
-SCHEMA_VERSION = 2
+from .profiles import REGISTRY as PROFILES
+
+SCHEMA_VERSION = 3
 DIMENSIONS = (
     "hook", "standalone_clarity", "payoff", "novelty", "emotion_humor",
     "quotability", "information_density", "visual_activity", "clean_ending",
     "profile_fit", "transcript_confidence", "crop_confidence", "rights_context_risk",
 )
-
-PROFILES = {
-    "podcast": {
-        "label": "Podcast & wawancara",
-        "result": "Hot take utuh, cerita mini, tanya-jawab, dan insight mandiri",
-        "duration": (25.0, 60.0), "layout": "portrait", "caption": "clean",
-        "crop": "speaker-aware dengan face crop tengah sebagai fallback",
-        "pacing": "natural", "safe_area": 0.14,
-        "weights": {"hook": 1.15, "standalone_clarity": 1.35, "payoff": 1.25, "novelty": 1.0,
-                    "emotion_humor": 1.0, "quotability": 1.2, "information_density": 1.0,
-                    "visual_activity": 0.45, "clean_ending": 1.25, "profile_fit": 1.2,
-                    "transcript_confidence": 0.8, "crop_confidence": 0.8, "rights_context_risk": -1.0},
-        "terms": ("podcast", "host", "narasumber", "wawancara", "menurut", "cerita", "kenapa", "jawab"),
-        "warning": "Pastikan kutipan tidak mengubah maksud pembicara dan izin wajah/suara tersedia.",
-    },
-    "tech_review": {
-        "label": "Review teknologi",
-        "result": "Masalah-solusi, demo, perbandingan, verdict, dan value dengan konteks",
-        "duration": (20.0, 50.0), "layout": "portrait", "caption": "clean",
-        "crop": "produk atau demo lebih utama; wajah sebagai fallback", "pacing": "medium",
-        "safe_area": 0.13,
-        "weights": {"hook": 1.0, "standalone_clarity": 1.3, "payoff": 1.2, "novelty": 1.1,
-                    "emotion_humor": 0.55, "quotability": 0.75, "information_density": 1.4,
-                    "visual_activity": 1.05, "clean_ending": 1.1, "profile_fit": 1.35,
-                    "transcript_confidence": 1.0, "crop_confidence": 0.9, "rights_context_risk": -1.25},
-        "terms": ("review", "fitur", "harga", "spesifikasi", "kamera", "baterai", "performa", "produk", "versus", "worth"),
-        "warning": "Harga dan spesifikasi harus berasal dari sumber atau transkrip; jangan menambah klaim.",
-    },
-    "mobile_legends": {
-        "label": "Gaming Mobile Legends",
-        "result": "Clutch, outplay, team fight, comeback, objective, tip, reaksi, atau funny fail",
-        "duration": (15.0, 40.0), "layout": "split", "caption": "bold-viral",
-        "crop": "gameplay-safe; facecam opsional dan tidak menutup HUD", "pacing": "fast",
-        "safe_area": 0.16,
-        "weights": {"hook": 1.0, "standalone_clarity": 0.8, "payoff": 1.2, "novelty": 0.8,
-                    "emotion_humor": 1.25, "quotability": 0.6, "information_density": 0.65,
-                    "visual_activity": 1.55, "clean_ending": 0.85, "profile_fit": 1.4,
-                    "transcript_confidence": 0.45, "crop_confidence": 1.0, "rights_context_risk": -1.0},
-        "terms": ("mobile legends", "mlbb", "lord", "turtle", "turret", "jungler", "roamer", "gank", "ulti", "maniac", "savage"),
-        "warning": "Event game hanya diberi label bila didukung ucapan atau sinyal visual/audio yang tersedia.",
-    },
-}
 
 GOALS = {
     "best_overall": "score",
@@ -73,21 +33,25 @@ def classify_profile(transcript: dict, metadata: dict | None = None, activity: d
     text = " ".join([str((metadata or {}).get("title", ""))] + [s.get("text", "") for s in transcript.get("segments", [])]).lower()
     activity = activity or {}
     scores = {name: sum(text.count(term) for term in data["terms"]) for name, data in PROFILES.items()}
+    evidence = [term for data in PROFILES.values() for term in data["terms"] if term in text]
     if activity.get("gameplay"):
-        scores["mobile_legends"] += 3
+        scores["gaming"] += 2; scores["mobile_legends"] += 3; evidence.append("gameplay visual")
     if activity.get("product_demo"):
-        scores["tech_review"] += 2
+        scores["review"] += 2; scores["tech_review"] += 2; evidence.append("product demo")
     if activity.get("speaker_changes", 0) >= 2:
-        scores["podcast"] += 2
+        scores["interview"] += 2; scores["podcast"] += 1; evidence.append("speaker changes")
     ordered = sorted(scores, key=lambda name: (-scores[name], name))
     best, second = ordered[0], ordered[1]
     total = max(1, scores[best] + scores[second])
     confidence = 0.35 if scores[best] == 0 else min(0.98, 0.55 + (scores[best] - scores[second]) / total * 0.4)
-    return {"profile": best, "confidence": round(confidence, 3), "signals": scores, "overridable": True}
+    return {"profile": best, "confidence": round(confidence, 3), "signals": scores,
+            "evidence": list(dict.fromkeys(evidence)), "overridable": True}
 
 
 def profile(name: str) -> dict:
-    return PROFILES.get(name if name != "auto" else "podcast", PROFILES["podcast"])
+    from .profiles import canonical
+
+    return PROFILES[canonical(name)]
 
 
 def overlap(a: dict, b: dict) -> float:
@@ -148,7 +112,8 @@ def normalize(raw: dict, index: int, profile_name: str, source_duration: float) 
         "transcript_excerpt": text, "text": text, "profile": profile_name,
         "title_options": raw.get("title_options") or [raw.get("title") or "Momen pilihan", "Inti pembahasan", "Bagian penting"],
         "title": raw.get("title") or "Momen pilihan", "reason": raw.get("reason", "Skor lokal dan cakupan sumber"),
-        "confidence": round(float(raw.get("confidence", .6)), 3), "viral_readiness": score,
+        "confidence": round(float(raw.get("confidence", .6)), 3), "content_readiness": score,
+        "viral_readiness": score,  # compatibility field for existing projects and API clients
         "readiness": score, "score": score, "score_breakdown": breakdown, "breakdown": breakdown,
         "warnings": warnings, "overlap_percentage": 0, "topic_cluster": topic_cluster(text),
         "speaker": raw.get("speaker"), "scene": raw.get("scene"), "selected": bool(raw.get("selected", False)),
@@ -228,7 +193,7 @@ def chunk_ranges(duration: float, size: float = 900, overlap_seconds: float = 30
 def manifest(items: list[dict], profile_name: str, source: str, revision: int = 1) -> dict:
     return {"schema_version": SCHEMA_VERSION, "revision": revision, "source": source, "profile": profile_name,
             "candidate_count": len(items), "candidates": items, "rankings": rankings(items),
-            "score_note": "Viral Readiness adalah alat review, bukan ramalan viral.",
+            "score_note": "Content Readiness adalah alat review editorial, bukan prediksi performa.",
             "rights_checklist": {"source_permission": False, "attribution": False, "music": False,
                                  "face_voice": False, "product_claims": False, "sponsor_disclosure": False,
                                  "note": "Checklist editorial, bukan nasihat hukum dan tidak memblokir workflow."}}

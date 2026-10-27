@@ -194,7 +194,20 @@ RECIPES["box-punch-podcast"] = _box_punch_profile("podcast", 3, "face")
 RECIPES["box-punch-review"] = _box_punch_profile("tech_review", 5, "product")
 
 AUTO = {"id": "auto", "label": "Auto", "niche": "auto", "badge": "Production", "status": "Production",
+        "surface": "utility", "category": "Otomatis",
         "desc": "Klasifikasi mode dengan confidence dan alasan. Confidence rendah selalu memakai Clean Large tanpa dekorasi."}
+
+PRIMARY_SURFACES = {
+    "recommended": "Bersih",
+    "box-punch-podcast": "Dinamis",
+    "clean-focus": "Edukasi",
+    "ml-hype": "Gaming",
+}
+COMPAT_ALIASES = {
+    "podcast-box": "box-punch-podcast", "podcast-hormozi": "box-punch-podcast",
+    "podcast-quote-glow": "box-punch-podcast", "tech-review": "box-punch-review",
+    "ml-neon": "ml-hype", "edukasi-wbw": "clean-focus", "clipping-campaign": "recommended",
+}
 
 # Gaming tidak berubah; profil tak dikenal / confidence rendah jatuh ke Clean Large.
 PROFILE_DEFAULT = {"podcast": "box-punch-podcast", "interview": "box-punch-podcast",
@@ -207,5 +220,36 @@ def default_for(profile: str | None) -> str:
     return PROFILE_DEFAULT.get(profile or "auto", FALLBACK)
 
 
+def resolve_id(recipe_id: str | None) -> str:
+    recipe_id = recipe_id or FALLBACK
+    return recipe_id if recipe_id in RECIPES else COMPAT_ALIASES.get(recipe_id, FALLBACK)
+
+
+def resolve(recipe_id: str | None, profile: str | None = None) -> dict:
+    requested = recipe_id or default_for(profile)
+    resolved_id = resolve_id(requested)
+    return {**RECIPES[resolved_id], "id": resolved_id, "requested_id": requested,
+            "compatibility_alias": requested != resolved_id}
+
+
+def preview(recipe_id: str | None, profile: str | None = None) -> dict:
+    from . import profiles
+
+    entry = resolve(recipe_id, profile)
+    profile_data = profiles.resolve(profile)
+    settings = entry["settings"]
+    return {"id": entry["id"], "profile": profile_data["id"], "renderer_settings": settings,
+            "caption": settings.get("caption", {}), "crop_strategy": profile_data["crop_strategy"],
+            "safe_zones": profile_data["safe_zones"],
+            "changes": ["caption", "crop", "safe zones", "hook", "decoration"]}
+
+
 def public() -> dict:
-    return {"auto": {**AUTO, "settings": {}}, **{k: {**v, "id": k} for k, v in RECIPES.items()}}
+    result = {"auto": {**AUTO, "settings": {}}}
+    for recipe_id, value in RECIPES.items():
+        category = PRIMARY_SURFACES.get(recipe_id)
+        result[recipe_id] = {**value, "id": recipe_id,
+                             "surface": "primary" if category else "experimental",
+                             "category": category or "Experimental",
+                             "compatibility_target": COMPAT_ALIASES.get(recipe_id)}
+    return result

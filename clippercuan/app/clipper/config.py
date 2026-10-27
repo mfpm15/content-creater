@@ -43,7 +43,7 @@ DEFAULTS: dict = {
     "source_has_burned_captions": "unknown",  # unknown | yes | no; heuristik hanya warning
     "min_score": 45,             # render otomatis melewati kandidat di bawah skor ini (minimal 1 klip tetap dibuat)
     "storage": "full",           # full | lite (link: hanya audio + potongan klip yang diunduh)
-    "content_profile": "auto",  # auto | podcast | tech_review | mobile_legends
+    "content_profile": "auto",  # auto | general | podcast | interview | review | tech_review | gaming | mobile_legends | educational
     "candidate_count": 15,       # kandidat dibuat & diranking (seperti "Detected clips")
     "auto_render": False,        # kandidat harus dipilih sebelum batch render
     "diversity": 0.30,           # bobot MMR untuk variasi semantik/scene/speaker

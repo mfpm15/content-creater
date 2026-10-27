@@ -31,7 +31,8 @@ def test_profile_classifier_and_override_profiles():
     assert candidates.classify_profile(tech)["profile"] == "tech_review"
     assert candidates.classify_profile(game)["profile"] == "mobile_legends"
     assert candidates.classify_profile(podcast)["profile"] == "podcast"
-    assert set(candidates.PROFILES) == {"podcast", "tech_review", "mobile_legends"}
+    assert {"general", "podcast", "interview", "review", "tech_review",
+            "gaming", "mobile_legends", "educational"} <= set(candidates.PROFILES)
 
 
 def test_profile_weights_change_score_without_mutation():

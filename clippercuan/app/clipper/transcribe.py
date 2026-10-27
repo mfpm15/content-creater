@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Callable
 
+from . import asr
 from .config import MODELS_DIR
 
 _MODEL_CACHE: dict = {}
@@ -66,7 +67,8 @@ def transcribe(
         if idx:
             segments.append({"text": seg.text.strip(), "s": words[idx[0]]["s"], "e": words[idx[-1]]["e"], "words": idx})
         progress(min(seg.end / total, 1.0), f"Transkripsi {int(seg.end)}/{int(total)} detik")
-    return {"language": info.language, "words": words, "segments": segments}
+    return asr.finalize_transcript(words, language, info.language, "whisper-local", model_name,
+                                   float(getattr(info, "language_probability", 0.8) or 0.8), "word", None)
 
 
 def load_or_transcribe(cache: Path, wav: Path, **kw) -> dict:

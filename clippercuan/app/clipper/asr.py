@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import statistics
 import subprocess
 import tempfile
 import urllib.error
@@ -54,13 +55,68 @@ def words_from_line(text: str, start: float, end: float) -> list[dict]:
     return out
 
 
+_EN_MARKERS = {"the", "and", "is", "are", "review", "battery", "life", "don't", "it's", "with", "for"}
+_ID_MARKERS = {"yang", "dan", "ini", "itu", "nggak", "gue", "kita", "hari", "cara", "mau"}
+_PROPER_CASE = {"microsoft": "Microsoft", "copilot": "Copilot", "openai": "OpenAI", "youtube": "YouTube",
+                "tiktok": "TikTok", "mlbb": "MLBB"}
+
+
+def finalize_transcript(words: list[dict], requested_language: str = "auto",
+                        detected_language: str | None = None, backend: str = "unknown",
+                        model: str = "unknown", language_confidence: float | None = None,
+                        timing_source: str = "word", fallback_reason: str | None = None) -> dict:
+    """Normalize ASR output without rewriting speech and attach an auditable render contract."""
+    cleaned, edits = [], []
+    for raw in words:
+        text = str(raw.get("w", "")).strip()
+        if not text:
+            continue
+        canonical = _PROPER_CASE.get(text.casefold(), text)
+        if canonical != text:
+            edits.append({"from": text, "to": canonical, "reason": "known proper noun casing"})
+        cleaned.append({**raw, "w": canonical, "s": round(float(raw.get("s", 0)), 3),
+                        "e": round(max(float(raw.get("e", 0)), float(raw.get("s", 0)) + .05), 3)})
+    cleaned.sort(key=lambda word: word["s"])
+    for left, right in zip(cleaned, cleaned[1:]):
+        if left["e"] > right["s"]:
+            previous = left["e"]
+            left["e"] = round(max(left["s"] + .05, right["s"]), 3)
+            edits.append({"from": previous, "to": left["e"], "reason": "timestamp overlap"})
+    tokens = {re.sub(r"[^\w']", "", word["w"].casefold()) for word in cleaned}
+    en_hits, id_hits = sorted(tokens & _EN_MARKERS), sorted(tokens & _ID_MARKERS)
+    code_switch = bool(en_hits and id_hits) or (detected_language == "id" and bool(en_hits))
+    probabilities = [float(word.get("p", .8)) for word in cleaned]
+    word_confidence = statistics.fmean(probabilities) if probabilities else 0.0
+    lang_confidence = float(language_confidence if language_confidence is not None else word_confidence)
+    confidence = min(lang_confidence, word_confidence) if cleaned else 0.0
+    render_allowed = bool(cleaned) and confidence >= .5
+    duration = cleaned[-1]["e"] - cleaned[0]["s"] if cleaned else 0.0
+    warning = None if render_allowed else ("Confidence transkripsi rendah; subtitle tidak dirender otomatis."
+                                             if cleaned else "Audio/ucapan tidak terdeteksi; subtitle tidak dibuat-buat.")
+    source = backend if model in ("", "unknown") else f"{backend}:{model}"
+    return {
+        "language": detected_language, "detected_language": detected_language,
+        "requested_language": requested_language or "auto", "language_confidence": round(lang_confidence, 3),
+        "transcript_confidence": round(confidence, 3),
+        "code_switching": {"detected": code_switch, "primary": detected_language,
+                           "english_markers": en_hits, "indonesian_markers": id_hits},
+        "words": cleaned, "segments": build_segments(cleaned), "source": source,
+        "asr_backend": backend, "asr_model": model, "backend_fallback_reason": fallback_reason,
+        "word_timestamps": bool(cleaned) and timing_source == "word", "timing_source": timing_source,
+        "normalization_profile": "preserve-id-en-proper-nouns-v1", "cleanup_edits": edits,
+        "segmentation_metrics": {"words": len(cleaned), "segments": len(build_segments(cleaned)),
+                                 "duration": round(duration, 3),
+                                 "words_per_second": round(len(cleaned) / max(duration, .001), 2)},
+        "caption_layer_count": 1, "render_allowed": render_allowed,
+        "status": "ready" if render_allowed else "needs_attention", "warning": warning,
+        "retry_options": ["model", "language_override", "backend"],
+    }
+
+
 def _finish(words: list[dict], language: str | None, source: str) -> dict:
-    words = [w for w in words if w["w"].strip()]
-    words.sort(key=lambda w: w["s"])
-    for a, b in zip(words, words[1:]):  # rapikan tumpang tindih
-        if a["e"] > b["s"]:
-            a["e"] = max(a["s"] + 0.05, b["s"])
-    return {"language": language, "words": words, "segments": build_segments(words), "source": source}
+    timing = "synthetic" if any(word.get("synthetic_timing") for word in words) else "word"
+    confidence = statistics.fmean([float(word.get("p", .8)) for word in words]) if words else 0.0
+    return finalize_transcript(words, "auto", language, source, "unknown", confidence, timing, None)
 
 
 # ------------------------------------------------------------------ YouTube

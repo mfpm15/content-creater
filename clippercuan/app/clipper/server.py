@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 from contextlib import asynccontextmanager
 
-from . import __version__, asr, automation, effects, llm, media, project
+from . import __version__, asr, automation, effects, llm, media, profiles, project
 from .captions import FONT_PRESETS
 from .config import DATA_DIR, DEFAULTS, FONTS_DIR, UPLOADS_DIR, WEB_DIR
 
@@ -139,6 +139,12 @@ class CaptionWorkspaceAction(BaseModel):
     payload: dict = {}
 
 
+class ProfilePreview(BaseModel):
+    profile: str = "auto"
+    classification_confidence: float = 0.0
+    evidence: list[str] = []
+
+
 def _get(pid: str) -> dict:
     try:
         return project.load(pid)
@@ -161,10 +167,23 @@ def health():
 
 @app.get("/api/info")
 def info():
-    from . import candidates
-    profiles = {name: {k: v for k, v in data.items() if k not in {"weights", "terms"}} for name, data in candidates.PROFILES.items()}
     return {"version": __version__, "data_dir": str(DATA_DIR), "defaults": DEFAULTS, "fonts": list(FONT_PRESETS),
-            "profiles": profiles, "inbox_dir": str(automation.INBOX_DIR)}
+            "profiles": profiles.public_registry(), "inbox_dir": str(automation.INBOX_DIR)}
+
+
+@app.get("/api/profiles")
+def content_profiles():
+    return {"source_of_truth": "backend", "profiles": profiles.public_registry(),
+            "aliases": profiles.ALIASES, "fallback": profiles.resolve("general")}
+
+
+@app.post("/api/profiles/preview")
+def preview_profile(body: ProfilePreview):
+    classification = {"profile": body.profile, "confidence": body.classification_confidence,
+                      "evidence": body.evidence}
+    resolved = profiles.resolve_selection(body.profile, classification)
+    return {"resolved": resolved, "confidence": round(body.classification_confidence, 3),
+            "reasons": [resolved["reason"], *body.evidence]}
 
 
 @app.get("/api/recipes")

@@ -203,6 +203,18 @@ def _pipeline(pid: str) -> None:
         else:
             tr, energy = {"language": None, "words": [], "segments": []}, np_.zeros(1)
 
+    if not tr.get("render_allowed", True):
+        update(pid, status="needs_attention", progress=0.62,
+               message=tr.get("warning") or "Transkripsi perlu diperiksa sebelum kandidat dibuat",
+               language=tr.get("detected_language") or tr.get("language"),
+               transcript_source=tr.get("source"), transcription_status="needs_attention",
+               transcription_metadata={k: tr.get(k) for k in (
+                   "requested_language", "detected_language", "language_confidence", "transcript_confidence",
+                   "code_switching", "asr_backend", "asr_model", "backend_fallback_reason",
+                   "word_timestamps", "normalization_profile", "cleanup_edits", "segmentation_metrics",
+                   "caption_layer_count", "retry_options")})
+        return
+
     visual = None
     if not lite:
         _progress(pid, 0.62, 0.65)(0, "Membaca aktivitas visual (scene & gerak)…")
@@ -211,12 +223,14 @@ def _pipeline(pid: str) -> None:
     target = clip_target(cfg, pr.duration)
     count = max(target + 3, min(30, int(cfg.get("candidate_count") or 10)))
     count = min(30, count)
-    # profil & resep ditentukan dulu: resep otomatis ikut menentukan durasi, format, dan gaya
+    # Profil backend adalah source of truth untuk scoring, recipe, crop, caption, dan manifest.
+    from . import profiles
+
     classified = candidates.classify_profile(tr, {"title": title}, _activity(p, pr, src, tr, cfg))
-    profile_name = cfg.get("content_profile", "auto")
-    if profile_name == "auto":
-        profile_name = classified["profile"]
+    resolved_profile = profiles.resolve_selection(cfg.get("content_profile", "auto"), classified)
+    profile_name = resolved_profile["id"]
     cfg = _apply_auto_recipe(pid, cfg, profile_name, classified)
+    cfg["profile_resolved"] = {k: v for k, v in resolved_profile.items() if k not in {"weights", "terms"}}
     preset = cfg.get("duration_preset", "custom" if (cfg.get("min_sec"), cfg.get("max_sec")) != (15, 60) else "auto")
     if preset == "custom":
         mn, mx, duration_reason = float(cfg["min_sec"]), float(cfg["max_sec"]), "Rentang durasi kustom"
@@ -224,7 +238,8 @@ def _pipeline(pid: str) -> None:
         mn, mx, duration_reason = highlights.duration_range(preset, tr)
     cfg["min_sec"], cfg["max_sec"] = mn, mx
     update(pid, settings=cfg, duration_estimate={"min": mn, "max": mx, "reason": duration_reason, "preset": preset},
-           content_profile=profile_name, profile_classification=classified, clip_target=target)
+           content_profile=profile_name, profile_classification=classified,
+           profile_resolved=cfg["profile_resolved"], clip_target=target)
     moments, engine = None, "lokal"
     if tr["segments"] and llm.active("moments") and cfg.get("use_llm", True):
         model = llm.cfg()["model_moments"]
@@ -317,7 +332,6 @@ def _apply_auto_recipe(pid: str, cfg: dict, profile_name: str, classified: dict)
     from .recipes import FALLBACK, RECIPES, default_for
 
     if cfg.get("recipe") == "auto" and not cfg.get("recipe_applied"):   # Ulangi tidak menimpa gaya yang sudah diedit
-        # confidence hanya relevan bila profil berasal dari klasifikasi otomatis
         auto_profile = cfg.get("content_profile", "auto") == "auto"
         low = auto_profile and float((classified or {}).get("confidence", 1.0) or 0) < 0.5
         rid = FALLBACK if low else default_for(profile_name)
@@ -377,8 +391,11 @@ def _transcript(pid: str, source: str, cfg: dict, work: Path, get_wav, duration:
         update(pid, asr_warning=" · ".join(notes) + f". Dipakai: {tr['source']}.")
     tr["_key"] = key
     tr["quality_report"] = caption_workspace.quality_report(tr, duration)
+    if not tr.get("render_allowed", True):
+        update(pid, asr_warning=tr.get("warning") or "Subtitle membutuhkan pemeriksaan",
+               transcription_status="needs_attention")
     caption_workspace.atomic_json(cache, tr)
-    ws = caption_workspace.workspace(tr, duration, load(pid).get("content_profile", "podcast"))
+    ws = caption_workspace.workspace(tr, duration, load(pid).get("content_profile", "general"))
     caption_workspace.atomic_json(work / "caption-workspace.json", ws)
     update(pid, transcript_source=tr.get("source"), transcription_quality=tr["quality_report"],
            caption_workspace={"schema_version": 3, "revision": ws["revision"], "recommended_template": ws["recommended_template"]})
@@ -584,7 +601,7 @@ def load_caption_workspace(pid: str) -> dict:
         return json.loads(path.read_text("utf-8"))
     transcript_path = pdir(pid) / "transcript.json"
     transcript = json.loads(transcript_path.read_text("utf-8")) if transcript_path.exists() else {"words": [], "segments": [], "source": p.get("transcript_source", "unknown")}
-    data = caption_workspace.workspace(transcript, p.get("media", {}).get("duration", 0), p.get("content_profile", "podcast"))
+    data = caption_workspace.workspace(transcript, p.get("media", {}).get("duration", 0), p.get("content_profile", "general"))
     caption_workspace.atomic_json(path, data)
     return data
 
@@ -692,8 +709,10 @@ def rerender_all(pid: str, settings: dict) -> dict:
 
 
 def _write_manifest(p: dict) -> None:
-    data = candidates.manifest(p.get("candidates", []), p.get("content_profile", "podcast"), p.get("source", ""),
+    data = candidates.manifest(p.get("candidates", []), p.get("content_profile", "general"), p.get("source", ""),
                                int(p.get("manifest_revision", 0)) + 1)
+    data["profile_resolved"] = p.get("profile_resolved") or p.get("settings", {}).get("profile_resolved")
+    data["transcription"] = {k: p.get(k) for k in ("language", "transcript_source", "transcription_quality", "transcription_status")}
     cap = p.get("settings", {}).get("caption", {})
     data["render_settings"] = {"template_id": cap.get("template_id") or cap.get("preset") or "none/raw",
                                "font": cap.get("font"), "size_level": cap.get("size_level", "custom"),
@@ -729,7 +748,7 @@ def candidate_action(pid: str, cid: str, action: str, value=True) -> dict:
         item[action] = bool(value)
         if action == "banned" and value:
             item["selected"] = False
-        p["candidates"] = candidates.rerank(p["candidates"], p.get("content_profile", "podcast"),
+        p["candidates"] = candidates.rerank(p["candidates"], p.get("content_profile", "general"),
                                               float(p["settings"].get("diversity", .3)),
                                               float(p["settings"].get("max_overlap", .35)))
         p["clips"] = p["candidates"]
@@ -740,7 +759,7 @@ def candidate_action(pid: str, cid: str, action: str, value=True) -> dict:
 def rerank_candidates(pid: str, options: dict | None = None) -> dict:
     with _LOCK:
         p = load(pid); options = options or {}
-        profile_name = options.get("profile", p.get("content_profile", "podcast"))
+        profile_name = options.get("profile", p.get("content_profile", "general"))
         p["content_profile"] = profile_name
         p["candidates"] = candidates.rerank(p["candidates"], profile_name,
                                               float(options.get("diversity", p["settings"].get("diversity", .3))),

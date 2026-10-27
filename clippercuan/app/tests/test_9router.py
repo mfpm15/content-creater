@@ -92,11 +92,12 @@ def test_ui_assets_workflow_contract_and_no_credentials():
     assert "text/css" in css.headers["content-type"]
     assert "javascript" in js.headers["content-type"]
     for marker in (b'id="srcTabs"', b'id="url"', b'id="file"', b'id="start"', b'id="startTop"', b'id="localFallback"', b'id="recipes"',
-                   b'id="storage_lite"', b'id="uiMode"', b'id="durationPreset"', b'id="capStyle"', b'src="studio.js"',
-                   b'production-flow', b'decoration_mode', b'skip-link', b'Production', b'Beta'):
+                   b'id="experimentalRecipes"', b'id="storage_lite"', b'id="uiMode"', b'id="durationPreset"', b'id="capStyle"',
+                   b'src="studio.js"', b'production-flow', b'decoration_mode', b'skip-link', b'Production',
+                   b'General', b'Interview', b'Review', b'Gaming', b'Educational'):
         assert marker in html.content
     studio = client.get("/studio.js")
-    assert studio.status_code == 200 and b"DETECTED CLIPS" in studio.content and b"VIRAL READINESS" in studio.content
+    assert studio.status_code == 200 and b"DETECTED CLIPS" in studio.content and b"CONTENT READINESS" in studio.content
     assert b"Decoration" in studio.content and b"decoration" in studio.content
     assert b"prefers-reduced-motion" in css.content and b"color-scheme:light" in css.content
     assert b"/api/projects" in js.content and b"source, settings" in js.content
