@@ -40,7 +40,7 @@ def load_words() -> list[dict]:
 
 
 def validation_configs() -> dict[str, dict]:
-    """Resolve A/B variants from production recipes; only runtime-neutral controls are overridden."""
+    """Resolve requested variants from production recipes; overrides affect runtime only, never caption style."""
     common = {
         "layout": "portrait", "smart_crop": False, "cut_silence": False,
         "caption_layers": 1, "source_has_burned_captions": "no",
@@ -53,9 +53,9 @@ def validation_configs() -> dict[str, dict]:
     out = {"raw_measurement_reference": deep_merge(DEFAULTS, deep_merge(common, {
         "caption": {"enabled": False, "template_id": "none/raw", "preset": "none/raw"}
     }))}
-    for label, recipe_id in (("viral_pop", "recommended"),
-                             ("box_punch", "clean-focus"),
-                             ("neon_karaoke", "minimal-medium")):
+    for label, recipe_id in (("clean_large", "recommended"),
+                             ("clean_focus_large", "clean-focus"),
+                             ("minimal_medium", "minimal-medium")):
         cfg = deep_merge(DEFAULTS, RECIPES[recipe_id]["settings"])
         cfg = deep_merge(cfg, common)
         cfg["recipe"] = recipe_id
@@ -112,7 +112,7 @@ def main() -> int:
         result = render.render_clip(work, source, probe, clip, cfg, words)
         video = work / result["file"]
         frames = extract_frames(video, work / "frames", float(result["duration"]))
-        root_video = audit / f"{clip_id}.mp4"
+        root_video = audit / f"validation_{label}_{stamp}.mp4"
         shutil.copy2(video, root_video)
         results[label] = {
             **result,
@@ -124,8 +124,9 @@ def main() -> int:
 
     report = {
         "schema_version": 2,
-        "render_path": "clipper.render.render_clip (production)",
-        "configuration_source": "clipper.recipes.RECIPES",
+        "render_path": "clipper.render.render_clip (same production entrypoint used by API/UI)",
+        "configuration_source": "clipper.recipes.RECIPES; orchestration overrides are runtime-neutral",
+        "caption_style_overrides": False,
         "measurement_reference": "raw_measurement_reference is not an A/B candidate",
         "project": str(PROJECT), "audit": str(audit), "source": str(source),
         "clip": {"id": original.get("id"), "start": original["start"], "end": original["end"]},

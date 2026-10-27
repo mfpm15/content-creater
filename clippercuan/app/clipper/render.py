@@ -309,6 +309,7 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     effective_units = int(float(cap.get("size", 0)) * size[0] / 1080) if cap.get("enabled") else 0
     estimated_height = effective_units * float(cap.get("line_height", 1.12)) + 2 * int(float(cap.get("outline", 0)) * size[0] / 1080)
     caption_meta = {"template_id": template_id, "template_name": template_name, "font": cap.get("font"),
+                    "caption_size_preset": cap.get("size_level", "custom"),
                     "size_level": cap.get("size_level", "custom"), "ass_size": cap.get("size"),
                     "effective_ass_size": effective_units, "effective_caption_height_px_estimate": round(estimated_height, 1),
                     "effective_caption_height_pct": round(estimated_height / size[1] * 100, 2),
@@ -317,14 +318,17 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
                     "animation": cap.get("animation", "none"), "effect": cap.get("effect", "none"),
                     "active_word": cap.get("style") in {"karaoke", "box"} or bool(cap.get("box")),
                     "emphasis_mode": "box" if cap.get("style") == "box" or cap.get("box") else "active-word" if cap.get("style") == "karaoke" else cap.get("accent_mode") if cap.get("style") == "keyword" else "none",
-                    "caption_source": "transcript", "caption_layers": 1}
+                    "caption_source": "transcript", "caption_layers": 1,
+                    "burned_in": bool(cap.get("enabled")), "sidecar_autoload_safe": True}
     crop_confidence = (0.0 if not keys else min(1.0, max(.35, len(keys) / max(out_dur / 4, 1)))) if smart else 1.0
     return {"file": out.name, "thumb": f"{cid}.jpg", "srt": f"subtitles/{cid}.srt",
             "ass": f"subtitles/{cid}.ass", "sidecar_autoload_safe": True,
             "crop_keys": keys, "words": cw,
             "duration": round(out_dur, 2), "cut_saved": round(dur - out_dur, 2), "emojis": [e["code"] for e in emojis],
             "caption_cues": len(captions.chunk_words(sub_words, int(cfg["caption"].get("words_per_line", 3)))),
-            "caption_layers": 1, "caption_provenance": "ASS:spoken-caption", "caption_render": caption_meta,
+            "caption_layers": 1, "caption_provenance": "ASS:spoken-caption",
+            "caption_size_preset": caption_meta["caption_size_preset"],
+            "burned_in": caption_meta["burned_in"], "caption_render": caption_meta,
             "template_id": template_id, "template_name": template_name,
             "effective_caption_height_pct": caption_meta["effective_caption_height_pct"],
             "hook_provenance": "ASS:hook" if cfg["title"].get("enabled") else None,

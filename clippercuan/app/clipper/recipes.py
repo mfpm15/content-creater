@@ -10,8 +10,9 @@ CAPTION_SIZE_LEVELS = {"small": 64, "medium": 72, "large": 84, "xlarge": 96}
 
 
 def _clean_caption(template_id: str, size: int, style: str = "clean") -> dict:
+    size_level = next((level for level, value in CAPTION_SIZE_LEVELS.items() if value == size), "custom")
     return {"enabled": True, "role": "spoken-caption", "preset": template_id, "template_id": template_id,
-            "size_level": "large" if size == 84 else "medium", "style": style, "box": False, "effect": "none",
+            "size_level": size_level, "style": style, "box": False, "effect": "none",
             "font": "Barlow Condensed", "size": size, "outline": 4, "shadow": 0, "color": "#FFFFFF",
             "highlight": "#FFD166", "uppercase": False, "words_per_line": 5, "max_chars": 30,
             "max_lines": 2, "line_height": 1.12, "safe_area": .18, "position": "bottom", "y_pct": 74,
@@ -26,25 +27,50 @@ _BASE_CLEAN = {"content_profile": "auto", "duration_preset": "auto", "layout": "
 
 RECIPES: dict[str, dict] = {
     "recommended": {
-        "label": "Viral Pop", "template_name": "Viral Pop", "niche": "auto", "badge": "Default eye-catching",
-        "desc": "Caption besar dengan active-word kuning, punch scale per kata, outline tegas, dan glow ringan.",
+        "label": "Clean Large", "template_name": "Clean Large", "niche": "auto", "badge": "Default · Besar",
+        "tier": "primary", "experimental": False,
+        "desc": "Caption putih besar, stabil, maksimal dua baris, tanpa active-word, animasi, glow, box, atau elemen dekoratif.",
+        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("clean-large", 84),
+            "outline": 4, "words_per_line": 5, "max_chars": 30, "y_pct": 74}},
+    },
+    "clean-focus": {
+        "label": "Clean Focus Large", "template_name": "Clean Focus Large", "niche": "auto", "badge": "Opsi kedua · Besar",
+        "tier": "primary", "experimental": False,
+        "desc": "Caption besar stabil dengan satu kata aksen sederhana dalam event glyph tunggal, tanpa layer visual duplikat.",
+        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("clean-focus-large", 84, "keyword"),
+            "accent_mode": "color", "accent_scale": 106, "outline": 4, "words_per_line": 5,
+            "max_chars": 30, "y_pct": 74}},
+    },
+    "minimal-medium": {
+        "label": "Minimal Medium", "template_name": "Minimal Medium", "niche": "auto", "badge": "Pembanding · Sedang",
+        "tier": "primary", "experimental": False,
+        "desc": "Caption putih stabil ukuran sedang untuk pembanding keterbacaan.",
+        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("minimal-medium", 72),
+            "outline": 3, "words_per_line": 5, "max_chars": 32, "y_pct": 74}},
+    },
+    "viral-pop": {
+        "label": "Viral Pop · Eksperimental", "template_name": "Viral Pop", "niche": "advanced", "badge": "Advanced · Eksperimental",
+        "tier": "advanced", "experimental": True,
+        "desc": "Karaoke, pop, dan glow. Hanya opt-in; tidak pernah dipilih otomatis.",
         "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("viral-pop", 84, "karaoke"),
             "animation": "pop", "effect": "glow", "glow_color": "#FFD166", "outline": 5,
             "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
     },
-    "clean-focus": {
-        "label": "Box Punch", "template_name": "Box Punch", "niche": "auto", "badge": "Energetic",
-        "desc": "Kotak warna bergerak mengikuti kata aktif dengan punch scale dan kontras tinggi.",
+    "box-punch": {
+        "label": "Box Punch · Eksperimental", "template_name": "Box Punch", "niche": "advanced", "badge": "Advanced · Eksperimental",
+        "tier": "advanced", "experimental": True,
+        "desc": "Kotak mengikuti kata aktif dan animasi pop. Hanya opt-in; tidak pernah dipilih otomatis.",
         "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("box-punch", 84, "box"),
-            "box": True, "animation": "pop", "effect": "none", "highlight": "#FFC933",
-            "outline": 5, "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
+            "box": True, "animation": "pop", "highlight": "#FFC933", "outline": 5,
+            "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
     },
-    "minimal-medium": {
-        "label": "Neon Karaoke", "template_name": "Neon Karaoke", "niche": "auto", "badge": "Stylized",
-        "desc": "Active-word cyan dengan glow neon dan transisi pop untuk tampilan teknologi.",
-        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("neon-karaoke", 82, "karaoke"),
-            "size_level": "large", "animation": "pop", "effect": "glow", "highlight": "#54E6E6",
-            "glow_color": "#54E6E6", "outline": 5, "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
+    "neon-karaoke": {
+        "label": "Neon Karaoke · Eksperimental", "template_name": "Neon Karaoke", "niche": "advanced", "badge": "Advanced · Eksperimental",
+        "tier": "advanced", "experimental": True,
+        "desc": "Active-word cyan, glow neon, dan pop. Hanya opt-in; tidak pernah dipilih otomatis.",
+        "settings": {**_BASE_CLEAN, "caption": {**_clean_caption("neon-karaoke", 84, "karaoke"),
+            "animation": "pop", "effect": "glow", "highlight": "#54E6E6", "glow_color": "#54E6E6",
+            "outline": 5, "words_per_line": 4, "max_chars": 27, "y_pct": 72}},
     },
     "podcast-box": {
         "label": "Podcast · Box merah", "niche": "podcast", "badge": "Paling populer",

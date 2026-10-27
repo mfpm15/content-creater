@@ -61,19 +61,19 @@ def test_cues_deduplicate_identical_overlap_without_dropping_words():
     assert caption_workspace.validate_cues(items)["valid"]
 
 
-def test_tech_review_default_is_viral_pop_single_caption():
+def test_tech_review_default_is_clean_large_single_caption():
     rid = recipes.PROFILE_DEFAULT["tech_review"]
     recipe = recipes.RECIPES[rid]
     cap = recipe["settings"]["caption"]
-    assert rid == "recommended" and recipe["template_name"] == "Viral Pop"
-    assert cap["template_id"] == "viral-pop" and cap["size_level"] == "large"
-    assert cap["style"] == "karaoke" and cap["box"] is False
-    assert cap["animation"] == "pop" and cap["effect"] == "glow"
+    assert rid == "recommended" and recipe["template_name"] == "Clean Large"
+    assert cap["template_id"] == "clean-large" and cap["size_level"] == "large"
+    assert cap["style"] == "clean" and cap["box"] is False
+    assert cap["animation"] == "none" and cap["effect"] == "none"
     assert recipe["settings"]["title"]["enabled"] is False
     assert recipe["settings"]["caption_layers"] == 1
     assert cap["size"] == recipes.CAPTION_SIZE_LEVELS["large"] > recipes.CAPTION_SIZE_LEVELS["medium"]
     assert cap["max_lines"] == 2 and cap["line_height"] >= 1.1
-    assert cap["outline"] >= 5 and cap["words_per_line"] <= 4
+    assert cap["outline"] >= 4 and 3 <= cap["words_per_line"] <= 6
 
 
 def test_clean_ass_uses_configured_thin_outline_without_shadow():
@@ -108,7 +108,9 @@ def test_clean_focus_uses_same_font_and_subtle_keyword_scale():
 
 
 def test_box_punch_recipe_is_opt_in_and_keeps_single_layer_contract():
-    recipe = recipes.RECIPES["clean-focus"]["settings"]
+    entry = recipes.RECIPES["box-punch"]
+    assert entry["tier"] == "advanced" and entry["experimental"] is True
+    recipe = entry["settings"]
     cap = recipe["caption"]
     assert cap["template_id"] == "box-punch"
     assert cap["style"] == "box" and cap["box"] is True
@@ -117,14 +119,30 @@ def test_box_punch_recipe_is_opt_in_and_keeps_single_layer_contract():
 
 
 def test_all_primary_templates_have_identity_and_two_line_contract():
-    for rid in ("recommended", "clean-focus", "minimal-medium"):
+    expected = {"recommended": "clean", "clean-focus": "keyword", "minimal-medium": "clean"}
+    for rid, style in expected.items():
         recipe = recipes.RECIPES[rid]
         cap = recipe["settings"]["caption"]
         assert recipe["template_name"] and cap["template_id"]
+        assert recipe["tier"] == "primary" and recipe["experimental"] is False
         assert cap["max_lines"] == 2 and cap["line_height"] >= 1.1
-        assert cap["animation"] == "pop"
-        assert cap["style"] in {"karaoke", "box"}
+        assert cap["animation"] == "none" and cap["effect"] == "none"
+        assert cap["style"] == style and cap["box"] is False
         assert recipe["settings"]["caption_layers"] == 1
+
+
+def test_experimental_templates_are_never_automatic():
+    automatic = {"recommended", *recipes.PROFILE_DEFAULT.values()}
+    for rid in ("viral-pop", "box-punch", "neon-karaoke"):
+        recipe = recipes.RECIPES[rid]
+        assert rid not in automatic
+        assert recipe["tier"] == "advanced" and recipe["experimental"] is True
+        assert "Eksperimental" in recipe["label"]
+
+
+def test_size_mapping_is_deterministic_and_large_exceeds_medium():
+    assert recipes.CAPTION_SIZE_LEVELS == {"small": 64, "medium": 72, "large": 84, "xlarge": 96}
+    assert recipes.RECIPES["recommended"]["settings"]["caption"]["size"] > recipes.RECIPES["minimal-medium"]["settings"]["caption"]["size"]
 
 
 def test_render_manifest_contract_contains_identity_and_effective_metric():

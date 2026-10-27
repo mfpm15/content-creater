@@ -21,7 +21,7 @@ AUDIT = Path(os.environ.get(
     "CLIPPER_VALIDATION_AUDIT",
     PROJECT / "caption_clean_validation_20261027_095710",
 ))
-VARIANTS = ("viral_pop", "box_punch", "neon_karaoke")
+VARIANTS = ("clean_large", "clean_focus_large", "minimal_medium")
 
 
 def read_image(path: Path) -> np.ndarray:
@@ -120,7 +120,7 @@ def main() -> int:
         variant_sheet = contact_sheet(variant_tiles, 4)
         cv2.imwrite(str(AUDIT / f"contact_sheet_{variant}.jpg"), variant_sheet, [cv2.IMWRITE_JPEG_QUALITY, 92])
 
-    for index, record in enumerate(report["results"]["viral_pop"]["frames"]):
+    for index, record in enumerate(report["results"]["clean_large"]["frames"]):
         for variant in VARIANTS:
             frame = read_image(AUDIT / variant / "frames" / record["full"])
             comparison_tiles.append(labeled_tile(frame, f"{variant}  {record['timestamp']:.2f}s", 240))

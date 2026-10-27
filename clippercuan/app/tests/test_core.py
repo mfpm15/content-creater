@@ -224,11 +224,11 @@ def test_backward_compatible_defaults_and_security_redaction():
     old = {"clip_count": 2, "caption": {"style": "clean"}}
     migrated = deep_merge(DEFAULTS, old)
     assert migrated["duration_preset"] == "auto"
-    assert migrated["caption"]["preset"] == "viral-pop"
-    assert migrated["caption"]["template_id"] == "viral-pop"
+    assert migrated["caption"]["preset"] == "clean-large"
+    assert migrated["caption"]["template_id"] == "clean-large"
     assert migrated["caption"]["size_level"] == "large"
-    assert migrated["caption"]["animation"] == "pop"
-    assert migrated["caption"]["effect"] == "glow"
+    assert migrated["caption"]["animation"] == "none"
+    assert migrated["caption"]["effect"] == "none"
     assert migrated["caption_layers"] == 1 and migrated["caption"]["role"] == "spoken-caption"
     public = llm.public_settings()
     assert public["llm"]["api_key"] in ("", "••••") and public["asr"]["api_key"] in ("", "••••")

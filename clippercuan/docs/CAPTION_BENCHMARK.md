@@ -41,13 +41,14 @@ Ranked hypotheses before implementation:
 
 Implemented response:
 
-- Animated production templates: Viral Pop (default), Box Punch, and Neon Karaoke.
-- Deterministic size levels: Small 64, Medium 72, Large 84, Extra Large 96 ASS units at a 1080-wide output.
-- Every render result now records template ID/name, font, nominal and effective ASS size, estimated caption height, placement, line budget, emphasis mode, source, and layer count.
-- Studio preview now scales from width, matching the renderer's 1080-wide coordinate basis.
-- The validation harness resolves production recipes and labels its caption-free output as a measurement reference, not an A/B candidate.
+- Production templates are Clean Large (default), Clean Focus Large, and Minimal Medium. They are stable, single-layer caption treatments with no pop animation, glow, moving box, or active-word karaoke.
+- Viral Pop, Box Punch, and Neon Karaoke remain available only under Advanced as explicitly experimental, opt-in templates. No automatic content profile selects them.
+- Deterministic size levels are Small 64, Medium 72, Large 84, and Extra Large 96 ASS units at a 1080-wide output.
+- Every render result records template ID/name, caption-size preset, font, nominal and effective ASS size, estimated caption height, placement, line budget, emphasis mode, caption source, burned-in state, sidecar safety, and layer count.
+- Studio preview scales from width, matching the renderer's 1080-wide coordinate basis, and the result card displays the template, human-readable size, font, and one-layer status.
+- The validation harness resolves production recipes and invokes the same `clipper.render.render_clip` entry point used by the application. Its only overrides are runtime-neutral controls such as CPU encoding, fixed resolution, disabled smart crop, and disabled optional overlays. It records `caption_style_overrides: false` and labels its caption-free output as a measurement reference rather than an A/B candidate.
 
-Rendered-frame validation on 27 October 2026 used twelve timestamps from the same 20.47-second source interval and a caption-free render as the pixel-difference reference. Eleven timestamps contained visible captions. Viral Pop measured a median 79 pixels (4.11 percent of 1920-pixel frame height), Box Punch measured 104 pixels (5.42 percent), and Neon Karaoke measured 77 pixels (4.01 percent). Minimum bottom clearance was 24.06 percent across all animated variants. The comparison sheet and representative full-resolution frames showed active-word emphasis, no clipping, no third line, no duplicate transcript layer, and stable placement. Viral Pop was selected as the production default after direct video review because its yellow active word, restrained glow, and pop transition supplied visual energy without the larger box footprint of Box Punch.
+Rendered-frame validation completed on 27 October 2026 in `caption_clean_validation_20261027_103235`. It used twelve timestamps from the same 20.47-second source interval and a caption-free render as the pixel-difference reference. Clean Large measured a median 67 pixels (3.49 percent of the 1920-pixel frame height), Clean Focus Large measured 68 pixels (3.54 percent), and Minimal Medium measured 57 pixels (2.97 percent). Minimum bottom clearance was 23.70 percent across the three production variants. Every result reported one caption layer, safe sidecar placement, twelve full frames plus twelve caption crops, no active-word mode, and no style override in the validation harness. Large therefore measured clearly larger than Medium while all three retained the configured two-line ceiling.
 
 These measurements describe this font, source, and sample interval. They are product validation evidence, not a universal accessibility threshold. Final acceptance still requires rendered-frame inspection because glyph shape, language, and scene content vary.
 
@@ -67,15 +68,19 @@ These thresholds are editable product rules, not universal accessibility standar
 
 ## Reusable templates
 
-1. Viral Pop (default)
+Primary production templates:
+
+1. Clean Large (default)
+2. Clean Focus Large
+3. Minimal Medium
+
+Advanced experimental templates:
+
+1. Viral Pop
 2. Box Punch
 3. Neon Karaoke
-4. Bold Viral
-5. Karaoke Focus
-6. Podcast Quote
-7. Tech Review
-8. Gaming Energy
-9. Minimal Lower Third
+
+Additional niche recipes remain opt-in and are not substitutes for the production caption baseline.
 
 Each template stores font, size, weight, line height, foreground, background, highlight, stroke, shadow, placement, animation, safe area, line budget, and compatible content profiles.
 
