@@ -79,6 +79,13 @@ class VideoRecoveryTest(unittest.TestCase):
         store.save_job(self.directory, self.job)
         self.assertEqual(store.recover_jobs(self.directory), {})
 
+    def test_symlinks_are_rejected_without_posix_nofollow(self):
+        outside=self.directory/'outside'
+        outside.write_text(json.dumps(self.job))
+        (self.directory/(self.key+'.json')).symlink_to(outside)
+        with patch.object(store.os,'O_NOFOLLOW',0,create=True):
+            self.assertEqual(store.recover_jobs(self.directory),{})
+
     def test_edit_storyboard_invalidates_earlier_approval(self):
         self.job.update(status='awaiting_storyboard', approvals={'scene_plan': 3})
         plan = copy.deepcopy(self.job['scenePlan'])

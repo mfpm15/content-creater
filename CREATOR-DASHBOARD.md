@@ -1,5 +1,18 @@
  # Creator Control Center
 
+## Instalasi Windows langsung dari GitHub
+
+Tidak perlu ZIP atau ekstraksi. Setelah Git, uv, Node.js 22+, FFmpeg/FFprobe dan Chrome/Edge tersedia, jalankan dari Command Prompt:
+
+```bat
+git clone https://github.com/mfpm15/content-creater.git
+cd content-creater
+setup-core.bat
+start-dashboard.bat
+```
+
+Untuk memperbarui, tutup aplikasi terlebih dahulu, lalu jalankan `git pull --ff-only`, `setup-core.bat`, dan `start-dashboard.bat`. Jika Git melaporkan konflik/perubahan lokal, pertahankan perubahan tersebut; jangan memakai `git reset --hard` atau menghapus `.data`, `output`, maupun credential lokal. ZIP di bagian lain hanya alternatif distribusi.
+
 Dashboard lokal ini menjadi pintu masuk untuk lima repository yang sekarang tersusun di `creator-dashboard\apps`:
 
 - **MoneyPrinterTurbo** untuk membuat video faceless dari topik.
@@ -16,7 +29,7 @@ Dashboard berjalan hanya di `127.0.0.1:3210`. Dashboard tidak mengirimkan API ke
 
 ## Memindahkan atau membagikan proyek
 
-Jangan menyalin seluruh folder kerja secara langsung karena folder ini dapat berisi API key lokal, data proyek, media, virtual environment, dan dependency berukuran beberapa GB. Gunakan `package-release.ps1` untuk membuat ZIP source code yang bersih. Panduan instalasi komputer penerima, daftar pengecualian, validasi secret, dan prosedur backup data tersedia di `DISTRIBUTION.md`.
+Jangan menyalin seluruh folder kerja secara langsung karena folder ini dapat berisi API key lokal, data proyek, media, virtual environment, dan dependency berukuran beberapa GB. Utamakan clone/pull dari GitHub. `package-release.ps1` tersedia hanya bila memerlukan ZIP source code yang bersih. Panduan instalasi komputer penerima, daftar pengecualian, validasi secret, dan prosedur backup data tersedia di `DISTRIBUTION.md`.
 
 ## Quick start
 

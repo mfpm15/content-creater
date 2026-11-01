@@ -1,5 +1,18 @@
 # Content Creator Control Center
 
+## Instalasi Windows langsung dari GitHub
+
+Tidak perlu ZIP atau ekstraksi. Setelah Git, uv, Node.js 22+, FFmpeg/FFprobe dan Chrome/Edge tersedia, jalankan dari Command Prompt:
+
+```bat
+git clone https://github.com/mfpm15/content-creater.git
+cd content-creater
+setup-core.bat
+start-dashboard.bat
+```
+
+Untuk memperbarui, tutup aplikasi terlebih dahulu, lalu jalankan `git pull --ff-only`, `setup-core.bat`, dan `start-dashboard.bat`. Jika Git melaporkan konflik/perubahan lokal, pertahankan perubahan tersebut; jangan memakai `git reset --hard` atau menghapus `.data`, `output`, maupun credential lokal. ZIP di bagian lain hanya alternatif distribusi.
+
 Satu dashboard lokal untuk menjalankan, memantau, dan membuka lima tool pembuat konten (video, podcast, dan workspace kreator) dari satu tempat.
 
 > Deskripsi singkat repo (untuk kolom About GitHub):

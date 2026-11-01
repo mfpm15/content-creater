@@ -14,12 +14,16 @@ def _job_key(value: object) -> bool:
     return isinstance(value, str) and len(value) == 32 and all(c in '0123456789abcdef' for c in value)
 
 
+def _linked(path: Path) -> bool:
+    return path.is_symlink() or bool(getattr(path,'is_junction',lambda:False)())
+
+
 def save_job(directory: Path, job: dict) -> None:
     key = job['jobId']
     if not _job_key(key):
         return  # historical/test-only in-memory job
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if directory.is_symlink():
+    if _linked(directory):
         raise ValueError('Checkpoint directory must not be a symbolic link')
     data = json.dumps(_redact_tree(job), ensure_ascii=False, allow_nan=False).encode('utf-8')
     if len(data) > MAX_CHECKPOINT_BYTES:
@@ -38,10 +42,10 @@ def save_job(directory: Path, job: dict) -> None:
 
 def recover_jobs(directory: Path) -> dict:
     result = {}
-    if directory.is_symlink():
+    if _linked(directory):
         return result
     for path in directory.glob('*.json'):
-        if not _job_key(path.stem):
+        if not _job_key(path.stem) or _linked(path):
             continue
         try:
             fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))

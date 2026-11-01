@@ -1,0 +1,85 @@
+name: Windows - Core setup and smoke
+
+on:
+  push:
+    paths:
+      - "creator-dashboard/**"
+      - "clippercuan/app/requirements.txt"
+      - "setup-core.bat"
+      - "start-dashboard.bat"
+      - ".github/workflows/windows-core.yml"
+  pull_request:
+    paths:
+      - "creator-dashboard/**"
+      - "setup-core.bat"
+      - "start-dashboard.bat"
+      - ".github/workflows/windows-core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-core:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: work space/content-creater
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: work space/content-creater
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install prerequisites
+        shell: pwsh
+        run: |
+          python -m pip install uv
+          if ($LASTEXITCODE -ne 0) { throw "uv install failed" }
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "FFmpeg install failed" }
+          }
+          ffmpeg -version
+          ffprobe -version
+      - name: Run the real Windows core installer
+        shell: cmd
+        run: call setup-core.bat
+      - name: Test planning, article documents and Windows paths
+        shell: pwsh
+        run: |
+          $python = ".\creator-dashboard\.venv\Scripts\python.exe"
+          foreach ($pattern in @("test_windows_runtime.py", "test_remaining_features.py", "test_video_drafter.py", "test_youtube_analytics.py")) {
+            & $python -m unittest discover -s creator-dashboard -p $pattern
+            if ($LASTEXITCODE -ne 0) { throw "Tests failed: $pattern" }
+          }
+          & $python creator-dashboard/test_dashboard.py
+          if ($LASTEXITCODE -ne 0) { throw "Dashboard HTTP smoke failed" }
+      - name: Test the real Windows launcher from a path with spaces
+        shell: pwsh
+        run: |
+          $env:CREATOR_DASHBOARD_NO_BROWSER = "1"
+          $process = Start-Process cmd.exe -ArgumentList "/d", "/c", "start-dashboard.bat" -PassThru -NoNewWindow
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 40; $attempt++) {
+              if ($process.HasExited) { throw "Windows launcher exited early" }
+              try {
+                $response = Invoke-RestMethod http://127.0.0.1:3210/api/tools -TimeoutSec 2
+                if ($response.tools.Count -eq 9) { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 250 }
+            }
+            if (-not $ready) { throw "Windows launcher did not become ready" }
+          } finally {
+            if (-not $process.HasExited) { taskkill /PID $process.Id /T /F | Out-Null }
+          }
