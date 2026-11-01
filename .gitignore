@@ -56,6 +56,9 @@ cache/
 # data lokal Clipper Cuan (proyek, model, settings berisi API key, temp)
 .data/
 
+# salinan repo referensi (292 MB, tiap repo punya .git sendiri); katalog + cara pasang ulang: docs/REFERENCES.md
+references/
+
 # local visual audit artifacts, temporary reports, and distribution archives
 .ui-audit/
 creator-control-center-*.zip
