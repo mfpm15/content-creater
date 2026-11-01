@@ -29,6 +29,9 @@ def _profile(label: str, result: str, duration: tuple[float, float], recipe: str
 
 
 REGISTRY = {
+    "screen_recording": _profile("Screen recording", "Tutorial layar dengan cursor-aware framing", (60, 90),
+        "clean-focus", "cursor-aware with full-frame fallback", "clean-large", ["spoken-caption", "screen-content"],
+        "manual screen profile only", (), decoration_policy="none", status="Experimental"),
     "general": _profile(
         "General", "Momen mandiri yang jelas untuk berbagai jenis konten", (60, 90),
         "recommended", "face-aware center crop dengan fallback tengah", "clean-large",

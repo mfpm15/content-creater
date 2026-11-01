@@ -41,9 +41,13 @@
       <nav class="analytics-tabs" aria-label="Jenis analisis">
         <button class="active" data-tab="retention" type="button">Retention Analyzer</button>
         <button data-tab="package" type="button">Judul + Thumbnail</button>
-        <button data-tab="hook" type="button">Hook Workshop</button>
+        <button data-tab="hook" type="button">Hook Workshop</button><button data-tab="mapped" type="button">Impor & evaluasi</button>
       </nav>
 
+      <section class="analytics-panel" data-panel="mapped" hidden>
+        <div class="analysis-grid"><form class="analysis-form" id="mappedForm"><h2>Pemetaan CSV lintas platform</h2><p>Pilih kolom secara eksplisit. Format ekspor asli belum diverifikasi; kolom lain akan dilaporkan.</p><label>Platform<select id="mappedPlatform"><option value="youtube">YouTube</option><option value="reels">Instagram Reels</option><option value="tiktok">TikTok</option></select></label><input type="file" id="mappedFile" accept=".csv" required><button type="button" id="inspectCsv">Baca header</button><div id="mappingFields"></div><label>Satuan retensi<select id="mappedUnits"><option value="percent">Persen</option><option value="ratio">Rasio</option></select></label><button type="submit">Analisis kolom terpilih</button></form><pre class="analysis-result" id="mappedResult">Pilih CSV lalu baca header.</pre></div>
+        <div class="analysis-grid"><form class="analysis-form" id="observationForm"><h2>Evaluasi 24 jam / 7 hari</h2><p>Data dicatat lokal. Persetujuan menyimpan rencana eksperimen; tidak menerbitkan atau mengubah konten otomatis.</p><label>ID video<input id="observationVideo" required maxlength="128"></label><label>Platform<select id="observationPlatform"><option value="youtube">YouTube</option><option value="reels">Instagram Reels</option><option value="tiktok">TikTok</option></select></label><label>Jendela<select id="observationWindow"><option value="24h">24 jam</option><option value="7d">7 hari</option></select></label><label>Views<input id="observationViews" type="number" min="0" required></label><label>Completion (%)<input id="observationCompletion" type="number" min="0" max="100" step=".1"></label><button type="submit">Simpan observasi</button></form><div class="analysis-result" id="observationList"></div></div>
+      </section>
       <section class="analytics-panel active" data-panel="retention">
         <div class="analysis-grid">
           <form class="analysis-form" id="retentionForm">
@@ -53,7 +57,7 @@
             <label>Satuan kolom retention<select id="retentionUnits" class="analysis-input"><option value="auto">Deteksi dari kolom</option><option value="percent">Persen (1 berarti 1%)</option><option value="ratio">Rasio (1 berarti 100%)</option></select></label>
             <label>Durasi video dalam detik <small>opsional untuk CSV berbasis persentase</small><input id="retentionDuration" class="analysis-input" type="number" min="1" step="0.1" placeholder="mis. 45" /></label>
             <label>Transkrip SRT <small>opsional</small><textarea id="retentionTranscript" class="analysis-input" rows="7" placeholder="Tempel isi file SRT agar cliff dapat dicocokkan dengan ucapan."></textarea></label>
-            <button class="primary-button" type="submit">Analisis retention</button>
+            <label>Scene Plan JSON (opsional)<textarea id="retentionScenes" rows="3" placeholder="Tempel objek Scene Plan atau array scene dengan start/end"></textarea></label><button class="primary-button" type="submit">Analisis retention</button>
           </form>
           <div class="analysis-result" id="retentionResult"><div class="empty-result"><strong>Belum ada analisis</strong><span>CSV hanya dibaca setelah tombol ditekan.</span></div></div>
         </div>

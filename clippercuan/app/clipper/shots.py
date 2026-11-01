@@ -152,8 +152,47 @@ def framing_zoom(boxes: list[tuple], src_w: int, src_h: int, ar: float = 9 / 16)
     return round(min(max(zoom, 1.0), MAX_SHOT_ZOOM), 3), round(cy, 4)
 
 
+def speaker_pieces(info: list[dict], a: float, b: float, src_w: int, src_h: int, voice) -> list[dict]:
+    """Offline stable turns from mouth motion gated by audio; ambiguity keeps multi."""
+    indices = [i for i in range(len(info)) if a <= i / facetrack.SAMPLE_FPS < b]
+    labels = []
+    for i in indices:
+        faces = sorted(info[i].get("faces", []), key=lambda f: -f[2])
+        boxes = sorted(info[i].get("boxes", []), key=lambda f: -f[2])[:2]
+        label = None
+        if i < len(voice) and voice[i] and len(faces) >= 2 and len(boxes) == 2:
+            if faces[0][2] > .5 and faces[0][2] > faces[1][2] * 1.8 + .1:
+                mid = sum(x[0] for x in boxes) / 2
+                label = 0 if faces[0][0] < mid else 1
+        labels.append(label)
+    runs = []
+    for offset, label in enumerate(labels):
+        if runs and runs[-1][2] == label: runs[-1][1] = offset + 1
+        else: runs.append([offset, offset + 1, label])
+    stable = {side for lo, hi, side in runs if side is not None and hi-lo >= facetrack.SAMPLE_FPS}
+    if len(stable) < 2: return []
+    out = []
+    for lo, hi, side in runs:
+        left = a if lo == 0 else indices[lo] / facetrack.SAMPLE_FPS
+        right = b if hi == len(indices) else indices[hi] / facetrack.SAMPLE_FPS
+        if side is None or hi-lo < facetrack.SAMPLE_FPS:
+            neutral = [{**fr, 'faces': [(f[0], f[1], 0) for f in fr.get('faces', [])]} for fr in info]
+            piece = classify(neutral, left, right, src_w, src_h)
+        else:
+            filtered = []
+            for i in indices[lo:hi]:
+                boxes = sorted(sorted(info[i].get("boxes", []), key=lambda f: -f[2])[:2], key=lambda f: f[0])
+                box = boxes[side]
+                face = min(info[i]["faces"], key=lambda f: abs(f[0]-box[0]))
+                filtered.append({"faces": [face], "boxes": [box], "motion": None})
+            piece = classify(filtered, 0, len(filtered)/facetrack.SAMPLE_FPS, src_w, src_h)
+            piece.update(a=left, b=right, speaker_side=side, reason="audio_gated_mouth_turn")
+        out.append(piece)
+    return out
+
+
 def plan(src: Path, start: float, end: float, src_w: int, src_h: int, duration: float | None = None,
-         frames=None, info=None, cuts: list[float] | None = None) -> dict | None:
+         frames=None, info=None, cuts: list[float] | None = None, use_audio: bool = False, voice=None) -> dict | None:
     """Rencana framing per shot untuk klip [start, end]. None bila deteksi tidak tersedia (pakai jalur lama)."""
     dur = duration if duration is not None else max(end - start, 0.5)
     if frames is None:
@@ -164,12 +203,21 @@ def plan(src: Path, start: float, end: float, src_w: int, src_h: int, duration: 
         info = facetrack.analyse(frames)
     if cuts is None:
         cuts = detect_cuts(src, start, end)
-    shots = [classify(info, a, b, src_w, src_h) for a, b in boundaries(cuts, dur)]
+    if voice is None and use_audio:
+        from . import media
+        voice = media.voice_activity(src, start, end, facetrack.SAMPLE_FPS)
+    spans = boundaries(cuts, dur)
+    shots = []
+    gated_info = [{**fr, 'faces': [(f[0], f[1], f[2] if i < len(voice) and voice[i] else 0)
+                                  for f in fr.get('faces', [])]} for i, fr in enumerate(info)] if voice is not None else info
+    for a, b in spans:
+        turns = speaker_pieces(info, a, b, src_w, src_h, voice) if voice is not None else []
+        shots.extend(turns or [classify(gated_info, a, b, src_w, src_h)])
     if not shots:
         return None
     total = sum(s["b"] - s["a"] for s in shots) or 1.0
     confidence = sum(s["confidence"] * (s["b"] - s["a"]) for s in shots) / total
-    return {"shots": shots, "confidence": round(confidence, 3), "source": "shots", "cuts": len(shots) - 1,
+    return {"shots": shots, "confidence": round(confidence, 3), "source": "shots", "cuts": len(spans) - 1, "speaker_switches": len(shots) - len(spans),
             "samples": len(info), "face_samples": sum(bool(fr["faces"]) for fr in info),
             "multi_shots": sum(s["mode"] == "multi" for s in shots)}
 

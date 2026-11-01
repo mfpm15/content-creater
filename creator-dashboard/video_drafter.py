@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import copy
+import hashlib
 import json
 import math
 import os
@@ -19,7 +20,6 @@ from security import open_authenticated
 
 from video_job_store import save_job, recover_jobs
 from runtime_config import resolve_python
-from security import redact
 
 ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
@@ -41,6 +41,7 @@ STYLES = {
 ASPECT_RATIOS = {
     "9:16": {"id": "9:16", "width": 1080, "height": 1920, "label": "9:16 Vertikal"},
     "16:9": {"id": "16:9", "width": 1920, "height": 1080, "label": "16:9 Horizontal"},
+    "4:5": {"id": "4:5", "width": 1080, "height": 1350, "label": "4:5 Portrait"},
     "1:1": {"id": "1:1", "width": 1080, "height": 1080, "label": "1:1 Persegi"},
 }
 DURATIONS = [15, 30, 45, 60, 90]
@@ -729,7 +730,9 @@ def generate_composition(plan: dict, aspect_info: dict, model: str = "", engine:
 
 
 def audio_manifest(plan: dict) -> dict:
-    return {"duration": plan["duration"], "voice": [{"id": scene["id"], "start": scene["start"], "end": scene["end"], "text": scene["narration"]} for scene in plan["scenes"]], "subtitles": [{"start": scene["start"], "end": scene["end"], "text": scene["narration"]} for scene in plan["scenes"]], "soundCues": [{"at": scene["start"], "cue": scene["soundCue"]} for scene in plan["scenes"] if scene["soundCue"]], "music": {"start": 0, "end": plan["duration"], "duckUnderVoice": True, "targetLufs": -14}}
+    return {"duration": plan["duration"], "voice": [{"id": scene["id"], "start": scene["start"], "end": scene["end"], "text": scene["narration"]} for scene in plan["scenes"]], "subtitles": [{"start": scene["start"], "end": scene["end"], "text": scene["narration"]} for scene in plan["scenes"]], "soundCues": [{"at": scene["start"], "cue": scene["soundCue"]} for scene in plan["scenes"] if scene["soundCue"]], "music": {"start": 0, "end": plan["duration"], "duckUnderVoice": True, "targetLufs": -14,
+            "beat_markers": [round(.125+i*.5,3) for i in range(math.ceil(plan['duration']*2)) if .125+i*.5<plan['duration']],
+            "beat_method": "known_procedural_envelope_peaks_2hz_not_external_music_detection"}}
 
 
 def _srt_time(seconds: float) -> str:
@@ -744,6 +747,8 @@ def write_subtitles(path: Path, plan: dict) -> None:
 def _result_metadata(directory: Path, meta: dict) -> dict:
     video, lottie = directory / "video.mp4", directory / "lottie.json"
     meta.update(htmlUrl=f"/api/videos/{directory.name}/index.html")
+    if (directory / "review.json").is_file():
+        meta["review"] = json.loads((directory / "review.json").read_text("utf-8"))
     if video.is_file():
         meta.update(videoSize=video.stat().st_size, videoUrl=f"/api/videos/{directory.name}/video.mp4")
     elif lottie.is_file():
@@ -786,6 +791,30 @@ def get_video(slug: str) -> dict:
         result["scenePlan"] = json.loads(plan_path.read_text(encoding="utf-8"))
         result["storyboard"] = _storyboard(result["scenePlan"])
     return result
+
+
+def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
+    if not isinstance(aspects, list) or not 1 <= len(aspects) <= len(ASPECT_RATIOS) or any(not isinstance(a, str) or a not in ASPECT_RATIOS for a in aspects):
+        raise ValueError("Pilih satu atau beberapa rasio yang didukung")
+    source = get_video(slug)
+    plan = source.get("scenePlan")
+    engine = source.get("engine")
+    if not plan or engine not in ENGINES:
+        raise ValueError("Hasil ini belum memiliki rencana yang dapat digunakan ulang")
+    jobs = []
+    with JOBS_LOCK:
+        for aspect in dict.fromkeys(aspects):
+            key = uuid.uuid4().hex
+            job = {"jobId": key, "topic": plan["topic"], "script": "", "engine": engine,
+                   "style": ENGINES[engine]["defaultStyle"], "aspect": aspect, "duration": plan["duration"],
+                   "model": source.get("model", LLM_MODEL), "status": "awaiting_scene_plan", "step": "Review layout rasio baru sebelum render",
+                   "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
+                   "storyboard": None, "video": None, "revision": 0, "approvals": {},
+                   "origin": {"slug": slug, "scene_plan_digest": hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()}}
+            save_job(JOB_DIR, job)
+            JOBS[key] = job
+            jobs.append(copy.deepcopy(job))
+    return jobs
 
 
 def delete_video(slug: str) -> dict:
@@ -859,10 +888,10 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
 
 
 def read_video_file(slug: str, filename: str) -> tuple[bytes, str]:
-    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "research.json", "review.json"}: raise FileNotFoundError(filename)
+    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "research.json", "review.json", "audio-manifest.json"} and not re.fullmatch(r"review-frame-\d{1,2}\.png", filename): raise FileNotFoundError(filename)
     path = _video_directory(slug) / filename
     if not path.is_file(): raise FileNotFoundError(filename)
-    return path.read_bytes(), {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8"}.get(path.suffix, "application/octet-stream")
+    return path.read_bytes(), {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png"}.get(path.suffix, "application/octet-stream")
 
 
 def job_status(job_id: str) -> dict:
@@ -1042,6 +1071,8 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         if job["engine"] == "lottie":
             lottie = generate_lottie(plan, ASPECT_RATIOS[job["aspect"]])
             (target / "lottie.json").write_text(json.dumps(lottie, ensure_ascii=False), encoding="utf-8")
+            from lottie_adapter import preview
+            (target / "index.html").write_text(preview(lottie), encoding="utf-8")
             meta = {"slug": target.name, "topic": job["topic"], "engine": "lottie", "model": job["model"], "style": STYLES["lottie_motion"], "aspect": ASPECT_RATIOS[job["aspect"]], "duration": plan["duration"], "sceneCount": len(plan["scenes"]), "research": job["research"], "createdAt": time.time(), "formattedTime": time.strftime("%Y-%m-%d %H:%M:%S")}
             (target / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
             _update_job(job_id, {"status": "succeeded", "step": "Animasi Lottie selesai", "progress": 100, "video": {"slug": target.name, "title": job["topic"], "htmlUrl": f"/api/videos/{target.name}/index.html", "lottieUrl": f"/api/videos/{target.name}/lottie.json", "duration": plan["duration"], "engine": "lottie"}})
@@ -1056,7 +1087,7 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         _update_job(job_id, {"step": "Melakukan mux audio dan video", "progress": 90})
         output = _mux_video(target, silent, final_audio, plan["duration"])
         from video_review import review
-        review_result = review(output, plan["duration"])
+        review_result = review(output, plan["duration"], plan)
         (target / "review.json").write_text(json.dumps(review_result), encoding="utf-8")
         _update_job(job_id, {"review": review_result})
         silent.unlink(missing_ok=True)
@@ -1069,12 +1100,5 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
 
 
 def generate_lottie(plan: dict, aspect_info: dict) -> dict:
-    """Translate Motion Plan into dependency-free Lottie JSON."""
-    width, height, fps = aspect_info["width"], aspect_info["height"], 30
-    layers = []
-    colors = ([0.13, 0.83, 0.93, 1], [0.55, 0.36, 0.96, 1], [0.98, 0.75, 0.14, 1])
-    for index, scene in enumerate(plan["scenes"]):
-        start, end = round(scene["start"] * fps), round(scene["end"] * fps)
-        size = min(width, height) * (0.18 + (index % 3) * 0.04)
-        layers.append({"ddd": 0, "ind": index + 1, "ty": 4, "nm": scene["id"], "ip": start, "op": end, "st": start, "ks": {"o": {"a": 1, "k": [{"t": start, "s": [0]}, {"t": min(start + 10, end), "s": [100]}, {"t": max(start, end - 8), "s": [100]}, {"t": end, "s": [0]}]}, "r": {"a": 0, "k": 0}, "p": {"a": 1, "k": [{"t": start, "s": [width * 0.42, height * 0.5, 0]}, {"t": end, "s": [width * 0.58, height * 0.5, 0]}]}, "a": {"a": 0, "k": [0, 0, 0]}, "s": {"a": 1, "k": [{"t": start, "s": [72, 72, 100]}, {"t": min(start + 18, end), "s": [100, 100, 100]}]}}, "shapes": [{"ty": "el", "p": {"a": 0, "k": [0, 0]}, "s": {"a": 0, "k": [size, size]}, "nm": scene["type"]}, {"ty": "fl", "c": {"a": 0, "k": list(colors[index % len(colors)])}, "o": {"a": 0, "k": 100}, "r": 1}], "ao": 0})
-    return {"v": "5.12.2", "fr": fps, "ip": 0, "op": round(plan["duration"] * fps), "w": width, "h": height, "nm": plan["topic"], "ddd": 0, "assets": [], "layers": layers, "markers": []}
+    from lottie_adapter import build
+    return build(plan, aspect_info)

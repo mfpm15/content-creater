@@ -345,7 +345,7 @@ async function pageNew(override) {
     return {
       content_profile: contentProfile, candidate_count: +$('#candidate_count').value, auto_render: $('#auto_render').checked,
       clip_count: clipCount === 'auto' ? 'auto' : +clipCount, duration_preset: durationPreset, min_sec: +$('#min_sec').value, max_sec: +$('#max_sec').value, language: $('#language').value, model: $('#model').value, transcriber: $('#transcriber').value,
-      translate_en: $('#translate_en').checked, cut_silence: $('#cut_silence').checked, use_llm: $('#use_llm').checked, layout: layout === 'auto' ? 'portrait' : layout, layout_mode: layout === 'auto' ? 'auto' : 'manual', smart_crop: $('#smart_crop').checked,
+      translate_en: $('#translate_en').checked, snap_silence: $('#snapSilence').checked, cut_silence: $('#cut_silence').checked, use_llm: $('#use_llm').checked, layout: layout === 'auto' ? 'portrait' : layout, layout_mode: layout === 'auto' ? 'auto' : 'manual', smart_crop: $('#smart_crop').checked,
       split: { face: [pos[0], pos[1], fs, fs], game: [0, 0, 1, 1], face_ratio: +$('#faceRatio').value / 100 },
       caption: { ...cfg.caption, enabled: $('#cap_enabled').checked, style: capStyle, box: $('#cap_box').checked, effect: $('#cap_glow').checked ? 'glow' : 'none', font: $('#cap_font').value, size: +$('#cap_size').value, color: $('#cap_color').value, highlight: $('#cap_highlight').value, uppercase: $('#cap_upper').checked, words_per_line: +$('#cap_wpl').value, position: $('#cap_position').value, y_pct: posTouched ? null : cfg.caption.y_pct, animation: $('#cap_pop').checked ? 'pop' : 'none' },
       title: { ...cfg.title, enabled: $('#ttl_enabled').checked, preset: ttlPreset, duration: +$('#ttl_duration').value },

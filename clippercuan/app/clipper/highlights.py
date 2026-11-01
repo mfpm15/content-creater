@@ -58,6 +58,9 @@ def _hook_score(text: str) -> float:
     if any(t.isdigit() for t in toks):
         s += 0.2
     s += min(sum(t in HOOK_WORDS or t in GAME_WORDS for t in toks) * 0.15 + sum(t in WEAK_HOOK_WORDS for t in toks) * 0.03, 0.6)
+    from .editorial import hook_archetypes
+    evidence = hook_archetypes(text)
+    s += .08 * sum(k in evidence["archetypes"] for k in ("personal_experience", "contrast", "demonstration"))
     return min(s, 1.0)
 
 

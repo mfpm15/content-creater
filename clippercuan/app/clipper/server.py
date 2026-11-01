@@ -448,6 +448,39 @@ def clip_subtitles(pid: str, cid: str, format: str = "srt", word_timing: bool = 
     return Response(body, media_type=wordtools.FORMATS[format.lower()] + "; charset=utf-8", headers=headers)
 
 
+@app.get("/api/projects/{pid}/clips/{cid}/takes")
+def review_takes(pid: str, cid: str):
+    from . import editorial
+    _, _, words = _clip_words_full(pid, cid)
+    return editorial.retakes(words)
+
+
+class TakeApproval(BaseModel):
+    revision: str
+    index: int
+    talking_head: bool = False
+
+
+@app.post("/api/projects/{pid}/clips/{cid}/takes")
+def apply_take(pid: str, cid: str, body: TakeApproval):
+    with project._LOCK:
+        from . import editorial
+        _, _, words = _clip_words_full(pid, cid)
+        report = editorial.retakes(words)
+        if body.revision != report["revision"]:
+            raise HTTPException(409, "Caption berubah; tinjau ulang saran take")
+        if not body.talking_head or not 0 <= body.index < len(report["suggestions"]):
+            raise HTTPException(400, "Konfirmasi talking-head dan pilih saran yang valid")
+        suggestion = report["suggestions"][body.index]
+        if not suggestion["apply_allowed"]:
+            raise HTTPException(400, "Perubahan makna mungkin terjadi; lakukan edit manual")
+        drop = set(suggestion["drop_indices"])
+        project.edit_clip(pid, cid, {"words": [w for i, w in enumerate(words) if i not in drop],
+                                            "overrides": {"cut_silence": True}}, rerender=True)
+        project._set_clip(pid, cid, take_edits={"revision": report["revision"], "suggestion": suggestion, "approved": True})
+        return project.load(pid)
+
+
 @app.get("/api/projects/{pid}/clips/{cid}/delivery")
 def clip_delivery(pid: str, cid: str, platform: str = "all"):
     """Ukur file klip hasil render terhadap aturan platform: rasio, durasi, audio, loudness."""
@@ -644,6 +677,28 @@ def detect_facecam_api(pid: str):
         return project.redetect_facecam(pid)
     except ValueError as e:
         raise HTTPException(409, redact(str(e)))
+
+
+class ReferenceStudy(BaseModel):
+    start: float = 0
+    seconds: float = 60
+
+
+@app.post("/api/projects/{pid}/study")
+def study_reference(pid: str, body: ReferenceStudy):
+    from . import reference_study
+    p = _get(pid)
+    info = p.get("media") or {}
+    if not info.get("file") or info.get("remote"):
+        raise HTTPException(409, "Analisis referensi memerlukan video lokal yang sudah diunduh")
+    root = project.pdir(pid).resolve()
+    source = (root / info["file"]).resolve()
+    if not source.is_relative_to(root) or not source.is_file():
+        raise HTTPException(404, "Video lokal tidak tersedia")
+    try:
+        return reference_study.analyze(source, project.resolve_caption_track(pid), float(info["duration"]), body.start, body.seconds)
+    except (ValueError, subprocess.TimeoutExpired):
+        raise HTTPException(400, "Sampel tidak valid atau analisis melampaui batas waktu") from None
 
 
 @app.get("/api/projects/{pid}/source")

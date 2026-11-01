@@ -491,6 +491,23 @@ async function pageProject(pid) {
         toast(error.message, true); drawPlatformExport();
       }
     };
+    const takeButton = document.createElement('button');
+    takeButton.type = 'button'; takeButton.className = 'btn ghost sm'; takeButton.textContent = 'Review take berulang';
+    box.append(takeButton);
+    takeButton.onclick = async () => {
+      try {
+        const report = await api(`/api/projects/${P.id}/clips/${c.id}/takes`);
+        openDlg(body => {
+          body.innerHTML = `<h2>Review take</h2><p>Saran lokal, bukan penilaian kualitas suara. Penghapusan hanya untuk kalimat persis sama, setelah konfirmasi. Jeda ikut dipotong saat render ulang.</p><label class="check"><input type="checkbox" id="takeTalkingHead"> Ini monolog/talking-head; pengulangan bukan percakapan antarorang</label>${report.suggestions.map((item, index) => `<p>${esc(item.reason)}</p><p>Hapus (${esc(item.drop_range.join('–'))}s): ${esc(item.drop_text)}<br>Pertahankan (${esc(item.keep_range.join('–'))}s): ${esc(item.keep_text)} <button type="button" class="btn sm" data-take="${index}" ${item.apply_allowed ? '' : 'disabled'}>Hapus take awal & jeda</button></p>`).join('') || '<p>Tidak ada pengulangan yang memenuhi ambang.</p>'}`;
+          $$('[data-take]', body).forEach(button => button.onclick = async () => {
+            try {
+              const updated = await api(`/api/projects/${P.id}/clips/${c.id}/takes`, {method: 'POST', body: {revision: report.revision, index: Number(button.dataset.take), talking_head: $('#takeTalkingHead', body).checked}});
+              $('#dlg').close(); load(updated); toast('Take diperbarui; render ulang dimulai');
+            } catch (error) { toast(error.message, true); }
+          });
+        });
+      } catch (error) { toast(error.message, true); }
+    };
     drawPlatformExport();
     $('#cTitle', box).value = c.title || ''; $('#cS', box).value = c.start; $('#cE', box).value = c.end; $('#cLay', box).value = lay;
     // Judul YouTube punya kolom sendiri (kotak "Judul Shorts"); isi kotak caption hanya deskripsi + hashtag, tanpa baris "Judul:".
@@ -568,12 +585,22 @@ async function pageProject(pid) {
     $('#sTitle').textContent = P.title;
     const m = P.media;
     $('#sMeta').textContent = [P.source.includes('uploads') ? 'File unggahan' : P.source, m ? `${fmt(m.duration)} · ${m.width}×${m.height}` : '', m?.remote ? 'mode hemat disk' : '', P.language ? 'bahasa ' + P.language : '', P.transcript_source || '', P.engine ? 'pemilih ' + P.engine : ''].filter(Boolean).join(' · ');
+    if (!$('#sStudy') && m && !m.remote) {
+      const study=document.createElement('button');study.id='sStudy';study.className='btn ghost sm';study.textContent='Pelajari tempo video ini';
+      $('#sMeta').after(study);study.onclick=()=>openDlg(body=>{
+        body.innerHTML='<h2>Analisis referensi lokal</h2><p>Ukur tempo potongan dan transkrip; struktur cerita tetap perlu review. Maksimal 120 detik per sampel.</p><label>Mulai (detik)<input id="studyStart" type="number" min="0" value="0"></label><label>Durasi sampel<input id="studySeconds" type="number" min="1" max="120" value="60"></label><button type="button" class="btn" id="studyRun">Ukur sampel</button><pre id="studyReport"></pre>';
+        $('#studyRun',body).onclick=async()=>{const run=$('#studyRun',body);run.disabled=true;try{
+          const report=await api(`/api/projects/${P.id}/study`,{method:'POST',body:{start:Number($('#studyStart',body).value),seconds:Number($('#studySeconds',body).value)}});
+          $('#studyReport',body).textContent=JSON.stringify(report,null,2);
+        }catch(error){toast(error.message,true)}finally{run.disabled=false}};
+      });
+    }
     const busyProj = ['queued', 'running', 'rendering'].includes(P.status);
     $('#sProg').hidden = !busyProj; $('#sBar').style.width = P.progress * 100 + '%';
     $('#sFootMsg').textContent = P.message; $('#sFootPct').textContent = Math.round(P.progress * 100) + '%';
     $('#sDot').className = 'status-dot ' + (P.status === 'error' ? 'bad' : busyProj ? 'busy' : 'ok');
     $('#sCancel').hidden = !['queued', 'running'].includes(P.status); $('#sRetry').hidden = !['error', 'cancelled'].includes(P.status);
-    const warn = [P.asr_warning, P.llm_warning].filter(Boolean).join(' · '); $('#sWarn').hidden = !warn; $('#sWarn').textContent = warn;
+    const warn = [P.asr_warning, P.llm_warning, P.boundary_warning].filter(Boolean).join(' · '); $('#sWarn').hidden = !warn; $('#sWarn').textContent = warn;
     const auto = [P.settings.recipe === 'auto' && P.settings.recipe_applied ? `Resep otomatis: ${(RECIPES?.[P.settings.recipe_applied]?.label) || P.settings.recipe_applied}` : '', P.settings.layout_reason, P.download_saved, P.clip_target && P.settings.auto_render ? `${P.clip_target} klip terbaik dirender otomatis` : ''].filter(Boolean).join(' · ');
     $('#sAuto').hidden = !auto; $('#sAuto').textContent = '⚡ ' + auto;
     $('#sErr').hidden = !P.error; if (P.error) $('#sErr pre').textContent = P.error;

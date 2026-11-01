@@ -137,7 +137,7 @@ def process(pid: str, cid: str, platform: str, token: str) -> None:
         ass = _path(folder, clip.get('ass'))
         if _digest(ass) != state.get('ass_digest'):
             raise ExportBlocked('Caption berubah setelah render; render ulang sebelum ekspor')
-        geometry = caption_geometry.measure(ass, pr.width, pr.height, pr.duration, min(pr.fps, 60))
+        geometry = caption_geometry.measure(ass, pr.width, pr.height, pr.duration, min(pr.fps, 60), include_overlays=True)
         geometry = caption_geometry.evaluate(geometry, delivery.PLATFORMS[platform]['safe'])
         if not geometry['ok']:
             _store(pid, cid, platform, token, status='blocked', geometry=geometry, error=' '.join(geometry['issues']))
@@ -186,6 +186,8 @@ def download(pid: str, cid: str, platform: str) -> Path:
         state = (clip.get('exports') or {}).get(platform) or {}
         if state.get('status') != 'passed':
             raise ExportBlocked('Varian platform belum lolos pemeriksaan')
+        if (state.get('geometry') or {}).get('scope') != 'generated_ass_text':
+            raise ExportBlocked('Pemeriksaan zona aman varian lama belum mencakup seluruh teks ASS; ulangi ekspor')
         if state.get('source_version') != clip.get('version') or _digest(_path(folder, clip.get('file'))) != state.get('source_digest'):
             raise ExportBlocked('Varian berasal dari render lama; ulangi ekspor')
         output = _path(folder, state.get('file'))

@@ -164,3 +164,18 @@ def visual_activity(src: Path, duration: float, hop: float = 0.5) -> np.ndarray 
     vals = np.interp(grid, mid, diff)
     lo, hi = np.percentile(vals, 5), np.percentile(vals, 95)
     return np.clip((vals - lo) / max(hi - lo, 1e-6), 0, 1)
+
+
+def voice_activity(src: Path, start: float, end: float, fps: float) -> np.ndarray | None:
+    """Audio activity gate, not speaker identity or diarization."""
+    try:
+        p = subprocess.run([FFMPEG, '-hide_banner', '-nostdin', '-ss', str(start), '-to', str(end),
+                            '-protocol_whitelist', 'file,pipe', '-i', str(src), '-vn', '-ac', '1', '-ar', '8000',
+                            '-f', 'f32le', '-'], capture_output=True, timeout=90, creationflags=_NO_WINDOW)
+        data = np.frombuffer(p.stdout, dtype=np.float32)
+        hop = max(1, round(8000 / fps))
+        if p.returncode or len(data) < hop: return None
+        rms = np.sqrt(np.mean(data[:len(data)//hop*hop].reshape(-1, hop) ** 2, axis=1))
+        return rms > max(.005, float(np.percentile(rms, 70)) * .15)
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None

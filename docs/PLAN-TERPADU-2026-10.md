@@ -1,5 +1,7 @@
 # Plan terpadu: 4 produk fokus × 8 repo referensi
 
+> Rencana awal/historis. Status implementasi terbaru dan keterbatasannya ada di [FEATURE-COVERAGE.md](FEATURE-COVERAGE.md).
+
 Dibuat 31 Oktober 2026 setelah membaca kode keempat produk dan isi dalam repo referensi (bukan hanya README).
 Menggantikan bagian "Tidak ada perubahan" di [plan-referensi-2026-10.md](../clippercuan/docs/plan-referensi-2026-10.md), yang terlalu longgar.
 

@@ -1,0 +1,4 @@
+# Optional local article diagrams and scene-midpoint browser review.
+# Install in the dashboard's own environment; Chromium is a separate prerequisite.
+Pillow>=10.4,<13
+playwright>=1.48,<2

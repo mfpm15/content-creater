@@ -241,7 +241,8 @@ class VideoDrafterTest(unittest.TestCase):
         result = video_drafter.generate_lottie(plan, video_drafter.ASPECT_RATIOS["9:16"])
         self.assertEqual(result["v"], "5.12.2")
         self.assertEqual(result["op"], 450)
-        self.assertEqual(len(result["layers"]), 1)
+        self.assertEqual(len([layer for layer in result["layers"] if layer["ty"] == 4]), 1)
+        self.assertTrue(any(layer["ty"] == 5 for layer in result["layers"]))
 
 
 if __name__ == "__main__":

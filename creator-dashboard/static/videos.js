@@ -34,6 +34,7 @@ let activeAspect = '9:16';
 let activeReviewStage = null;
 let activeRevision = 0;
 let activeScenePlan = null;
+let resultSlug = null;
 
 function escapeHtml(value) {
   const span = document.createElement('span');
@@ -140,10 +141,13 @@ async function deleteVideo(slug) {
 }
 
 function showResult(result, aspectId) {
+  resultSlug = result.slug;
+  document.getElementById("aspectVariants").hidden = !resultSlug;
   const isLandscape = (aspectId || result.aspect?.id) === '16:9';
   elements.videoContainer.className = `video-preview-box ${isLandscape ? 'landscape' : ''}`;
+  elements.videoContainer.style.aspectRatio=({'9:16':'9 / 16','16:9':'16 / 9','1:1':'1 / 1','4:5':'4 / 5'})[aspectId||result.aspect?.id]||'9 / 16';
   if (result.engine === 'lottie' || result.lottieUrl) {
-    elements.videoContainer.innerHTML = `<iframe title="Preview animasi Lottie" src="${escapeHtml(result.htmlUrl)}" style="width:100%;height:100%;border:0"></iframe>`;
+    elements.videoContainer.innerHTML = `<iframe sandbox="allow-scripts" title="Preview animasi Lottie" src="${escapeHtml(result.htmlUrl)}" style="width:100%;height:100%;border:0"></iframe>`;
     elements.downloadBtn.href = result.lottieUrl;
     elements.downloadBtn.textContent = 'Unduh lottie.json';
   } else {
@@ -153,6 +157,16 @@ function showResult(result, aspectId) {
   }
   elements.inspectHtmlBtn.href = result.htmlUrl || '#';
   elements.videoActions.style.display = 'flex';
+  let reviewBox=document.getElementById('mediaReviewResult');
+  if(!reviewBox){reviewBox=document.createElement('section');reviewBox.id='mediaReviewResult';elements.videoActions.after(reviewBox)}
+  reviewBox.replaceChildren();
+  if(result.review){
+    const heading=document.createElement('h3');heading.textContent='Pemeriksaan hasil render';
+    const status=document.createElement('p');status.textContent=`${result.review.status==='needs_attention'?'Ada temuan untuk ditinjau':'Pemeriksaan media selesai'}. Audio: ${result.review.audio?.status||'belum diukur'}. Visual: ${result.review.visual_review?.status||'belum diukur'}. Tetap periksa video secara manual.`;
+    reviewBox.append(heading,status);
+    for(const issue of result.review.issues||[]){const text=document.createElement('p');text.textContent=issue;reviewBox.append(text)}
+    for(const name of result.review.visual_review?.screenshots||[]){if(!/^review-frame-\d{1,2}\.png$/.test(name))continue;const link=document.createElement('a');link.href=`/api/videos/${encodeURIComponent(result.slug)}/${name}`;link.textContent=`${name} · `;link.target='_blank';link.rel='noopener';reviewBox.append(link)}
+  }
 }
 
 function sceneEditor(scene, index) {
@@ -331,7 +345,7 @@ function startPolling(jobId, aspectId) {
         elements.statusStep.textContent = 'Selesai. Hasil animasi siap.';
         elements.progressBar.style.width = '100%';
         setWorkflowStep('render');
-        if (job.video) showResult(job.video, aspectId);
+        if (job.video) showResult({...job.video,review:job.review}, aspectId);
         loadHistory();
       } else if (job.status === 'interrupted' || job.status === 'failed') {
         clearInterval(pollTimer);
@@ -385,3 +399,16 @@ async function loadPendingJobs() {
     }
   } catch (error) { container.textContent = error.message; }
 }
+
+document.getElementById('createAspectBtn').addEventListener('click', async event => {
+  if (!resultSlug) return;
+  event.target.disabled = true;
+  try {
+    const response = await fetch(`/api/videos/${encodeURIComponent(resultSlug)}/aspects`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({aspects:[document.getElementById('variantAspect').value]})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Gagal membuat variasi');
+    elements.formStatus.textContent = `${result.jobs.length} variasi menunggu review pada daftar pekerjaan tersimpan.`;
+    await loadPendingJobs();
+  } catch(error) { elements.formStatus.textContent=error.message; }
+  finally { event.target.disabled=false; }
+});

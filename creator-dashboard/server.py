@@ -335,6 +335,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self._json(HTTPStatus.OK, article_drafter.options())
             elif len(parts) == 4 and parts[2] == "jobs":
                 self._json(HTTPStatus.OK, article_drafter.job_status(unquote(parts[3])))
+            elif len(parts) == 4 and parts[3] == "evidence":
+                from article_tools import evidence_report
+                self._json(HTTPStatus.OK, evidence_report(unquote(parts[2])))
             elif len(parts) == 3:
                 self._json(HTTPStatus.OK, article_drafter.get_article(unquote(parts[2])))
             elif len(parts) == 5 and parts[3] == "files":
@@ -354,11 +357,26 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def _articles_post(self, parts: list[str]) -> None:
         try:
-            if parts == ["api", "articles"]:
+            if parts == ["api", "articles", "source"]:
+                raw = self._read_body(10_000)
+                if raw is None: return
+                payload = json.loads(raw or b"{}")
+                if not isinstance(payload, dict): raise ValueError("Body harus objek JSON")
+                from source_reader import retrieve
+                self._json(HTTPStatus.OK, retrieve(str(payload.get("url", ""))))
+            elif parts == ["api", "articles"]:
                 raw = self._read_body(200_000)
                 if raw is None:
                     return
                 self._json(HTTPStatus.ACCEPTED, article_drafter.start_job(json.loads(raw or b"{}")))
+            elif len(parts) == 4 and parts[3] in {"evidence", "rewrite", "apply-rewrite", "diagram"}:
+                raw = self._read_body(200_000)
+                if raw is None: return
+                payload = json.loads(raw or b"{}")
+                if not isinstance(payload, dict): raise ValueError("Body harus objek JSON")
+                from article_tools import update_evidence, propose_rewrite, apply_rewrite, add_diagram
+                action = {"evidence": update_evidence, "rewrite": propose_rewrite, "apply-rewrite": apply_rewrite, "diagram": add_diagram}[parts[3]]
+                self._json(HTTPStatus.OK, action(unquote(parts[2]), payload))
             elif len(parts) == 4 and parts[3] == "resume":
                 self._json(HTTPStatus.ACCEPTED, article_drafter.resume_job(unquote(parts[2])))
             elif len(parts) == 4 and parts[3] == "rebuild":
@@ -395,6 +413,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(data)))
                 if content_type == "video/mp4":
                     self.send_header("Accept-Ranges", "bytes")
+                if filename == "index.html":
+                    self.send_header("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'")
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.end_headers()
                 self.wfile.write(data)
@@ -414,6 +434,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 if raw is None:
                     return
                 self._json(HTTPStatus.ACCEPTED, video_drafter.start_job(json.loads(raw or b"{}")))
+            elif len(parts) == 4 and parts[3] == "aspects":
+                raw = self._read_body(10_000)
+                if raw is None: return
+                payload = json.loads(raw or b"{}")
+                if not isinstance(payload, dict): raise ValueError("Body harus objek JSON")
+                self._json(HTTPStatus.ACCEPTED, {"jobs": video_drafter.create_aspect_jobs(unquote(parts[2]), payload.get("aspects"))})
             elif len(parts) == 5 and parts[2] == "jobs" and parts[4] == "approve":
                 raw = self._read_body(10_000)
                 if raw is None:
@@ -455,11 +481,28 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def _analytics_post(self, parts: list[str]) -> None:
         try:
-            raw = self._read_body(youtube_analytics.MAX_CSV_BYTES + youtube_analytics.MAX_TRANSCRIPT_CHARS + 100_000)
+            raw = self._read_body(youtube_analytics.MAX_CSV_BYTES + youtube_analytics.MAX_TRANSCRIPT_CHARS + 1_000_000)
             if raw is None:
                 return
             payload = json.loads(raw or b"{}")
-            if parts == ["api", "analytics", "retention"]:
+            if not isinstance(payload, dict): raise ValueError("Body harus objek JSON")
+            if parts == ["api", "analytics", "source"]:
+                from source_reader import retrieve
+                result = retrieve(str(payload.get("url", "")))
+            elif parts == ["api", "analytics", "import", "inspect"]:
+                from analytics_import import inspect_csv
+                data = inspect_csv(str(payload.get("csv") or ""))
+                result = {key: data[key] for key in ("headers", "preview", "row_count")}
+            elif parts == ["api", "analytics", "import"]:
+                from analytics_import import mapped_import
+                result = mapped_import(str(payload.get("csv") or ""), payload.get("platform"), payload.get("mapping"), payload.get("units", "percent"), payload.get("scenes"))
+            elif parts == ["api", "analytics", "observations"]:
+                from analytics_learning import create
+                result = create(payload)
+            elif len(parts) == 5 and parts[:3] == ["api", "analytics", "observations"] and parts[4] == "decision":
+                from analytics_learning import decide
+                result = decide(parts[3], payload.get("revision"), payload.get("approve"))
+            elif parts == ["api", "analytics", "retention"]:
                 csv_text = str(payload.get("csv") or "")
                 result = youtube_analytics.analyze_retention(
                     csv_text.encode("utf-8"),
@@ -467,6 +510,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     float(payload["duration"]) if payload.get("duration") not in (None, "") else None,
                     str(payload.get("units") or "auto"),
                 )
+                if payload.get("scenes"):
+                    from analytics_import import scene_retention
+                    result["scenes"] = scene_retention(result["points"], result["events"], payload["scenes"])
             elif parts == ["api", "analytics", "package"]:
                 result = youtube_analytics.lint_package(
                     str(payload.get("title") or ""),
@@ -483,6 +529,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json(HTTPStatus.BAD_REQUEST, {"error": "Body bukan JSON valid"})
         except (TypeError, ValueError) as exc:
             self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except FileNotFoundError:
+            self._json(HTTPStatus.NOT_FOUND, {"error": "Observasi tidak ditemukan"})
+        except (OSError, urllib.error.URLError):
+            self._json(HTTPStatus.BAD_GATEWAY, {"error": "Sumber atau penyimpanan tidak tersedia"})
 
     def do_HEAD(self) -> None:
         parts = self._route_parts()
@@ -517,6 +567,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         if parts[:2] == ["api", "articles"]:
             self._articles_get(parts)
+            return
+        if parts == ["api", "analytics", "observations"]:
+            from analytics_learning import list_observations
+            self._json(HTTPStatus.OK, {"observations": list_observations()})
             return
         if parts == ["api", "tools"]:
             sync_tools()

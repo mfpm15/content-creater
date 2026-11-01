@@ -60,7 +60,7 @@
           <label>Sumber rujukan (satu per baris atau paragraf)
             <textarea name="sources" rows="5" placeholder="Judul, penulis, tahun, penerbit, atau URL. Dipakai untuk sitasi [n] dan Daftar Pustaka (gaya IEEE)."></textarea>
           </label>
-          <label class="check"><input type="checkbox" name="research" /> Riset sumber melalui Google Search (memerlukan provider; klaim tetap diperiksa)</label>
+          <label>Kesegaran sumber (hari; 0 = tanpa syarat usia)<input type="number" name="freshness_days" min="0" max="3650" value="0"></label><label class="check"><input type="checkbox" name="research" /> Riset sumber melalui Google Search (memerlukan provider; klaim tetap diperiksa)</label>
           <label class="check"><input type="checkbox" name="suggest_refs" /> Sarankan rujukan tambahan (AI, belum diverifikasi, ditempatkan terpisah)</label>
 
           <h3>Gambar penjelasan</h3>
@@ -97,7 +97,7 @@
             <div id="complete" hidden>
               <div id="downloads" class="downloads"></div>
               <p class="muted small" id="resultPath"></p>
-              <div class="muted small" id="writingReport" hidden></div>
+              <div class="muted small" id="writingReport" hidden></div><section id="articleTools"></section>
               <h3>Prompt gambar</h3>
               <p class="muted small">Salin ke Nano Banana atau ChatGPT. Simpan hasilnya, lalu unggah di sini (PNG atau JPG, maks 10 MB). Dokumen dibangun ulang otomatis.</p>
               <div id="imageList"></div>

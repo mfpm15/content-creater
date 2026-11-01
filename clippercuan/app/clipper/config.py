@@ -71,6 +71,7 @@ DEFAULTS: dict = {
     "smart_crop": True,          # ikuti wajah
     "shot_framing": True,        # portrait dari video 16:9: framing diputuskan per shot (satu wajah / dua wajah / B-roll)
     "cut_silence": False,        # potong jeda hening (jump cut)
+    "snap_silence": False,       # opt-in batas kandidat ke jeda terukur; tidak mengubah cakupan kata
     "silence_gap": 0.55,         # detik jeda minimum yang dipotong
     "split": {                   # area dalam pecahan (0..1) dari frame sumber
         "face": [0.70, 0.62, 0.30, 0.38],   # x, y, w, h  (default: facecam pojok kanan bawah)

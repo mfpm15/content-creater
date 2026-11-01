@@ -5,7 +5,7 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const escapeHtml = value => {
   const node = document.createElement('span');
   node.textContent = String(value ?? '');
-  return node.innerHTML;
+  return node.innerHTML.replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 };
 const fmtTime = seconds => {
   const value = Math.max(0, Number(seconds) || 0);
@@ -68,10 +68,12 @@ $('#retentionForm').addEventListener('submit', async event => {
       transcript: $('#retentionTranscript').value,
       duration: $('#retentionDuration').value || null,
       units: $('#retentionUnits').value,
+      scenes: $('#retentionScenes').value.trim() ? ((value) => value.scenes || value)(JSON.parse($('#retentionScenes').value)) : null,
     });
     const s = result.summary;
     const events = result.events.length ? result.events.map(item => `<article class="event-row ${item.kind}"><span>${item.kind === 'cliff' ? '↓ CLIFF' : '↑ SPIKE'}</span><strong>${fmtTime(item.second)}</strong><b>${item.change > 0 ? '+' : ''}${item.change}%</b><p>${escapeHtml(item.spoken || 'Tambahkan SRT untuk melihat ucapan pada titik ini.')}</p></article>`).join('') : '<p class="result-note">Tidak ditemukan perubahan tajam berdasarkan ambang diagnostik.</p>';
-    const warnings = result.warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    const sceneSummary = result.scenes?.map(scene => `${scene.scene}: ${scene.average_sample_retention ?? 'tanpa data'}% (${scene.samples} sampel)`).join(' · ');
+    const warnings = [...result.warnings, ...(sceneSummary ? [sceneSummary] : [])].map(item => `<li>${escapeHtml(item)}</li>`).join('');
     $('#retentionResult').innerHTML = `<div class="score-head"><div><small>RATA-RATA SAMPEL</small><strong>${s.average}%</strong></div><span>Diagnostik, bukan bukti sebab-akibat</span></div><div class="metric-strip"><div><small>AWAL</small><b>${s.start}%</b></div><div><small>AKHIR</small><b>${s.end}%</b></div><div><small>DROP 0–3 DETIK</small><b>${s.hook_drop}%</b></div><div><small>SAMPEL</small><b>${s.sample_count}</b></div></div><p class="result-note">Satuan: ${escapeHtml(result.normalization.units)}. Kolom lain: ${escapeHtml(result.normalization.unknown_columns.join(", ") || "tidak ada")}.</p><h3>Titik perubahan terkuat</h3><div class="event-list">${events}</div>${warnings ? `<h3>Catatan</h3><ul class="issue-list">${warnings}</ul>` : ''}`;
   } catch (error) {
     toast(error.message, true);
@@ -102,3 +104,41 @@ $('#hookForm').addEventListener('submit', async event => {
   } catch (error) { toast(error.message, true); }
   finally { busy(form, false); }
 });
+
+let mappedCsv = null;
+const mappingLabels = {time:'Waktu (detik)',retention:'Retensi',video_id:'ID video',views:'Views',likes:'Likes',comments:'Komentar',shares:'Shares',average_watch_seconds:'Rata-rata ditonton (detik)',completion_percent:'Completion (%)'};
+$('#mappedFile').onchange = () => { mappedCsv=null; $('#mappingFields').replaceChildren(); };
+$('#inspectCsv').onclick = async () => {
+  try {
+    const file=$('#mappedFile').files[0]; if(!file||file.size>2000000) throw new Error('Pilih CSV maksimal 2 MB');
+    mappedCsv=await file.text(); const data=await post('/api/analytics/import/inspect',{csv:mappedCsv});
+    $('#mappingFields').innerHTML=Object.entries(mappingLabels).map(([name,label])=>`<label>${escapeHtml(label)}<select data-map="${name}"><option value="">Tidak dipakai</option>${data.headers.map(h=>`<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('')}</select></label>`).join('');
+    $('#mappedResult').textContent=JSON.stringify({preview:data.preview,rows:data.row_count},null,2);
+  } catch(error){toast(error.message,true)}
+};
+$('#mappedForm').onsubmit=async event=>{event.preventDefault();try{
+  if(!mappedCsv)throw new Error('Baca header CSV terlebih dahulu');
+  const mapping=Object.fromEntries($$('[data-map]').map(node=>[node.dataset.map,node.value]));
+  const result=await post('/api/analytics/import',{csv:mappedCsv,platform:$('#mappedPlatform').value,mapping,units:$('#mappedUnits').value});
+  $('#mappedResult').textContent=JSON.stringify(result,null,2);
+}catch(error){toast(error.message,true)}};
+async function loadObservations(){
+  try {
+    const response=await fetch('/api/analytics/observations');if(!response.ok)throw new Error('Gagal memuat observasi');
+    const data=await response.json();$('#observationList').replaceChildren();
+    for(const row of data.observations){
+      const card=document.createElement('article'),text=document.createElement('p');text.textContent=`${row.video_id} · ${row.platform} · ${row.window} · ${row.status}: ${row.proposal}`;card.append(text);
+      const metrics=document.createElement('pre');metrics.textContent=JSON.stringify(row.metrics,null,2);card.append(metrics);
+      for(const [label,approve] of [['Setujui eksperimen',true],['Tolak',false]]){
+        const button=document.createElement('button');button.type='button';button.textContent=label;
+        button.onclick=async()=>{try{await post(`/api/analytics/observations/${encodeURIComponent(row.id)}/decision`,{revision:row.revision,approve});await loadObservations()}catch(error){toast(error.message,true)}};card.append(button);
+      }
+      $('#observationList').append(card);
+    }
+  }catch(error){toast(error.message,true)}
+}
+$('#observationForm').onsubmit=async event=>{event.preventDefault();try{
+  const metrics={views:Number($('#observationViews').value)};if($('#observationCompletion').value!=='')metrics.completion_percent=Number($('#observationCompletion').value);
+  await post('/api/analytics/observations',{video_id:$('#observationVideo').value,platform:$('#observationPlatform').value,window:$('#observationWindow').value,metrics});await loadObservations();
+}catch(error){toast(error.message,true)}};
+loadObservations();

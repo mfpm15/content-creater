@@ -210,3 +210,23 @@ Tambahkan entri ke `creator-dashboard/tools.json`. Gunakan command dalam bentuk 
 ## Batas integrasi saat ini
 
 Dashboard ini adalah **control center/launcher**, bukan penggabungan source code kelima aplikasi menjadi satu runtime. Setiap tool tetap mempertahankan dependency, konfigurasi, storage, lisensi, dan UI masing-masing. Pendekatan ini sengaja dipilih agar upgrade upstream lebih aman dan konflik dependency Python, Node.js, Electron, MoviePy, serta FFmpeg tidak bercampur dalam satu process.
+
+### Review dan fitur editorial tambahan
+
+Lihat [cakupan fitur](docs/FEATURE-COVERAGE.md) untuk status dan batas pengujian terbaru.
+Article Drafter menyediakan ledger kutipan/klaim, proposal revisi bagian yang bisa dibuka kembali,
+serta diagram lokal SVG/PNG yang masuk DOCX. Analytics menyediakan pemetaan kolom CSV eksplisit,
+retensi per adegan dan catatan evaluasi 24h/7d. Video Studio dapat membuat variasi empat rasio
+untuk direview ulang; hasil MP4 mempunyai laporan pemeriksaan media dan screenshot midpoint opsional.
+
+Dependency tambahan dashboard bersifat opsional, dipasang pada environment dashboard sendiri:
+
+```sh
+python -m pip install -r creator-dashboard/requirements-review.txt
+```
+
+Diagram memerlukan Pillow. Review visual memerlukan Playwright dan browser Chromium yang tersedia
+pada PATH; bila tidak tersedia hasil dilabeli `unmeasured`. Sandbox browser tetap aktif secara default.
+Pengambilan teks sumber publik baru aktif bila admin mengisi `RESEARCH_SOURCE_HOSTS` dengan host
+HTTPS tepercaya (dipisahkan koma). Default kosong; kutipan manual tetap dapat dipakai. Fetch tersebut
+tidak menggunakan API key provider dan sumber tetap harus diperiksa pengguna.

@@ -36,22 +36,22 @@ Kedalaman bacaan berbeda. "Kode" = file skrip dibaca langsung. "README" = hanya 
 - `scripts/compute_reframe.py`: pelacakan wajah dan pelacakan kursor untuk rekaman layar, perataan posisi.
 - `scripts/snap_boundaries.py`: batas klip ditarik ke batas kata, lalu ke jeda hening terdekat.
 - **Dipakai:** gagasan crop mengikuti wajah (sudah ada lebih dulu di `facetrack.py`).
-- **Belum:** snap ke jeda hening (butuh benchmark; mengubah ranking), cursor tracking (butuh rekaman layar nyata).
+- **Tambahan:** snap hening opt-in dengan invariant kata/durasi dan cache; cursor tracker manual eksperimental dengan fallback. Diuji sintetis; benchmark nyata belum tersedia.
 
 ### openmontage (README)
 - Gerbang persetujuan visual, analisis video referensi, papan produksi.
 - **Dipakai:** tidak ada perubahan; `/api/production` dan pilih kandidat sudah ada di ClipperCuan.
 - Lisensi AGPL-3.0: hanya ide.
 
-### ghost-editor (README)
+### ghost-editor (kode/dokumentasi workflow)
 - Self-check akhir (jeda, level suara, ukuran caption), pilih take terbaik, gaya dari reel referensi.
-- **Dipakai:** self-check lewat delivery check. Belum: pilih take terbaik, gaya dari reel referensi.
+- **Dipakai:** self-check delivery/audio/visual opsional, review pengulangan lokal dengan persetujuan. Take terakhir hanya saran, bukan bukti kualitas audio terbaik; gaya dari reel masih memerlukan review semantik.
 
-### youtube-automation-agent (README)
+### youtube-automation-agent (dokumentasi fitur)
 - Gerbang persetujuan, resume per tahap, Shorts dari video, analitik.
 - **Dipakai:** tidak ada perubahan; resume (`recover_interrupted`, `retry`) sudah ada, analitik ada di `creator-dashboard/youtube_analytics.py`.
 
-### animate (README)
+### animate (grammar/FORMATS.md)
 - Animasi prosedural dengan storyboard.
 - **Dipakai:** tidak ada perubahan; sudah tercakup Opuscar/HyperFrames di Video Studio.
 
@@ -84,4 +84,4 @@ Salinan awal dibuat dangkal (`--depth 1`); perintah `checkout` di atas hanya ber
 
 ## Ide yang belum dikerjakan dari referensi
 
-Daftar kerja ada di [STATUS-2026-11-01.md](STATUS-2026-11-01.md) dan [../clippercuan/docs/plan-referensi-2026-10.md](../clippercuan/docs/plan-referensi-2026-10.md). Ringkas: snap jeda hening, zona aman caption per platform, ekspor per platform, cursor tracking, pilih take terbaik, gaya dari reel referensi.
+Daftar kerja ada di [STATUS-2026-11-01.md](STATUS-2026-11-01.md) dan [../clippercuan/docs/plan-referensi-2026-10.md](../clippercuan/docs/plan-referensi-2026-10.md). Status terbaru dan batas benchmark: [FEATURE-COVERAGE.md](FEATURE-COVERAGE.md). Snap hening, zona aman/ekspor, cursor eksperimental dan review take sudah diintegrasikan; alignment kata, beat eksternal, dan review semantik referensi masih terbuka.

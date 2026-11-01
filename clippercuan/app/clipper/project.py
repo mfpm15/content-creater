@@ -53,7 +53,7 @@ _RENDER_FIELDS = ("status", "file", "thumb", "srt", "ass", "words", "crop_keys",
                   "caption_provenance", "caption_render", "template_id", "template_name", "effective_caption_height_pct",
                   "sidecar_autoload_safe", "crop_confidence", "tracking", "render_warnings", "manual",
                   "exports", "delivery", "delivery_status", "caption_revision", "needs_rerender",
-                  "artifact_digest", "caption_ass_digest")
+                  "artifact_digest", "caption_ass_digest", "take_edits")
 
 
 def _unify_clips(p: dict) -> None:
@@ -264,6 +264,16 @@ def _pipeline(pid: str) -> None:
             candidates.snap_chapters(moments, json.loads(chapters_file.read_text("utf-8")), mn, mx)
         except (OSError, ValueError, KeyError) as e:  # noqa: BLE001 — chapter hanya bonus, jangan gagalkan pipeline
             print(f"[chapters] dilewati: {redact(str(e))}")
+    if cfg.get("snap_silence"):
+        if wav.exists():
+            from . import silence
+            pauses = silence.detect(wav, pr.duration, work / "silences.json")
+            for moment in moments:
+                adjustment = silence.snap(float(moment["start"]), float(moment["end"]), tr.get("words", []), pauses, pr.duration, mn, mx)
+                if adjustment["changed"]:
+                    moment.update(start=adjustment["start"], end=adjustment["end"], duration=round(adjustment["end"]-adjustment["start"], 3), boundary_adjustment=adjustment)
+        else:
+            update(pid, boundary_warning="Snap jeda dilewati: audio belum tersedia pada mode hemat")
     update(pid, engine=engine)
     lang = tr.get("language")
     prepared = []

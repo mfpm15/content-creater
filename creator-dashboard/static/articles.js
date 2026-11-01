@@ -83,6 +83,7 @@ function renderArticle(article) {
       ...(notes.length ? [el('ul', {}, ...notes)] : [el('span', {}, ' | tidak ada pola yang perlu dirapikan')]));
   }
   document.querySelector('#mdPreview').textContent = article.markdown;
+  renderArticleTools(article);
 
   document.querySelector('#downloads').replaceChildren(...article.files.map(name =>
     el('a', { href: `/api/articles/${article.slug}/files/${name}`, download: name }, `Unduh ${name}`)));
@@ -197,3 +198,44 @@ form.addEventListener('submit', async event => {
 });
 
 loadOptions().then(loadHistory).catch(error => toast(error.message));
+
+function renderArticleTools(article) {
+  const root=document.getElementById('articleTools');root.replaceChildren();
+  const send=async(action,body)=>api(`/api/articles/${encodeURIComponent(article.slug)}/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const refresh=async()=>renderArticle(await api(`/api/articles/${encodeURIComponent(article.slug)}`));
+  const report=article.evidence;
+  const evidencePanel=el('details',{},el('summary',{},`Bukti & klaim: ${report.unreviewed} paragraf perlu review`));
+  evidencePanel.append(el('p',{},'Kutipan dan sitasi tidak otomatis membuktikan fakta. Pemeriksaan di sini adalah catatan review pengguna, bukan fact-check otomatis.'));
+  const url=el('input',{placeholder:'URL HTTPS sumber'}),title=el('input',{placeholder:'Judul sumber'}),quote=el('textarea',{placeholder:'Kutipan bukti yang Anda periksa'}),date=el('input',{type:'date'}),add=el('button',{type:'button'},'Tambahkan sumber');
+  add.onclick=async()=>{try{await send('evidence',{revision:report.revision,action:'source',url:url.value,title:title.value,excerpt:quote.value,published_at:date.value});await refresh()}catch(error){toast(error.message)}};
+  const fetchSource=el('button',{type:'button'},'Ambil teks publik (host harus diizinkan)');
+  fetchSource.onclick=async()=>{fetchSource.disabled=true;try{const data=await api('/api/articles/source',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url.value})});quote.value=data.excerpt;if(data.published_at)date.value=data.published_at.slice(0,10);toast('Teks diambil; periksa kutipan dan tanggal sebelum disimpan')}catch(error){toast(error.message)}finally{fetchSource.disabled=false}};
+  evidencePanel.append(el('div',{},url,title,quote,date,fetchSource,add));
+  const source=el('select',{},...report.sources.map(item=>el('option',{value:item.id},`${item.title||item.url} ${item.verified?'— sudah direview':'— belum direview'}`))),note=el('input',{placeholder:'Catatan pemeriksaan (minimal 10 karakter)'}),verify=el('button',{type:'button'},'Saya sudah memeriksa sumber & kutipan');
+  verify.onclick=async()=>{try{await send('evidence',{revision:report.revision,action:'verify',source_id:source.value,note:note.value});await refresh()}catch(error){toast(error.message)}};
+  const sourceDetail=el('pre',{});
+  const showSource=()=>{const row=report.sources.find(item=>item.id===source.value);sourceDetail.textContent=row?`${row.url}\nTanggal: ${row.published_at||'Tidak diketahui'}\n${row.excerpt}\n${row.review_note||''}`:''};source.onchange=showSource;showSource();
+  evidencePanel.append(el('div',{},source,sourceDetail,note,verify));
+  const claim=el('select',{},...report.claims.map(item=>el('option',{value:item.id},`${item.status}: ${item.text.slice(0,90)}`))),link=el('button',{type:'button'},'Hubungkan klaim ke sumber terpilih');
+  link.onclick=async()=>{try{await send('evidence',{revision:report.revision,action:'link',claim_id:claim.value,source_ids:[source.value]});await refresh()}catch(error){toast(error.message)}};
+  evidencePanel.append(el('div',{},claim,link));root.append(evidencePanel);
+  const rewritePanel=el('details',{},el('summary',{},'Revisi bagian dengan review sebelum diterapkan'));
+  const section=el('select',{},...article.sections.map(item=>el('option',{value:item.index},item.heading))),instruction=el('textarea',{placeholder:'Instruksi perbaikan bahasa; jangan ubah fakta'}),propose=el('button',{type:'button'},'Buat usulan revisi'),comparison=el('div',{});
+  propose.onclick=async()=>{propose.disabled=true;try{
+    const result=await send('rewrite',{article_revision:article.article_revision,section:Number(section.value),instruction:instruction.value});
+    const apply=el('button',{type:'button'},'Setujui & terapkan revisi ini');
+    comparison.replaceChildren(el('h4',{},'Sebelum'),el('pre',{},result.before.join('\n\n')),el('h4',{},'Usulan — periksa makna dan nama sebelum menyetujui'),el('pre',{},result.after.join('\n\n')),apply);
+    apply.onclick=async()=>{apply.disabled=true;try{renderArticle(await send('apply-rewrite',{proposal_id:result.id,approve:true}))}catch(error){toast(error.message);apply.disabled=false}};
+  }catch(error){toast(error.message)}finally{propose.disabled=false}};
+  rewritePanel.append(section,instruction,propose,comparison);
+  for(const proposal of article.rewrite_proposals||[]){
+    const show=el('button',{type:'button'},proposal.stale?'Usulan lama (artikel telah berubah)':'Buka usulan tersimpan');show.disabled=proposal.stale;
+    show.onclick=()=>{const apply=el('button',{type:'button'},'Setujui & terapkan usulan tersimpan');comparison.replaceChildren(el('h4',{},'Sebelum'),el('pre',{},proposal.before.join('\n\n')),el('h4',{},'Usulan — periksa makna dan nama'),el('pre',{},proposal.after.join('\n\n')),apply);apply.onclick=async()=>{apply.disabled=true;try{renderArticle(await send('apply-rewrite',{proposal_id:proposal.id,approve:true}))}catch(error){toast(error.message);apply.disabled=false}}};rewritePanel.append(show);
+  }
+  root.append(rewritePanel);
+  const diagramPanel=el('details',{},el('summary',{},'Diagram lokal → SVG, PNG, dan Word'));
+  const kind=el('select',{},el('option',{value:'flow'},'Alur berurutan'),el('option',{value:'mindmap'},'Mind map satu tingkat')),
+    labels=el('textarea',{placeholder:'Satu label per baris, maksimal 60 karakter. Mind map: baris pertama adalah pusat.'}),diagramTitle=el('input',{placeholder:'Judul diagram'}),diagram=el('button',{type:'button'},'Buat dan sisipkan diagram');
+  diagram.onclick=async()=>{diagram.disabled=true;try{renderArticle(await send('diagram',{article_revision:article.article_revision,kind:kind.value,labels:labels.value.split('\n').map(x=>x.trim()).filter(Boolean),title:diagramTitle.value}))}catch(error){toast(error.message)}finally{diagram.disabled=false}};
+  diagramPanel.append(kind,diagramTitle,labels,diagram);root.append(diagramPanel);
+}

@@ -67,6 +67,10 @@ def test_measured_variant_and_download_detect_tampering(clip_state):
     assert output.parent.name == 'variants'
     assert b'private-source-tag' not in output.read_bytes()
     assert source.read_bytes() == before
+    result['geometry']['scope']='generated_spoken_caption'
+    with pytest.raises(platform_export.ExportBlocked,match='seluruh teks ASS'):
+        platform_export.download('example','clip_01','shorts')
+    result['geometry']['scope']='generated_ass_text'
     output.write_bytes(b'tampered')
     with pytest.raises(platform_export.ExportBlocked, match='Artefak berubah'):
         platform_export.download('example', 'clip_01', 'shorts')
@@ -86,6 +90,19 @@ def test_unsafe_caption_blocks_export_before_encoder(clip_state, monkeypatch):
     assert not result['geometry']['ok']
     assert not called
     assert not list(folder.glob('variants/*.mp4'))
+
+
+@pytest.mark.skipif(not HAS_FFMPEG, reason='FFmpeg unavailable')
+def test_title_and_text_watermark_are_included_in_export_mask(tmp_path):
+    cfg=deep_merge(DEFAULTS, {'caption':{'enabled':False},'title':{'enabled':True},
+                             'watermark':{'enabled':True,'text':'Brand','position':'br'}})
+    path=tmp_path/'overlays.ass'
+    path.write_text(captions.build_ass([], 'Judul', cfg,(320,568),1),'utf-8')
+    spoken=caption_geometry.measure(path,320,568,1,10)
+    assert spoken['status']=='not_required'
+    overlays=caption_geometry.measure(path,320,568,1,10,include_overlays=True)
+    assert overlays['scope']=='generated_ass_text' and overlays['status']=='measured'
+    assert not caption_geometry.evaluate(overlays,delivery.PLATFORMS['tiktok']['safe'])['ok']
 
 
 def test_path_escape_and_stale_render_fail_closed(clip_state):

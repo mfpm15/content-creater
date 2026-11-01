@@ -251,18 +251,27 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     tracking = None
     wide = pr.width / pr.height > SIZES[layout][0] / SIZES[layout][1]
     shot_plan = None
-    if layout == "portrait" and cfg.get("smart_crop") and cfg.get("shot_framing", True) and not keys and wide:
+    cursor_mode = cfg.get("content_profile") == "screen_recording" and layout == "portrait"
+    if cursor_mode and layout in ("portrait", "square") and wide and not keys:
+        from . import cursor
+        frames = facetrack._frames(src, start, end, pr.width, pr.height)
+        tracking = cursor.track(frames, pr.width, pr.height)
+        keys = tracking["keys"]
+        if tracking["fallback"]:
+            layout = "blur"
+            cfg = {**cfg, "layout": layout}
+    if not cursor_mode and layout == "portrait" and cfg.get("smart_crop") and cfg.get("shot_framing", True) and not keys and wide:
         try:
-            shot_plan = shots.plan(src, start, end, pr.width, pr.height, duration=dur)
+            shot_plan = shots.plan(src, start, end, pr.width, pr.height, duration=dur, use_audio=pr.has_audio)
         except Exception as e:  # noqa: BLE001 — deteksi shot gagal → jalur lama (satu jalur kamera), render tetap jalan
             print(f"[shots] gagal ({e}); pakai pelacakan tunggal")
     if shot_plan:
         tracking = {**{k: v for k, v in shot_plan.items() if k != "shots"},
                     "shots": [{"a": s["a"], "b": s["b"], "mode": s["mode"]} for s in shot_plan["shots"]]}
-    elif layout in ("portrait", "square") and cfg.get("smart_crop") and not keys and wide:
+    elif not cursor_mode and layout in ("portrait", "square") and cfg.get("smart_crop") and not keys and wide:
         tracking = facetrack.tracking_result(src, start, end, pr.width, pr.height)
         keys = tracking["keys"]
-    elif keys:
+    elif keys and not cursor_mode:
         tracking = {"keys": keys, "confidence": 1.0, "source": "manual", "samples": len(keys),
                     "face_samples": 0, "motion_samples": 0, "target_samples": len(keys)}
     cw = clip_words(words, start, end) if clip.get("words") is None else clip["words"]

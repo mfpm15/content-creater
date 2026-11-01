@@ -126,7 +126,7 @@
         </div>
         <label>Sumber subtitle<select id="transcriber" class="in"><option value="auto">Otomatis — YouTube → cloud → Whisper lokal</option><option value="youtube">Subtitle YouTube</option><option value="api">API cloud</option><option value="local">Whisper lokal</option></select></label>
         <label class="check"><input type="checkbox" id="translate_en"> Terjemahkan caption ke bahasa Inggris</label>
-        <label class="check"><input type="checkbox" id="cut_silence"> Potong jeda hening otomatis</label>
+        <label class="check"><input type="checkbox" id="snapSilence"> Rapikan batas klip ke jeda audio (eksperimental; memakai audio yang sudah tersedia)</label><label class="check"><input type="checkbox" id="cut_silence"> Potong jeda hening otomatis</label>
         <div class="ai-choice" id="llmRow" hidden><label class="check"><input type="checkbox" id="use_llm" checked> Pilih momen & judul dengan AI</label><small>Model aktif: <b id="llmModel"></b></small></div>
         <div class="ai-choice fallback" id="localFallback"><span class="status-dot"></span><div><b>Seleksi lokal aktif</b><small>Highlight dipilih dengan analisis transkrip lokal.</small></div></div>
       </div>

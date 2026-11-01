@@ -651,6 +651,7 @@ def clean_input(raw: object) -> dict:
         "words": number("words", 1200, 200, MAX_WORDS),
         "points": text("points"),
         "sources": text("sources"),
+        "freshness_days": number("freshness_days", 0, 0, 3650),
         "research": str(raw.get("research", "")).lower() in ("1", "true", "on", "yes"),
         "suggest_refs": str(raw.get("suggest_refs", "")).lower() in ("1", "true", "on", "yes"),
         "image_count": number("image_count", 0, 0, MAX_IMAGES),
@@ -869,15 +870,20 @@ def get_article(slug: str) -> dict:
         return {"slug": slug, "complete": False, "title": (outline or {}).get("title") or inp.get("title") or slug,
                 "summary": "", "images": [], "markdown": "", "files": [], "path": str(directory),
                 "sectionsDone": done, "sectionsTotal": total, "wordCount": 0, "referencesCount": 0}
+    import article_tools
     images = [{**image, "hasFile": find_image(directory, image["id"]) is not None} for image in article["images"]]
     return {
         "slug": slug,
         "complete": True,
+        "article_revision": article_tools.digest(article),
+        "sections": article_tools.sections(article),
+        "rewrite_proposals": article_tools.proposals(slug),
+        "evidence": article_tools.evidence_report(slug),
         "title": article["title"],
         "summary": article["summary"],
         "images": images,
         "markdown": (directory / "article.md").read_text(encoding="utf-8"),
-        "files": [name for name in DOWNLOADS if (directory / name).is_file()],
+        "files": [name for name in DOWNLOADS if (directory / name).is_file()] + [path.name for path in (directory / "images").glob("diagram-*.svg")],
         "path": str(directory),
         "wordCount": count_words(article["blocks"]),
         "referencesCount": len(article.get("references", [])),
@@ -911,6 +917,10 @@ def list_articles() -> list[dict]:
 
 
 def read_file(slug: str, name: str) -> tuple[bytes, str]:
+    if re.fullmatch(r"diagram-[a-f0-9]{8}\.svg", name):
+        path = _dir(slug) / "images" / name
+        if not path.is_file(): raise FileNotFoundError(name)
+        return path.read_bytes(), "image/svg+xml"
     if name not in DOWNLOADS:
         raise FileNotFoundError(name)
     path = _dir(slug) / name

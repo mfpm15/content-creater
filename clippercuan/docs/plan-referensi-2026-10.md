@@ -1,5 +1,7 @@
 # Plan: serap ide dari 8 repo referensi
 
+> Rencana awal/historis. Status implementasi terbaru dan keterbatasannya ada di [FEATURE-COVERAGE.md](../../docs/FEATURE-COVERAGE.md).
+
 Sumber dibaca 31 Oktober 2026 (README, clone dangkal). Hanya ide dan alur kerja yang diambil; tidak ada kode yang disalin.
 Baseline sebelum perubahan: `python -m pytest tests` di `clippercuan/app` = 129 lulus.
 
