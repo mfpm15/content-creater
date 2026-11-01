@@ -1122,6 +1122,8 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         output = _mux_video(target, silent, final_audio, plan["duration"])
         from video_review import review
         review_result = review(output, plan["duration"], plan)
+        with output.open('rb') as source:
+            review_result['artifact_sha256']=hashlib.file_digest(source,'sha256').hexdigest()
         (target / "review.json").write_text(json.dumps(review_result), encoding="utf-8")
         _update_job(job_id, {"review": review_result})
         silent.unlink(missing_ok=True)

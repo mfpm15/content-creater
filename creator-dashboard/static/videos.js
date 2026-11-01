@@ -167,6 +167,10 @@ function showResult(result, aspectId) {
   }
   elements.inspectHtmlBtn.href = result.htmlUrl || '#';
   elements.videoActions.style.display = 'flex';
+  let bundle=document.getElementById('downloadBundle');
+  if(!bundle){bundle=document.createElement('a');bundle.id='downloadBundle';bundle.className='secondary-button';bundle.download='production-bundle.zip';bundle.textContent='Unduh paket produksi';elements.videoActions.append(bundle)}
+  bundle.href=`/api/videos/${encodeURIComponent(result.slug)}/bundle`;
+  elements.videoActions.style.flexWrap='wrap';bundle.style.flex='1 1 100%';bundle.style.textAlign='center';
   let reviewBox=document.getElementById('mediaReviewResult');
   if(!reviewBox){reviewBox=document.createElement('section');reviewBox.id='mediaReviewResult';elements.videoActions.after(reviewBox)}
   reviewBox.replaceChildren();

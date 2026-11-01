@@ -341,6 +341,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 status=HTTPStatus.PARTIAL_CONTENT
             self.send_response(status)
             self.send_header('Content-Type',content_type)
+            if content_type=='application/zip':self.send_header('Content-Disposition','attachment; filename="production-bundle.zip"')
             self.send_header('Content-Length',str(max(0,end-start+1)))
             self.send_header('Cache-Control','no-store')
             self.send_header('X-Content-Type-Options','nosniff')
@@ -479,6 +480,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self._json(HTTPStatus.OK, video_drafter.job_status(unquote(parts[3])))
             elif len(parts) == 3:
                 self._json(HTTPStatus.OK, video_drafter.get_video(unquote(parts[2])))
+            elif len(parts)==4 and parts[3]=='bundle':
+                from video_bundle import build
+                slug=unquote(parts[2])
+                video_drafter.get_video(slug)  # Require a completed result, not a partial render directory.
+                with build(video_drafter._video_directory(slug)) as path:
+                    self._video_file(path,'application/zip')
             elif len(parts) == 4:
                 slug, filename = unquote(parts[2]), unquote(parts[3])
                 path, content_type = video_drafter.video_file_path(slug, filename)
@@ -489,6 +496,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
         except FileNotFoundError as exc:
             self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except ValueError as exc:
+            from video_bundle import BundleBusy
+            self._json(HTTPStatus.CONFLICT if isinstance(exc,BundleBusy) else HTTPStatus.BAD_REQUEST,{'error':str(exc)})
         except Exception as exc:
             self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 

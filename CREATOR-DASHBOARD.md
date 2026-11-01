@@ -249,3 +249,5 @@ Mode video **Naskah sendiri** membuat rencana lokal tanpa provider; wajib mengis
 Perubahan artikel diterbitkan melalui staging dan journal pemulihan. Jika render dokumen gagal, revisi tetap berupa usulan; saat proses terputus, pembacaan berikutnya memulihkan versi sebelumnya. Pemutaran MP4 mendukung seek melalui byte-range.
 
 Target akhir aplikasi adalah laptop Windows 10/11 x64. Jalankan `setup-core.bat` untuk empat fitur inti; `setup-dashboard.bat --core` setara. `start-dashboard.bat` memakai venv Windows yang sudah dipasang. Lihat [DISTRIBUTION.md](DISTRIBUTION.md) untuk ZIP source dan prasyarat. Jangan menyalin venv atau node_modules dari Linux/cloud ke laptop.
+
+Video Studio menyediakan **Unduh paket produksi** setelah hasil selesai: MP4/Lottie, preview, SRT, audio mix/voice/music, rencana adegan, referensi dan review yang tersedia. ZIP menyertakan manifest checksum dan catatan review manual, tanpa konfigurasi/job lokal. Video dikemas tanpa kompresi ZIP ulang agar tidak membebani laptop. Batas paket 2 GiB; video lebih besar dapat diunduh terpisah. Instalasi aplikasi tetap melalui GitHub clone/pull.

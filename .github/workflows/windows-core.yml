@@ -59,7 +59,7 @@ jobs:
         shell: pwsh
         run: |
           $python = ".\creator-dashboard\.venv\Scripts\python.exe"
-          foreach ($pattern in @("test_windows_runtime.py", "test_remaining_features.py", "test_video_drafter.py", "test_youtube_analytics.py")) {
+          foreach ($pattern in @("test_windows_runtime.py", "test_remaining_features.py", "test_video_drafter.py", "test_youtube_analytics.py", "test_video_bundle.py")) {
             & $python -m unittest discover -s creator-dashboard -p $pattern
             if ($LASTEXITCODE -ne 0) { throw "Tests failed: $pattern" }
           }
