@@ -69,17 +69,38 @@ jobs:
         shell: pwsh
         run: |
           $env:CREATOR_DASHBOARD_NO_BROWSER = "1"
-          $process = Start-Process cmd.exe -ArgumentList "/d", "/c", "start-dashboard.bat" -PassThru -NoNewWindow
+          $directory = (Get-Location).Path
+          $stdout = Join-Path $env:RUNNER_TEMP "dashboard-launcher-stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "dashboard-launcher-stderr.log"
+          if (-not (Test-Path (Join-Path $directory "start-dashboard.bat"))) { throw "Launcher missing in working directory" }
+          $process = Start-Process $env:ComSpec -WorkingDirectory $directory -ArgumentList "/d", "/c", "call start-dashboard.bat" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          $failed = $false
           try {
             $ready = $false
             for ($attempt = 0; $attempt -lt 40; $attempt++) {
-              if ($process.HasExited) { throw "Windows launcher exited early" }
+              $process.Refresh()
+              if ($process.HasExited) { throw "Windows launcher exited early with code $($process.ExitCode)" }
               try {
                 $response = Invoke-RestMethod http://127.0.0.1:3210/api/tools -TimeoutSec 2
                 if ($response.tools.Count -eq 9) { $ready = $true; break }
               } catch { Start-Sleep -Milliseconds 250 }
             }
             if (-not $ready) { throw "Windows launcher did not become ready" }
+          } catch {
+            $failed = $true
+            $details = ($_ | Out-String)
+            foreach ($log in @($stdout, $stderr)) {
+              if (Test-Path $log) { $details += (Get-Content $log -Tail 20 | Out-String) }
+            }
+            Write-Host $details
+            $annotation = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Host "::error title=Windows launcher startup failed::$annotation"
           } finally {
-            if (-not $process.HasExited) { taskkill /PID $process.Id /T /F | Out-Null }
+            $process.Refresh()
+            if (-not $process.HasExited) {
+              taskkill /PID $process.Id /T /F | Out-Null
+              if ($LASTEXITCODE -ne 0) { Write-Warning "Launcher process exited during cleanup" }
+            }
           }
+          if ($failed) { exit 1 }
+          exit 0

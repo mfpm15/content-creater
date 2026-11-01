@@ -7,7 +7,7 @@ set "DASHBOARD_PORT=3210"
 if exist "creator-dashboard\.venv\Scripts\python.exe" (
   set "CREATOR_DASHBOARD_HOST=%DASHBOARD_HOST%"
   set "CREATOR_DASHBOARD_PORT=%DASHBOARD_PORT%"
-  "creator-dashboard\.venv\Scripts\python.exe" "creator-dashboard\server.py"
+  "creator-dashboard\.venv\Scripts\python.exe" -u "creator-dashboard\server.py"
   if errorlevel 1 (pause & exit /b 1)
   exit /b 0
 )
@@ -32,7 +32,7 @@ echo  http://%DASHBOARD_HOST%:%DASHBOARD_PORT%
 echo.
 set "CREATOR_DASHBOARD_HOST=%DASHBOARD_HOST%"
 set "CREATOR_DASHBOARD_PORT=%DASHBOARD_PORT%"
-%PYTHON_CMD% creator-dashboard\server.py
+%PYTHON_CMD% -u creator-dashboard\server.py
 
 if errorlevel 1 (
   echo.
