@@ -31,6 +31,7 @@ FFmpeg adalah prasyarat media bersama. Setiap aplikasi mempertahankan venv, pack
 | `creator-dashboard/static/` | Halaman `index.html`, `articles.html`, `videos.html`, `youtube-analytics.html`; JS/CSS per fitur; `shell.js` untuk shell UI |
 | `creator-dashboard/article_drafter.py`, `humanizer.py` | Pipeline artikel bertahap, sitasi, prompt gambar, unggah gambar, pembuatan Markdown/DOCX; normalisasi gaya teks |
 | `creator-dashboard/video_drafter.py` | Job animasi, riset, Scene Plan/Motion Plan, persetujuan storyboard, adapter render dan artefak |
+| `creator-dashboard/creative_profile.py`, `benchmark_media.py` | Validasi/katalog brand dan cue kata eksplisit; CLI benchmark lokal terpisah untuk hash, audio dan precision/recall cut |
 | `creator-dashboard/google_search_research.py` | Worker terpisah: JSON stdin/stdout, Google Search grounding via Google GenAI |
 | `creator-dashboard/{analytics_import,analytics_learning}.py` | Pemetaan CSV eksplisit, retensi per scene, observasi lokal 24h/7d dan keputusan eksperimen |
 | `creator-dashboard/article_storage.py` | Penulisan privat, staging dokumen, journal commit dan rollback/recovery artikel; dipakai revisi, diagram, unggah gambar dan rebuild |
@@ -106,7 +107,7 @@ Mulai dengan `rg --files <folder-target>` dan `rg -n '<simbol>' <folder-target>`
 
 ### Repo referensi (`references/`, katalog di `docs/REFERENCES.md`)
 
-- Delapan repo dipelajari untuk ClipperCuan: `ffmpeg-skill`, `ghost-editor`, `claude-shorts`, `openmontage`, `animate`, `handy`, `agent-reach`, `youtube-automation-agent`. Salinan lokal ada di `references/` (diabaikan Git). Versi (commit), lisensi, apa yang dipelajari, apa yang sudah dipakai, dan cara memasang ulang tercatat di [`docs/REFERENCES.md`](docs/REFERENCES.md).
+- Delapan repo dipelajari untuk ClipperCuan: `ffmpeg-skill`, `ghost-editor`, `claude-shorts`, `openmontage`, `animate`, `handy`, `agent-reach`, `youtube-automation-agent`. Salinan lokal opsional di `references/` (diabaikan Git; bisa tidak ada pada checkout baru). Versi (commit), lisensi, apa yang dipelajari, apa yang sudah dipakai, dan cara memasang ulang tercatat di [`docs/REFERENCES.md`](docs/REFERENCES.md).
 - Perlakukan sebagai bahan bacaan: ambil ide, angka, alur kerja. Jangan salin kode dan jangan menambah dependency ke folder itu. `openmontage` berlisensi **AGPL-3.0**: ide saja, tidak ada kode atau aset.
 - Status penyerapan terkini: [`docs/FEATURE-COVERAGE.md`](docs/FEATURE-COVERAGE.md). Snap hening opt-in (`silence.py`), review take/hook (`editorial.py`), cursor eksperimental (`cursor.py`), studi referensi lokal (`reference_study.py`), zona aman dan ekspor per platform sudah diintegrasikan. Heuristik baru belum tervalidasi pada video nyata.
 - Angka dari referensi bukan jaminan. Uji pada video nyata sebelum dipakai sebagai default (contoh: ambang crossfade di `shots.py` dikalibrasi pada satu video).
@@ -139,3 +140,9 @@ Paket hasil Video Studio: `video_bundle.py`, `GET /api/videos/{slug}/bundle`, to
 Handoff juga menyertakan audio mix/voice/music yang tersedia pada allowlist. Review MP4 baru menyimpan `artifact_sha256`; manifest mengikat review ke hash video yang diekspor. Hasil lama ditandai `not_recorded`; video yang telah berubah ditandai `stale_review`, tanpa mengklaim review masih berlaku.
 
 Paket produksi telah lulus CI Windows native run 41317023982 (kode a20076f), termasuk tujuh tes bundle. Source instalasi tetap GitHub; ZIP bundle hanya untuk hasil konten.
+
+Brand kit Video Studio: `GET/POST /api/videos/brands`, katalog `output/brand-kits.json` (maksimal 50, revision wajib, nama sama memperbarui), atomic private write, path symlink/junction ditolak. Plan menyimpan snapshot warna/font sistem/wordmark teks; edit UI wajib mempertahankan seluruh plan termasuk brand/cue. Jangan menerima CSS, font URL atau logo remote. Material 3D tidak seluruhnya mengikuti kit; font tidak di-embed.
+
+`wordCues` menerima `{word,start,end}` atau alias Clipper `{w,s,e}`, detik absolut video. Isi angka/desimal/negasi dan urutan/batas adegan divalidasi; `visualCueWord` indeks mulai 0. Ini input timestamp, bukan forced alignment terhadap audio TTS. Pemicu: bentuk/judul Lottie, judul/panel Opuscar, reticle Three.js. Perubahan storyboard tetap membatalkan approval. Preview Lottie mengikuti urutan layer standar (layer pertama terdepan), termasuk background/wordmark; setiap layer teks wajib menyertakan `t.m` (grouping/alignment) agar player standar dapat merender. Uji isi SVG aktual, bukan hanya `isLoaded`.
+
+Studi referensi Clipper menambahkan `timeline_thirds` berisi bukti per bagian waktu sama, bukan segmentasi cerita. Benchmark publik dan pemetaan enam situs kini ada di `docs/benchmarks/README.md`; fixture hanya di `.data/benchmarks/`, tidak di Git. Tambahan referensi kode Whisper MIT/PySceneDetect BSD-3-Clause hanya ide/tes, tanpa dependency baru. Sampel film menemukan 4/5 cut acuan; jangan menganggap threshold sudah terkalibrasi luas. Sesuai pengguna, jangan menambahkan upload audio pribadi atau manajemen antrean render pada pengembangan ini; CSV asli tetap ditunda.

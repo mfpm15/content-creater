@@ -4,16 +4,7 @@ Diperbarui 1 November 2026. Dokumen ini mencatat kemampuan proyek, bukan klaim k
 
 ## Referensi produk dari pengguna
 
-| URL | Status pemeriksaan |
-|---|---|
-| https://socialvisuals.pro/ | Halaman belum dapat dibaca; proxy cloud mengembalikan 403 |
-| https://reap.video/clipping | Sama |
-| https://www.opus.pro/ | Sama |
-| https://www.heygen.com/id-id/tool/ai-video-clip-generator | Sama |
-| https://creatify.ai/id/tools/ai-video-clip-generator | Sama |
-| https://www.vmaker.com/tools/ai-clip-maker | Sama |
-
-Draft allowlist enam host dan `speech.platform.bing.com` sudah disimpan pada konfigurasi environment; belum diterapkan ke instance berjalan. Jangan mengatribusikan fitur spesifik ke produk tersebut tanpa membaca sumbernya. Tidak ada kode, aset, merek, atau model milik produk tersebut yang disalin. Rincian delapan repo pengetahuan ada di [REFERENCES.md](REFERENCES.md).
+Keenam URL berhasil dibaca HTTP 200 pada 1 November 2026. [Pemetaan fitur, sumber dan benchmark](benchmarks/README.md) mencatat klaim halaman publik SocialVisuals, Reap, OpusClip, HeyGen, Creatify dan Vmaker. Ini bukan pengujian akun/hasil layanan mereka atau bukti kesetaraan kualitas.
 
 ## Kemampuan yang tersedia
 
@@ -27,8 +18,10 @@ Draft allowlist enam host dan `speech.platform.bing.com` sudah disimpan pada kon
 | Rekaman layar | Profil manual `screen_recording`, cursor heuristic, smoothing dan blur fallback | Eksperimental, portrait saja; diuji sintetis |
 | Delivery per platform | Preset bersama, overlay, antrean H.264/AAC/loudness dua tahap, hash dan unduhan tervalidasi | Profil referensi, bukan ketentuan resmi terbaru; jalur unduh mentah tetap ada |
 | Zona aman teks | Mask libass semua frame, termasuk caption, title, CTA dan watermark teks pada ekspor | Teks bawaan video, watermark gambar/dekorasi tidak diukur; mask tidak aman memblokir ekspor |
-| Analisis referensi lokal | Sampel 1–120 detik, scene cuts, median shot, tempo ucapan, pembuka dan jeda transkrip | Tidak menilai struktur semantik, fakta, atau estetika; tidak menyalin gaya otomatis |
+| Analisis referensi lokal | Sampel 1–120 detik, cuts/median shot, tempo, pembuka/jeda dan bukti tiga bagian waktu | Tidak menilai struktur semantik, fakta, atau estetika; tidak menyalin gaya otomatis |
 | Video Studio | Gerbang Scene Plan/Storyboard, resume, variasi 9:16/1:1/4:5/16:9 dari satu rencana; mode naskah sendiri lokal tanpa provider | Tiap rasio direview ulang; MP4 memerlukan runtime HyperFrames/Opuscar/TTS yang siap |
+| Brand kit Video Studio | Katalog lokal berversi, snapshot per job, aksen/latar/teks/font sistem dan wordmark teks pada HTML/Lottie | Tanpa logo gambar/remote CSS; warna material 3D tidak seluruhnya diganti; font tidak di-embed |
+| Timing visual per kata | Cue input eksplisit, validasi isi/angka/negasi/waktu; pemicu visual per adapter, tersimpan saat edit/variasi/ekspor | Bukan ASR/forced alignment; waktu perlu dicocokkan dengan TTS hasil; efek lain mengikuti timing adegan |
 | Lottie | Data ekspor sama dengan sumber preview mandiri, teks aman, bentuk dan transform dasar | Subset vektor sederhana, tanpa audio/3D/aset eksternal; bukan seluruh Motion Plan |
 | Review video | ffprobe, loudness/true peak/silence, estimasi kecepatan narasi, delta cut ke grid envelope musik prosedural | Bukan deteksi beat musik eksternal atau timestamp per kata; timing disetujui tidak otomatis diubah |
 | Review visual | Screenshot midpoint maksimal 20 adegan dan cek overflow elemen teks | Opsional Playwright/browser; bukan review semua frame/transisi/estetika; `unmeasured` bila tidak siap |
@@ -49,10 +42,10 @@ Draft allowlist enam host dan `speech.platform.bing.com` sudah disimpan pada kon
 ## Pekerjaan yang masih memerlukan tahap berikutnya
 
 1. Benchmark video nyata untuk cursor, speaker-turn, crossfade dan snap hening; CSV ekspor asli setelah pengguna siap.
-2. Timestamp narasi per kata dan gerak visual yang mengikutinya; belum ada model alignment siap yang tervalidasi.
+2. Alignment audio otomatis per kata masih memerlukan model/benchmark; cue input eksplisit dan pemicu visual kini tersedia.
 3. Deteksi beat musik eksternal, transient setelah hening, serta review seluruh frame/rendered pixel termasuk elemen visual nonteks.
 4. Analisis semantik hook/payoff referensi dan style proposal dengan review; tidak menganggap statistik cuts sebagai pemahaman cerita.
-5. Verifikasi fitur keenam situs setelah akses tersedia, kemudian petakan gap faktual. Avatar, dubbing/terjemahan, generative B-roll, integrasi publishing/scheduler bukan fitur yang sudah selesai dalam perubahan ini.
+5. Uji layanan pesaing melalui akun belum dilakukan. Avatar, dubbing/terjemahan, generative B-roll, integrasi publishing/scheduler tetap belum tersedia sebagai workflow terpadu.
 6. Uji provider nyata dan MP4 penuh dengan runtime render/TTS siap; pengujian lokal tidak membuktikan akun/provider eksternal berfungsi.
 
 ## Audit perbaikan menyeluruh
@@ -65,8 +58,10 @@ Draft allowlist enam host dan `speech.platform.bing.com` sudah disimpan pada kon
 - Review GSAP menangani objek cyclic tanpa serialisasi; kegagalan analyzer/audio/browser tetap dilaporkan sebagai belum terukur dan tidak membuang hasil render.
 - Renderer tidak mewarisi credential provider aplikasi, telemetry dimatikan dan worker dibatasi satu. Proxy, CA dan guard platform dipertahankan. HyperFrames upstream meluncurkan browser dengan no-sandbox: adapter hanya boleh merender template yang dibuat backend, bukan HTML arbitrer dari pengguna. Ini bukan isolasi browser yang setara sandbox produksi.
 - Environment dashboard, renderer dan voice sudah dipasang terpisah. Uji aktual Opuscar dan Three.js: render → mux → ffprobe/ebur128 → screenshot midpoint, 2 detik/320×568/30 fps, audio sintetis sebagai pengganti TTS daring. Keduanya lolos pemeriksaan media. Uji ini tidak membuktikan kualitas narasi atau render panjang.
-- Instruksi install/startup dan host TTS tersimpan di draft konfigurasi cloud. Akses TTS masih 403 pada instance berjalan; Review/Save/Publish di pengaturan environment diperlukan untuk menerapkan draft. Google/LLM provider dan TTS daring belum tervalidasi.
+- Kebijakan jaringan runtime kini mencakup keenam situs produk dan host TTS; halaman publik berhasil dibaca. Keberhasilan TTS/Google/LLM provider tetap belum divalidasi pada sesi ini; hasil historis 403 bukan status baru provider.
 
 ## Target laptop Windows
 
 Gunakan `setup-core.bat`, lalu `start-dashboard.bat`. Browser Edge/Chrome dideteksi tanpa mewajibkan PATH. Dependency/venv cloud Linux tidak didistribusikan; Windows memasangnya ulang. `package-release.ps1` memakai helper ZIP Python yang diuji dengan filter source/secret/cache dan mempertahankan folder source build/projects. Hasil uji cloud, fixture path Windows dan validasi ZIP tidak menggantikan smoke test Windows native. Lihat [DISTRIBUTION.md](../DISTRIBUTION.md).
+
+Benchmark baru: fixture suara Whisper 11 detik untuk audio, serta sampel video PySceneDetect 10,469 detik dengan 4/5 cut acuan, precision 1,0 dan recall 0,8. Tidak mengubah threshold berdasarkan satu sampel. Upload audio pribadi dan pengembangan manajemen antrean render dikeluarkan dari lingkup sesuai pengguna.

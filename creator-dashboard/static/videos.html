@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="/styles.css" />
   <link rel="stylesheet" href="/articles.css" />
   <style>
+    #brandEditor input[type="color"] { height:44px; padding:4px; cursor:pointer; }
+    #styleSelect[hidden] { display:none; }
     .video-preview-box {
       width: 100%;
       border-radius: 12px;
@@ -165,6 +167,27 @@
             <select id="researchMode" name="researchMode"><option value="web">Riset web + motion planner</option><option value="provided">Naskah sendiri — rencana lokal tanpa provider</option></select>
             <small>Mode naskah sendiri tidak memeriksa fakta atau membuat audio. Adapter Lottie dapat diselesaikan secara lokal; MP4 tetap memerlukan runtime render dan TTS.</small>
           </label>
+          <label>Brand kit
+            <select id="brandSelect"><option value="">Tampilan bawaan</option></select>
+            <small>Warna, font sistem dan wordmark teks. Pilihan disalin ke pekerjaan baru; mengubah kit tidak mengubah hasil lama.</small>
+          </label>
+          <details id="brandEditor">
+            <summary>Buat / perbarui brand kit</summary>
+            <label>Nama kit<input id="brandName" maxlength="60" placeholder="Contoh: Kopi Nusantara"></label>
+            <label>Wordmark teks<input id="brandWordmark" maxlength="24" placeholder="Opsional, maksimal 24 karakter"></label>
+            <div class="row2">
+              <label>Aksen<input id="brandAccent" type="color" value="#22d3ee"></label>
+              <label>Latar<input id="brandBackground" type="color" value="#030712"></label>
+            </div>
+            <div class="row2">
+              <label>Teks<input id="brandText" type="color" value="#ffffff"></label>
+              <label>Font<select id="brandFont"><option>Arial</option><option>Verdana</option><option>Georgia</option><option>Tahoma</option></select></label>
+            </div>
+            <button id="saveBrandBtn" class="secondary-button" type="button">Simpan kit</button>
+            <button id="reloadBrandsBtn" class="secondary-button" type="button">Muat ulang kit</button>
+            <p id="brandStatus" role="status"></p>
+            <small>Nama yang sama memperbarui kit tersebut. Periksa kontras teks pada preview sebelum produksi.</small>
+          </details>
           <div class="row2">
             <label>Render Adapter
               <select name="engine" id="engineSelect"></select>

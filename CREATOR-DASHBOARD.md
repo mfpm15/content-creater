@@ -248,6 +248,22 @@ Mode video **Naskah sendiri** membuat rencana lokal tanpa provider; wajib mengis
 
 Perubahan artikel diterbitkan melalui staging dan journal pemulihan. Jika render dokumen gagal, revisi tetap berupa usulan; saat proses terputus, pembacaan berikutnya memulihkan versi sebelumnya. Pemutaran MP4 mendukung seek melalui byte-range.
 
-Target akhir aplikasi adalah laptop Windows 10/11 x64. Jalankan `setup-core.bat` untuk empat fitur inti; `setup-dashboard.bat --core` setara. `start-dashboard.bat` memakai venv Windows yang sudah dipasang. Lihat [DISTRIBUTION.md](DISTRIBUTION.md) untuk ZIP source dan prasyarat. Jangan menyalin venv atau node_modules dari Linux/cloud ke laptop.
+Target akhir aplikasi adalah laptop Windows 10/11 x64. Jalankan `setup-core.bat` untuk empat fitur inti; `setup-dashboard.bat --core` setara. `start-dashboard.bat` memakai venv Windows yang sudah dipasang. Ambil pembaruan dengan `git pull --ff-only`, lalu restart dashboard; lihat [DISTRIBUTION.md](DISTRIBUTION.md) untuk prasyarat. Jangan menyalin venv atau node_modules dari Linux/cloud ke laptop.
 
 Video Studio menyediakan **Unduh paket produksi** setelah hasil selesai: MP4/Lottie, preview, SRT, audio mix/voice/music, rencana adegan, referensi dan review yang tersedia. ZIP menyertakan manifest checksum dan catatan review manual, tanpa konfigurasi/job lokal. Video dikemas tanpa kompresi ZIP ulang agar tidak membebani laptop. Batas paket 2 GiB; video lebih besar dapat diunduh terpisah. Instalasi aplikasi tetap melalui GitHub clone/pull.
+
+### Brand kit dan timing visual per kata
+
+Di Video Studio pilih **Brand kit**, atau buka **Buat / perbarui brand kit**. Simpan nama, tiga warna, font sistem dan wordmark teks opsional (24 karakter). Nama sama memperbarui kit. Pilihan disalin ke pekerjaan baru; hasil lama tidak berubah. Kit tersimpan privat di `creator-dashboard/output/brand-kits.json`, tidak masuk Git atau paket produksi sebagai katalog. Paket hasil hanya membawa salinan kit yang memang dipakai rencana.
+
+Pada setiap kartu review tersedia **Timing visual per kata**. Tempel daftar JSON kata dengan waktu detik absolut dari awal video, lalu pilih indeks kata pemicu visual mulai dari 0. Contoh narasi “Tidak 3 kali”:
+
+```json
+[{"word":"Tidak","start":0,"end":0.4},{"word":"3","start":1.25,"end":1.5},{"word":"kali","start":2,"end":2.4}]
+```
+
+Indeks `1` memulai visual pada 1,25 detik. Kata harus cocok dengan seluruh narasi, berurutan, tidak tumpang tindih, dan berada dalam waktu adegan. Alias Clipper `{w,s,e}` juga diterima. Kosongkan indeks untuk timing bawaan; daftar kosong menghapus cue. Mengubahnya pada storyboard membatalkan persetujuan sebelumnya, sama seperti perubahan adegan lain.
+
+Cakupan cue: Lottie bentuk/judul, Opuscar judul/panel visual, Three.js panel reticle. Ini timestamp yang diberikan pengguna, **bukan hasil forced alignment atau perubahan timing TTS otomatis**; cocokkan dengan audio hasil. Brand mengubah warna aksen UI visual, latar, font/warna teks dan wordmark, bukan seluruh material/partikel 3D atau aset gambar. Font sistem tidak di-embed; player memakai font yang tersedia. Periksa kontras dan keterbacaan pada preview.
+
+Clipper → Studio → **Pelajari tempo video ini** sekarang menampilkan bukti awal/tengah/akhir: jumlah cut/kata, kata/detik, cakupan timestamp dan kutipan. Ketiganya bagian waktu sama; bukan pemahaman struktur cerita. Tidak tersedianya transkrip dilaporkan jelas. Lihat [hasil benchmark publik](docs/benchmarks/README.md).

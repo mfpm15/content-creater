@@ -588,10 +588,20 @@ async function pageProject(pid) {
     if (!$('#sStudy') && m && !m.remote) {
       const study=document.createElement('button');study.id='sStudy';study.className='btn ghost sm';study.textContent='Pelajari tempo video ini';
       $('#sMeta').after(study);study.onclick=()=>openDlg(body=>{
-        body.innerHTML='<h2>Analisis referensi lokal</h2><p>Ukur tempo potongan dan transkrip; struktur cerita tetap perlu review. Maksimal 120 detik per sampel.</p><label>Mulai (detik)<input id="studyStart" type="number" min="0" value="0"></label><label>Durasi sampel<input id="studySeconds" type="number" min="1" max="120" value="60"></label><button type="button" class="btn" id="studyRun">Ukur sampel</button><pre id="studyReport"></pre>';
+        body.innerHTML='<h2>Analisis referensi lokal</h2><p>Ukur tempo potongan dan transkrip; struktur cerita tetap perlu review. Maksimal 120 detik per sampel.</p><label>Mulai (detik)<input id="studyStart" type="number" min="0" value="0"></label><label>Durasi sampel<input id="studySeconds" type="number" min="1" max="120" value="60"></label><button type="button" class="btn" id="studyRun">Ukur sampel</button><div id="studyReport" aria-live="polite"></div>';
         $('#studyRun',body).onclick=async()=>{const run=$('#studyRun',body);run.disabled=true;try{
           const report=await api(`/api/projects/${P.id}/study`,{method:'POST',body:{start:Number($('#studyStart',body).value),seconds:Number($('#studySeconds',body).value)}});
-          $('#studyReport',body).textContent=JSON.stringify(report,null,2);
+          const output=$('#studyReport',body);output.replaceChildren();
+          const summary=document.createElement('p');summary.textContent=`${report.shots} shot · median ${report.median_shot_seconds}s · ${report.cuts_per_minute} potongan/menit. Transkrip: ${report.transcript_status==='available'?'tersedia':'tidak tersedia pada sampel'}.`;
+          output.append(summary);
+          for(const part of report.timeline_thirds||[]){
+            const section=document.createElement('section'),heading=document.createElement('h3'),text=document.createElement('p'),excerpt=document.createElement('blockquote');
+            heading.textContent=`${part.part} · ${part.start_relative_seconds}–${part.end_relative_seconds}s dari awal sampel`;
+            text.textContent=`${part.cuts} potongan · ${part.words} kata · ${part.words_per_second??'belum diukur'} kata/detik · cakupan timestamp ${part.transcript_coverage_percent??'belum diukur'}%.`;
+            excerpt.textContent=part.excerpt||'Tidak ada kata yang dimulai pada bagian ini.';section.append(heading,text,excerpt);output.append(section);
+          }
+          const note=document.createElement('p');note.textContent='Tiga bagian ini adalah pembagian waktu yang sama, bukan deteksi struktur cerita. Cakupan timestamp bukan pengukuran keheningan audio.';
+          const detail=document.createElement('details'),title=document.createElement('summary'),raw=document.createElement('pre');title.textContent='Laporan pengukuran lengkap';raw.textContent=JSON.stringify(report,null,2);detail.append(title,raw);output.append(note,detail);
         }catch(error){toast(error.message,true)}finally{run.disabled=false}};
       });
     }

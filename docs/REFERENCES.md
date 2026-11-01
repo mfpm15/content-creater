@@ -85,3 +85,14 @@ Salinan awal dibuat dangkal (`--depth 1`); perintah `checkout` di atas hanya ber
 ## Ide yang belum dikerjakan dari referensi
 
 Daftar kerja ada di [STATUS-2026-11-01.md](STATUS-2026-11-01.md) dan [../clippercuan/docs/plan-referensi-2026-10.md](../clippercuan/docs/plan-referensi-2026-10.md). Status terbaru dan batas benchmark: [FEATURE-COVERAGE.md](FEATURE-COVERAGE.md). Snap hening, zona aman/ekspor, cursor eksperimental dan review take sudah diintegrasikan; alignment kata, beat eksternal, dan review semantik referensi masih terbuka.
+
+## Studi lanjutan — 1 November 2026
+
+Dua repo tambahan dibaca terarah dalam checkout sementara `/tmp`, bukan dependency produk:
+
+| Sumber | Commit kode | Lisensi kode | File yang dipelajari dan penerapan |
+|---|---|---|---|
+| [openai/whisper](https://github.com/openai/whisper) | `86098128c0b4f24f0e2aa2994de830614b474227` | MIT | `tests/test_transcribe.py`: word timestamps harus naik dan menjaga isi transkrip; tes kata “Americans” terhadap waktu 1,8 detik. Diterapkan sebagai validasi cue input eksplisit, bukan menjalankan/copy model Whisper. `tests/jfk.flac` hanya untuk ukur audio lokal. |
+| [Breakthrough/PySceneDetect](https://github.com/Breakthrough/PySceneDetect) | `55f20ff3448ed336df032ac6270cf47d215dc2c4` | BSD-3-Clause | `scenedetect/detectors/content_detector.py`: skor perubahan HSV/luma dan kalibrasi; `tests/test_detectors.py`: titik potong berbasis frame sebagai acuan regresi. Ditambahkan benchmark satu-ke-satu dengan precision/recall dan pembagian bukti tempo per sepertiga waktu. Tidak mengimpor detector upstream. |
+
+Fixture video PySceneDetect berasal dari commit branch resources `e68d06a78e5241d82300d4924a53629feecbcb6b`, berbeda dari commit kode. Hak media tidak diasumsikan mengikuti lisensi kode; tidak dimasukkan ke Git. Sumber, hash, hasil, batas dan cara ulang Windows ada di [benchmarks/README.md](benchmarks/README.md). Keenam situs produk pengguna kini berhasil dibaca HTTP 200; perbandingan tersebut adalah studi halaman publik, bukan pengujian akun/layanan mereka.

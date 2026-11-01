@@ -476,6 +476,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self._json(HTTPStatus.OK, {"jobs": video_drafter.list_jobs()})
             elif parts == ["api", "videos", "options"]:
                 self._json(HTTPStatus.OK, video_drafter.options())
+            elif parts == ['api','videos','brands']:
+                import creative_profile
+                self._json(HTTPStatus.OK,creative_profile.catalog(video_drafter.VIDEOS_DIR.parent/'brand-kits.json'))
             elif len(parts) == 4 and parts[2] == "jobs":
                 self._json(HTTPStatus.OK, video_drafter.job_status(unquote(parts[3])))
             elif len(parts) == 3:
@@ -504,7 +507,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def _videos_post(self, parts: list[str]) -> None:
         try:
-            if parts == ["api", "videos"]:
+            if parts==['api','videos','brands']:
+                raw=self._read_body(10000)
+                if raw is None:return
+                payload=json.loads(raw or b'{}')
+                if not isinstance(payload,dict):raise ValueError('Body harus objek JSON')
+                import creative_profile
+                self._json(HTTPStatus.OK,creative_profile.save(video_drafter.VIDEOS_DIR.parent/'brand-kits.json',payload))
+            elif parts == ["api", "videos"]:
                 raw = self._read_body(200_000)
                 if raw is None:
                     return

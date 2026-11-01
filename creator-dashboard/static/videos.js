@@ -37,6 +37,55 @@ let activeScenePlan = null;
 let resultSlug = null;
 let engineRuntime = {};
 let researchReady = false;
+let brandCatalog = { revision: 0, kits: [] };
+let brandsReady = false;
+
+function displayBrands(data, selected = document.getElementById('brandSelect').value) {
+  brandCatalog = data;
+  const select = document.getElementById('brandSelect');
+  select.replaceChildren(new Option('Tampilan bawaan', ''));
+  for (const kit of data.kits) select.add(new Option(kit.name, kit.id));
+  select.value = data.kits.some(kit => kit.id === selected) ? selected : '';
+  brandsReady = true;
+}
+
+async function loadBrands() {
+  brandsReady = false;
+  try {
+    const response = await fetch('/api/videos/brands');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Gagal memuat brand');
+    displayBrands(data);
+    document.getElementById('brandStatus').textContent = '';
+  } catch (error) { document.getElementById('brandStatus').textContent = error.message; }
+}
+
+document.getElementById('brandSelect').addEventListener('change', event => {
+  const kit = brandCatalog.kits.find(row => row.id === event.target.value);
+  if (!kit) return;
+  for (const key of ['name', 'wordmark', 'accent', 'background', 'text', 'font']) {
+    document.getElementById(`brand${key[0].toUpperCase()}${key.slice(1)}`).value = kit[key];
+  }
+});
+document.getElementById('reloadBrandsBtn').addEventListener('click', loadBrands);
+document.getElementById('saveBrandBtn').addEventListener('click', async event => {
+  const status = document.getElementById('brandStatus');
+  if (!brandsReady) { status.textContent = 'Muat ulang kit dahulu agar perubahan tersimpan aman.'; return; }
+  event.target.disabled = true;
+  try {
+    const brand = {};
+    for (const key of ['name', 'wordmark', 'accent', 'background', 'text', 'font']) {
+      brand[key] = document.getElementById(`brand${key[0].toUpperCase()}${key.slice(1)}`).value.trim();
+    }
+    const response = await fetch('/api/videos/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ revision: brandCatalog.revision, brand }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Gagal menyimpan brand');
+    displayBrands(data, data.kits.at(-1)?.id);
+    status.textContent = 'Kit tersimpan dan dipilih untuk pekerjaan baru.';
+  } catch (error) { status.textContent = error.message; }
+  finally { event.target.disabled = false; }
+});
 
 function escapeHtml(value) {
   const span = document.createElement('span');
@@ -195,6 +244,16 @@ function sceneEditor(scene, index) {
     ${field('background','Background')}${field('camera','Kamera',true)}${field('lighting','Lighting')}
     <div class="editor-row">${field('colorMood','Color mood')}${field('transition','Transisi')}</div>
     ${field('typography','Tipografi')}${field('continuity','Kontinuitas',true)}${field('soundCue','Sound cue')}
+    <details><summary>Timing visual per kata (opsional)</summary>
+      <p>Tempel seluruh kata narasi beserta timestamp dalam detik dari awal video. Ini timing yang Anda berikan, bukan alignment audio otomatis. Angka dan negasi harus tetap lengkap.</p>
+      <label>Daftar JSON [{"word":"Halo","start":0,"end":0.5}]
+        <textarea data-cues="${index}" rows="4">${escapeHtml(JSON.stringify(scene.wordCues || [], null, 2))}</textarea>
+      </label>
+      <label>Indeks kata pemicu visual (mulai 0; kosong = bawaan)
+        <input data-cue-index="${index}" type="number" min="0" step="1" value="${escapeHtml(scene.visualCueWord ?? '')}">
+      </label>
+      <small>Lottie: bentuk dan judul; Opuscar: judul dan panel visual; Three.js: panel reticle. Efek lain dan waktu narasi tidak diubah. Timing perlu dibandingkan dengan audio hasil render.</small>
+    </details>
   </article>`;
 }
 
@@ -227,6 +286,11 @@ function renderReview(job) {
     elements.approveBtn.textContent = 'Setujui Storyboard & Mulai Render';
     elements.reviseBtn.style.display = 'inline-flex';
   }
+  if (job.scenePlan?.brand) {
+    const note = document.createElement('p');
+    note.textContent = `Brand pekerjaan: ${job.scenePlan.brand.name} (salinan tetap)`;
+    elements.reviewGrid.prepend(note);
+  }
 }
 
 function collectEditedPlan() {
@@ -237,7 +301,18 @@ function collectEditedPlan() {
     const value = ['start','end'].includes(input.dataset.field) ? Number(input.value) : input.value.trim();
     scenes[index][input.dataset.field] = value;
   });
-  return { scenes };
+  elements.reviewGrid.querySelectorAll('[data-cues]').forEach(input => {
+    const index = Number(input.dataset.cues);
+    let cues;
+    try { cues = JSON.parse(input.value || '[]'); }
+    catch { throw new Error(`JSON timestamp adegan ${index + 1} tidak valid`); }
+    if (!Array.isArray(cues)) throw new Error(`Timestamp adegan ${index + 1} harus berupa daftar`);
+    if (cues.length || scenes[index].wordCues) scenes[index].wordCues = cues;
+    const cueIndex = elements.reviewGrid.querySelector(`[data-cue-index="${index}"]`).value;
+    if (cueIndex !== '') scenes[index].visualCueWord = Number(cueIndex);
+    else delete scenes[index].visualCueWord;
+  });
+  return { ...structuredClone(activeScenePlan), scenes };
 }
 
 async function saveEditedPlan() {
@@ -304,6 +379,7 @@ elements.form.addEventListener('submit', async event => {
     duration: parseInt(elements.durationSelect.value, 10),
     model: elements.modelSelect.value,
     researchMode: document.getElementById('researchMode').value,
+    brandId: document.getElementById('brandSelect').value,
   };
   if (!payload.topic) {
     elements.formStatus.textContent = 'Topik animasi wajib diisi.';
@@ -378,6 +454,7 @@ function startPolling(jobId, aspectId) {
 }
 
 loadOptions();
+loadBrands();
 loadPendingJobs();
 loadHistory();
 

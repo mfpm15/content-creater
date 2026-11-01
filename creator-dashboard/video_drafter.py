@@ -20,6 +20,7 @@ from security import open_authenticated, render_environment
 
 from video_job_store import save_job, recover_jobs
 from runtime_config import resolve_python
+import creative_profile
 
 ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
@@ -281,7 +282,10 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
             end = float(duration) if index == len(scenes) - 1 else round(cursor + duration * weights[index] / sum(weights), 3)
             scene.update(start=cursor, end=end, duration=end - cursor)
             cursor = end
-    return {"topic": topic, "duration": duration, "scenes": scenes}
+    for scene,raw in zip(scenes,source):creative_profile.timing(scene,raw)
+    result={"topic": topic, "duration": duration, "scenes": scenes}
+    if data.get('brand') is not None:result['brand']=creative_profile.snapshot(data['brand'])
+    return result
 
 
 def build_scene_prompt(topic: str, script: str, duration: int, aspect: str) -> str:
@@ -435,8 +439,8 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
         animation.append(f'''
         tl.fromTo("#sc_{index} .scene-inner", {{opacity:0,scale:1.08,filter:"blur(14px)"}}, {{opacity:1,scale:1,filter:"blur(0px)",duration:0.55,ease:"power3.out"}}, {start});
         tl.from("#sc_{index} .chapter-badge", {{x: -70, opacity: 0, duration: 0.5, ease: "back.out(1.4)"}}, {start + 0.03});
-        tl.from("#sc_{index} .hero-title", {{y: -55, scale: 1.12, opacity: 0, duration: 0.62, ease: "power3.out"}}, {start + 0.06});
-        tl.from("#sc_{index} .visual-wrapper", {{scale: 0.58, rotation: -7, opacity: 0, duration: 0.8, ease: "back.out(1.55)"}}, {start + 0.12});
+        tl.from("#sc_{index} .hero-title", {{y: -55, scale: 1.12, opacity: 0, duration: 0.62, ease: "power3.out"}}, {creative_profile.reveal(scene, .06)});
+        tl.from("#sc_{index} .visual-wrapper", {{scale: 0.58, rotation: -7, opacity: 0, duration: 0.8, ease: "back.out(1.55)"}}, {creative_profile.reveal(scene, .12)});
         tl.from("#sc_{index} .subtitle-capsule", {{y: 45, opacity: 0, duration: 0.5, ease: "power3.out"}}, {start + 0.18});
         tl.to("#sc_{index} .visual-canvas-box", {{y: {(-10 if family in ('nature','constellation') else 0)}, scale: {1.018 if family in ('device','portal','interface') else 1.0}, duration: Math.max(1.2, {length} * 0.48), yoyo:true, repeat:1, ease:"sine.inOut"}}, {start + 0.35});
         tl.to("#sc_{index} .orbit-a", {{rotation:{180 if index % 2 == 0 else -150}, duration:{length}, ease:"none"}}, {start});
@@ -600,7 +604,7 @@ def generate_threejs_composition(plan: dict, aspect_info: dict, model: str = "")
         tl.set("#th_sc_{index}", {{display:"flex", opacity:0}}, {start});
         tl.to("#th_sc_{index}", {{opacity:1, duration: 0.45, ease: "power2.out"}}, {start});
         tl.from("#th_sc_{index} .chapter-badge", {{y: -25, opacity: 0, duration: 0.5, ease: "back.out(1.4)"}}, {start + 0.05});
-        tl.from("#th_sc_{index} .reticle-box", {{scale: 0.78, opacity: 0, duration: 0.6, ease: "back.out(1.5)"}}, {start + 0.1});
+        tl.from("#th_sc_{index} .reticle-box", {{scale: 0.78, opacity: 0, duration: 0.6, ease: "back.out(1.5)"}}, {creative_profile.reveal(scene, .1)});
         tl.from("#th_sc_{index} .subtitle-capsule", {{y: 25, opacity: 0, duration: 0.45, ease: "power2.out"}}, {start + 0.2});
         tl.to("#th_sc_{index}", {{opacity: 0, scale: 1.05, duration: 0.35, ease: "power2.in"}}, {max(start + 0.1, scene['end'] - 0.35)});
         tl.set("#th_sc_{index}", {{display: "none"}}, {scene['end']});
@@ -745,8 +749,9 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
 
 def generate_composition(plan: dict, aspect_info: dict, model: str = "", engine: str = "opuscar") -> str:
     if engine == "threejs":
-        return generate_threejs_composition(plan, aspect_info, model)
-    return generate_opuscar_composition(plan, aspect_info, model)
+        document=generate_threejs_composition(plan, aspect_info, model)
+    else:document=generate_opuscar_composition(plan, aspect_info, model)
+    return creative_profile.styled(document,plan.get('brand'))
 
 
 def audio_manifest(plan: dict) -> dict:
@@ -971,6 +976,10 @@ def start_job(payload: dict) -> dict:
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
     job = {"jobId": job_id, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    if payload.get('brandId'):
+        kit=next((row for row in creative_profile.catalog(VIDEOS_DIR.parent/'brand-kits.json')['kits'] if row['id']==payload['brandId']),None)
+        if not kit:raise ValueError('Brand tidak ditemukan; muat ulang daftar')
+        job['brand']=creative_profile.snapshot(kit)
     with JOBS_LOCK:
         JOBS[job_id] = job
         save_job(JOB_DIR, job)
@@ -1081,6 +1090,7 @@ def _run_job(job_id: str) -> None:
         grounded_script = job["script"] + "\n\n" + _research_context(research)
         data = {} if explicit or provided else _clean_json(_call_9router(build_scene_prompt(job["topic"], grounded_script, job["duration"], job["aspect"]), job["model"]))
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
+        if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])
         _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan})
     except Exception as exc:
         _update_job(job_id, {"status": "failed", "step": f"Gagal: {exc}", "progress": 100, "error": str(exc)})

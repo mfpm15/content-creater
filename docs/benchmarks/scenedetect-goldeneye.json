@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "measured_at_utc": "2026-11-01T15:28:40.446412+00:00",
+  "fixture": {
+    "name": "scenedetect-goldeneye.mp4",
+    "sha256": "7262e7b13e8a3bfd389b9188b6c62583b9ba2a2fd35207862faed19d4f0ae5a1",
+    "bytes": 15829601,
+    "duration_seconds": 82.593379
+  },
+  "runtime": {
+    "os": "Linux",
+    "python": "3.12.14",
+    "ffmpeg": "ffmpeg version 7.1.5-0+deb13u1 Copyright (c) 2000-2026 the FFmpeg developers"
+  },
+  "asr_alignment": {
+    "status": "not_run",
+    "reason": "No model invocation or download in this benchmark"
+  },
+  "limitations": [
+    "One fixture is not a representative corpus",
+    "No face/cursor/speaker or semantic quality measurement"
+  ],
+  "audio": {
+    "status": "measured",
+    "integrated_lufs": -28.3,
+    "true_peak_dbfs": -10.5,
+    "silence_starts": [],
+    "wall_seconds": 0.795
+  },
+  "scene_study": {
+    "wall_seconds": 0.718,
+    "report": {
+      "method": "local_scene_and_transcript_measurements",
+      "sample": {
+        "start": 50.0082916667,
+        "end": 60.4770833334
+      },
+      "cuts_relative_seconds": [
+        1.126125,
+        3.420083,
+        5.630625,
+        6.923583
+      ],
+      "shots": 5,
+      "median_shot_seconds": 2.211,
+      "cuts_per_minute": 22.93,
+      "transcript_words": 0,
+      "words_per_second": null,
+      "transcript_pauses": [],
+      "opening_transcript": "",
+      "hook": {
+        "archetypes": [],
+        "evidence": {},
+        "method": "editorial_heuristic_not_prediction"
+      },
+      "timeline_thirds": [
+        {
+          "part": "awal",
+          "start_relative_seconds": 0.0,
+          "end_relative_seconds": 3.49,
+          "cuts": 2,
+          "words": 0,
+          "words_per_second": null,
+          "transcript_coverage_percent": null,
+          "excerpt": ""
+        },
+        {
+          "part": "tengah",
+          "start_relative_seconds": 3.49,
+          "end_relative_seconds": 6.979,
+          "cuts": 2,
+          "words": 0,
+          "words_per_second": null,
+          "transcript_coverage_percent": null,
+          "excerpt": ""
+        },
+        {
+          "part": "akhir",
+          "start_relative_seconds": 6.979,
+          "end_relative_seconds": 10.469,
+          "cuts": 0,
+          "words": 0,
+          "words_per_second": null,
+          "transcript_coverage_percent": null,
+          "excerpt": ""
+        }
+      ],
+      "transcript_status": "not_available_in_sample",
+      "manual_review": [
+        "Semantic hook/payoff and narrative structure are unmeasured",
+        "Temporal thirds are equal time windows, not automatic story segmentation",
+        "Transcript gaps are not acoustic silence measurements",
+        "Scene thresholds need real-video calibration; no style is copied automatically"
+      ]
+    },
+    "cut_comparison": {
+      "tolerance_seconds": 0.12,
+      "expected": [
+        1.126125,
+        2.5442083333,
+        3.4200833333,
+        5.630625,
+        6.9235833333
+      ],
+      "detected": [
+        1.126125,
+        3.420083,
+        5.630625,
+        6.923583
+      ],
+      "matched": 4,
+      "false_positives": 0,
+      "missed": 1,
+      "precision": 1.0,
+      "recall": 0.8,
+      "matched_delta_seconds": [
+        0.0,
+        -0.0,
+        0.0,
+        -0.0
+      ]
+    }
+  }
+}
