@@ -161,6 +161,10 @@
             <textarea name="script" id="scriptInput" rows="9" placeholder="Input bebas, atau format eksplisit:&#10;00:00-00:08 Narasi: ...&#10;Visual: ...&#10;Teks layar: ...&#10;SFX: ..."></textarea>
           </label>
 
+          <label>Sumber rencana
+            <select id="researchMode" name="researchMode"><option value="web">Riset web + motion planner</option><option value="provided">Naskah sendiri — rencana lokal tanpa provider</option></select>
+            <small>Mode naskah sendiri tidak memeriksa fakta atau membuat audio. Adapter Lottie dapat diselesaikan secara lokal; MP4 tetap memerlukan runtime render dan TTS.</small>
+          </label>
           <div class="row2">
             <label>Render Adapter
               <select name="engine" id="engineSelect"></select>

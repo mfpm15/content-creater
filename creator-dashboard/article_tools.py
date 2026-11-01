@@ -11,6 +11,7 @@ from collections import Counter
 from pathlib import Path
 
 import article_drafter as ad
+import article_storage
 import evidence
 
 LOCK=threading.RLock()
@@ -108,7 +109,7 @@ def propose_rewrite(slug,payload):
 def apply_rewrite(slug,payload):
     key=str(payload.get('proposal_id',''))
     if not re.fullmatch(r'[a-f0-9]{32}',key) or payload.get('approve') is not True:raise ValueError('Persetujuan proposal wajib')
-    with LOCK,ad._jobs_lock:
+    with LOCK,ad._jobs_lock,article_storage.LOCK:
         _idle(slug);directory,article=_article(slug)
         proposal=ad._read_json(directory/'revisions'/(key+'.json'))
         if not proposal or proposal['status']!='proposed' or proposal['base_revision']!=digest(article):raise ValueError('Proposal usang/tidak tersedia')
@@ -118,27 +119,36 @@ def apply_rewrite(slug,payload):
             i,field,j,_=target
             if j is None:blocks[i][field]=text
             else:blocks[i][field][j]=text
-        _private_write(directory/'revisions'/('before-'+key+'.json'),article)
+        backup=copy.deepcopy(article)
         article['blocks'][section['start']:section['end']]=blocks
         source=ad._read_json(directory/'sections'/f"{proposal['section']:02d}.json",{})
-        source['blocks']=blocks;ad._write_json(directory/'sections'/f"{proposal['section']:02d}.json",source)
-        ad._write_json(directory/'article.json',article)
-        proposal['status']='applied';_private_write(directory/'revisions'/(key+'.json'),proposal)
-        return ad.build_outputs(slug)
+        source['blocks']=blocks
+        proposal['status']='applied'
+        updates={'article.json':article_storage.json_bytes(article),
+                 f"sections/{proposal['section']:02d}.json":article_storage.json_bytes(source),
+                 f'revisions/before-{key}.json':article_storage.json_bytes(backup),
+                 f'revisions/{key}.json':article_storage.json_bytes(proposal)}
+        article_storage.commit(directory,updates,article,ad._render_output_files)
+        return ad.get_article(slug)
 
 
 def add_diagram(slug,payload):
     from local_diagrams import render
-    with LOCK,ad._jobs_lock:
+    with LOCK,ad._jobs_lock,article_storage.LOCK:
         _idle(slug);directory,article=_article(slug)
         if payload.get('article_revision')!=digest(article):raise ValueError('Artikel berubah; muat ulang')
-        key='diagram-'+uuid.uuid4().hex[:8];images=directory/'images'
-        spec=render(payload.get('kind'),payload.get('labels'),images/(key+'.svg'),images/(key+'.png'))
+        key='diagram-'+uuid.uuid4().hex[:8]
+        with tempfile.TemporaryDirectory(dir=directory,prefix='.diagram-') as folder:
+            images=Path(folder)
+            spec=render(payload.get('kind'),payload.get('labels'),images/(key+'.svg'),images/(key+'.png'))
+            updates={f'images/{key}.{ext}':(images/(key+'.'+ext)).read_bytes() for ext in ('svg','png')}
         image={'id':key,'purpose':'Diagram lokal','aspect':'custom','alt':str(payload.get('title','Diagram'))[:300],
                'prompt':'Dibuat lokal dari label pengguna','style':'local-diagram','section':max(0,len(sections(article))-1),'diagram':spec}
         article['images'].append(image);article['blocks'].append({'type':'image','id':key,'caption':image['alt']})
-        prompts=ad._read_json(directory/'prompts.json',[]);prompts.append(image);ad._write_json(directory/'prompts.json',prompts)
+        prompts=ad._read_json(directory/'prompts.json',[]);prompts.append(image)
         last=directory/'sections'/f"{image['section']:02d}.json"
-        source=ad._read_json(last,{'blocks':[]});source['blocks'].append({'type':'image','id':key,'caption':image['alt']});ad._write_json(last,source)
-        ad._write_json(directory/'article.json',article)
-        return ad.build_outputs(slug)
+        source=ad._read_json(last,{'blocks':[]});source['blocks'].append({'type':'image','id':key,'caption':image['alt']})
+        updates.update({'article.json':article_storage.json_bytes(article),'prompts.json':article_storage.json_bytes(prompts),
+                        str(last.relative_to(directory)):article_storage.json_bytes(source)})
+        article_storage.commit(directory,updates,article,ad._render_output_files)
+        return ad.get_article(slug)

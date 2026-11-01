@@ -1,11 +1,20 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 cd /d "%~dp0"
 
 echo ============================================================
 echo Creator Control Center - Dependency Setup
 echo ============================================================
 echo.
+
+call setup-core.bat
+if errorlevel 1 goto :failed
+if /I "%~1"=="--core" exit /b 0
+where corepack >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Corepack diperlukan untuk aplikasi Node tambahan. Setup inti sudah selesai.
+  goto :failed
+)
 
 where uv >nul 2>nul
 if errorlevel 1 (
@@ -64,10 +73,15 @@ pushd creator-dashboard\apps\opencreator
 call corepack pnpm install --frozen-lockfile
 if errorlevel 1 (popd & goto :failed)
 call corepack pnpm templates:compile
+if errorlevel 1 (popd & goto :failed)
 call corepack pnpm --filter @opencreator/config build
+if errorlevel 1 (popd & goto :failed)
 call corepack pnpm --filter @opencreator/protocol build
+if errorlevel 1 (popd & goto :failed)
 call corepack pnpm --filter @opencreator/skill-market build
+if errorlevel 1 (popd & goto :failed)
 call corepack pnpm --filter @opencreator/writing-templates build
+if errorlevel 1 (popd & goto :failed)
 popd
 pushd creator-dashboard\apps\short-video-factory
 call corepack pnpm install --frozen-lockfile
@@ -76,7 +90,7 @@ popd
 
 echo Menyiapkan HyperFrames...
 pushd creator-dashboard\apps\hyperframes
-call npm install
+call npm ci --no-audit --no-fund
 if errorlevel 1 (popd & goto :failed)
 popd
 

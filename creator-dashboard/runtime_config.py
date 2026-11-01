@@ -1,5 +1,6 @@
 """Platform-aware executable selection; commands remain server controlled."""
 import os
+import shutil
 from pathlib import Path
 
 
@@ -7,6 +8,22 @@ def resolve_python(app_dir: Path) -> Path:
     app_dir = Path(app_dir)
     folder = "Scripts" if os.name == "nt" else "bin"
     return app_dir / ".venv" / folder / ("python.exe" if os.name == "nt" else "python")
+
+
+def find_browser() -> str | None:
+    configured=os.environ.get('HYPERFRAMES_BROWSER_PATH')
+    if configured and Path(configured).is_file():return configured
+    for name in ('chromium','chromium-browser','google-chrome','chrome','msedge'):
+        found=shutil.which(name)
+        if found:return found
+    if os.name=='nt':
+        for variable in ('ProgramFiles','ProgramFiles(x86)','LOCALAPPDATA'):
+            root=os.environ.get(variable)
+            if not root:continue
+            for relative in ('Microsoft/Edge/Application/msedge.exe','Google/Chrome/Application/chrome.exe'):
+                candidate=Path(root)/relative
+                if candidate.is_file():return str(candidate)
+    return None
 
 
 def resolve_tool_command(tool: dict) -> list[str] | None:

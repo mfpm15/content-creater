@@ -16,7 +16,7 @@ import urllib.request
 import uuid
 import wave
 from pathlib import Path
-from security import open_authenticated
+from security import open_authenticated, render_environment
 
 from video_job_store import save_job, recover_jobs
 from runtime_config import resolve_python
@@ -60,6 +60,8 @@ DEFAULT_MODELS = [
 ALLOWED_MODEL_IDS = {item["id"] for item in DEFAULT_MODELS}
 JOBS_LOCK = threading.Lock()
 JOB_DIR = VIDEOS_DIR / ".jobs"
+MAX_PLAN_SECONDS = 600
+MAX_SCENES = 200
 JOBS: dict[str, dict] = recover_jobs(JOB_DIR)
 TIMECODE_RE = re.compile(r"(?m)^\s*(?P<start>\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?)\s*(?:-->|-|–|—)\s*(?P<end>\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?)\s*[:|]?\s*(?P<body>.*?)(?=^\s*(?:\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?)\s*(?:-->|-|–|—)|\Z)", re.S)
 FIELD_RE = re.compile(r"(?im)^\s*(narasi|narration|visual|teks(?: layar)?|on.?screen|suara|sound|sfx|tipe|type)\s*:\s*(.+)$")
@@ -72,7 +74,18 @@ def get_available_models() -> list[dict]:
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
     research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": list(ENGINES.values()), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": True, "ready": research_ready}}
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": True, "ready": research_ready,"modes":["web","provided"]}}
+
+
+def runtime_issues(engine: str) -> list[str]:
+    if engine=='lottie':return []
+    missing=[]
+    if not shutil.which('node'):missing.append('Node.js')
+    if not shutil.which('ffmpeg') and not (ROOT/'bin'/'ffmpeg.exe').is_file():missing.append('FFmpeg')
+    if not (HYPERFRAMES_APP_DIR/'node_modules'/'hyperframes'/'bin'/'hyperframes.mjs').is_file():missing.append('HyperFrames renderer')
+    if not resolve_python(OPUSCAR_DIR).is_file():missing.append('Opuscar voice environment')
+    if not (OPUSCAR_DIR/'core'/'tts'/'tts_zh.py').is_file():missing.append('Opuscar TTS worker')
+    return missing
 
 
 def _seconds(value: str) -> float:
@@ -196,14 +209,21 @@ def _motion_for(scene_type: str, index: int, family: str = "") -> dict:
 
 
 def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> dict:
+    if not isinstance(data,dict) or not math.isfinite(float(duration)) or not 0<duration<=MAX_PLAN_SECONDS:
+        raise ValueError('Durasi rencana harus 0–600 detik')
     explicit = parse_explicit_scenes(script)
     source = explicit or (data.get("scenes") if isinstance(data.get("scenes"), list) else [])
     if not source: source = proportional_scenes(topic, script, duration)
+    if len(source)>MAX_SCENES or any(not isinstance(raw,dict) for raw in source):raise ValueError('Rencana maksimal 200 adegan berbentuk objek')
     scenes = []
     for index, raw in enumerate(source):
         narration = str(raw.get("narration") or raw.get("script") or "").strip()
-        start = float(raw.get("start", 0))
-        end = float(raw.get("end", start + float(raw.get("duration", 0))))
+        try:
+            start = float(raw.get("start", 0))
+            end = float(raw["end"]) if 'end' in raw else start+float(raw.get('duration',0))
+        except (TypeError,ValueError,OverflowError):raise ValueError('Waktu adegan harus numerik') from None
+        if not math.isfinite(start) or not math.isfinite(end) or start<0 or end>MAX_PLAN_SECONDS:
+            raise ValueError('Waktu adegan harus angka terbatas dalam 0–600 detik')
         visual = str(raw.get("visual") or "")
         scene_type = str(raw.get("type") or _scene_type(" ".join((narration, visual))))
         # Deliberately exclude the global topic. A cyber-security film can contain
@@ -246,7 +266,7 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
         for item in source
     )
     if explicit:
-        duration = int(max(scene["end"] for scene in scenes))
+        duration = int(math.ceil(max(scene["end"] for scene in scenes)))
     elif source_has_timing:
         previous_end = 0.0
         for scene in scenes:
@@ -303,7 +323,7 @@ def _research_context(research: dict) -> str:
         f"[{item['id']}] {item['title']} | {item['publisher']} | {item['url']}"
         for item in research.get("sources", [])
     )
-    return f"RINGKASAN RISET WEB TERVERIFIKASI:\n{research.get('summary', '')}\n\nSUMBER GROUNDING:\n{sources}"
+    return f"RINGKASAN RISET — KLAIM MASIH PERLU REVIEW:\n{research.get('summary', '')}\n\nSUMBER GROUNDING:\n{sources}"
 
 
 def _call_9router(prompt: str, model: str = "") -> str:
@@ -404,7 +424,7 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
         sections.append(f'''<section class="scene clip type-{html.escape(kind)} family-{html.escape(family)} layout-{layout} transition-{html.escape(scene.get("transition", "shape-morph"))}" id="sc_{index}" data-family="{html.escape(family)}" data-start="{start}" data-duration="{length}">
             <div class="scene-inner">
                 <div class="scene-orbit orbit-a"></div><div class="scene-orbit orbit-b"></div>
-                <div class="chapter-badge"><span class="badge-dot"></span> {index + 1:02d} / {len(plan["scenes"]):02d} · {kind.upper()}</div>
+                <div class="chapter-badge"><span class="badge-dot"></span> {index + 1:02d} / {len(plan["scenes"]):02d} · {html.escape(kind.upper())}</div>
                 <div class="content-stack">
                     <div class="copy-wrapper"><h2 class="hero-title">{html.escape(scene["onScreenText"])}</h2></div>
                     <div class="visual-wrapper">{_visual_markup(scene, index)}</div>
@@ -475,7 +495,7 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
 .badge-dot{{width:10px;height:10px;border-radius:50%;background:#22d3ee;box-shadow:0 0 14px #22d3ee}}
 .content-stack{{position:relative;z-index:2;flex:1;min-height:0;width:100%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:16px;align-items:stretch}}
 .copy-wrapper{{width:100%;text-align:left;padding-top:2px}}
-.hero-title{{max-width:920px;font-size:{68 if height > width else 50}px;line-height:1.04;margin:0;font-weight:950;background:linear-gradient(120deg,#fff 20%,#bae6fd 67%,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 12px 42px rgba(0,0,0,.86);letter-spacing:-.035em;text-wrap:balance}}
+.hero-title{{max-width:920px;font-size:{min(68 if height > width else 50, round(width * .10))}px;line-height:1.04;margin:0;font-weight:950;background:linear-gradient(120deg,#fff 20%,#bae6fd 67%,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 12px 42px rgba(0,0,0,.86);letter-spacing:-.035em;text-wrap:balance}}
 .visual-wrapper{{min-height:0;width:100%;display:flex;align-items:center;justify-content:center;padding:6px 0 12px}}
 .visual-canvas-box{{width:100%;height:min(100%,760px);min-height:0;max-height:760px;border-radius:34px;background:linear-gradient(145deg,rgba(8,47,73,.64),rgba(3,7,18,.92));border:2px solid rgba(34,211,238,.5);box-shadow:0 24px 72px rgba(0,0,0,.58),inset 0 0 70px rgba(34,211,238,.1);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}}
 .visual-canvas-box>div:not(.visual-label),.visual-canvas-box>svg{{max-width:88%;max-height:84%}}
@@ -548,7 +568,7 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
     <div class="bg-grid"></div>
     <div class="scanner-line"></div>
     {''.join(sections)}
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script>
     const tl = gsap.timeline({{paused: true}});
     {''.join(animation)}
@@ -566,7 +586,7 @@ def generate_threejs_composition(plan: dict, aspect_info: dict, model: str = "")
         start, length = scene["start"], scene["duration"]
         kind = scene["type"]
         sections.append(f'''<section class="scene-hud" id="th_sc_{index}" data-start="{start}" data-duration="{length}">
-            <div class="chapter-badge"><span class="badge-dot"></span> TAHAP {index + 1:02d} / {len(plan["scenes"]):02d} · 3D {kind.upper()}</div>
+            <div class="chapter-badge"><span class="badge-dot"></span> TAHAP {index + 1:02d} / {len(plan["scenes"]):02d} · 3D {html.escape(kind.upper())}</div>
             <div class="hud-center">
                 <div class="reticle-box">
                     <span class="hud-corner tl"></span><span class="hud-corner tr"></span>
@@ -603,7 +623,7 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
 .hud-corner.tr{{top:-2px;right:-2px;border-left:0;border-bottom:0}}
 .hud-corner.bl{{bottom:-2px;left:-2px;border-right:0;border-top:0}}
 .hud-corner.br{{bottom:-2px;right:-2px;border-left:0;border-top:0}}
-.hero-title{{font-size:{68 if height > width else 52}px;line-height:1.1;margin:0;font-weight:900;color:#ffffff;text-shadow:0 0 35px rgba(56,189,248,0.6);letter-spacing:-0.02em}}
+.hero-title{{font-size:{min(68 if height > width else 52, round(width * .10))}px;line-height:1.1;margin:0;font-weight:900;color:#ffffff;text-shadow:0 0 35px rgba(56,189,248,0.6);letter-spacing:-0.02em}}
 .subtitle-capsule{{width:100%;max-width:920px;padding:20px 28px;border-radius:24px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.4);backdrop-filter:blur(16px);display:flex;align-items:center;gap:18px;font-size:{30 if height > width else 24}px;line-height:1.35;color:#f8fafc;box-shadow:0 15px 45px rgba(0,0,0,0.8)}}
 .sound-wave{{display:flex;gap:4px;align-items:center}}
 .sound-wave i{{width:4px;height:22px;background:#38bdf8;border-radius:3px;animation:swPulse 0.9s ease-in-out infinite alternate}}
@@ -617,7 +637,7 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
         {''.join(sections)}
     </div>
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script>
     const width = {width}, height = {height}, duration = {duration};
     const canvas = document.getElementById('webglCanvas');
@@ -888,10 +908,15 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
 
 
 def read_video_file(slug: str, filename: str) -> tuple[bytes, str]:
+    path,content_type=video_file_path(slug,filename)
+    return path.read_bytes(),content_type
+
+
+def video_file_path(slug: str, filename: str) -> tuple[Path, str]:
     if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "research.json", "review.json", "audio-manifest.json"} and not re.fullmatch(r"review-frame-\d{1,2}\.png", filename): raise FileNotFoundError(filename)
     path = _video_directory(slug) / filename
-    if not path.is_file(): raise FileNotFoundError(filename)
-    return path.read_bytes(), {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png"}.get(path.suffix, "application/octet-stream")
+    if path.is_symlink() or not path.is_file(): raise FileNotFoundError(filename)
+    return path, {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png"}.get(path.suffix, "application/octet-stream")
 
 
 def job_status(job_id: str) -> dict:
@@ -929,8 +954,14 @@ def revise_job(job_id: str, expected_revision: int | None = None) -> dict:
 
 
 def start_job(payload: dict) -> dict:
+    if not isinstance(payload,dict):raise ValueError('Brief harus objek JSON')
     topic = str(payload.get("topic") or "").strip()
     if not topic: raise ValueError("Topik video wajib diisi")
+    script=str(payload.get('script') or '').strip()
+    if len(topic)>500 or len(script)>30000:raise ValueError('Topik maksimal 500 karakter; naskah maksimal 30.000 karakter')
+    research_mode=payload.get('researchMode','web')
+    if research_mode not in {'web','provided'}:raise ValueError('Mode riset tidak dikenal')
+    if research_mode=='provided' and not script:raise ValueError('Mode naskah sendiri memerlukan naskah; periksa fakta sebelum menyetujui')
     aspect = str(payload.get("aspect") or "9:16"); aspect = aspect if aspect in ASPECT_RATIOS else "9:16"
     duration = int(payload.get("duration") or 60); duration = duration if duration in DURATIONS else 60
     fallback_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
@@ -939,7 +970,7 @@ def start_job(payload: dict) -> dict:
     if engine not in ENGINES or ENGINES[engine].get("disabled"): raise ValueError("Render Adapter belum tersedia")
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
-    job = {"jobId": job_id, "topic": topic, "script": str(payload.get("script") or "").strip(), "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan riset web", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    job = {"jobId": job_id, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
     with JOBS_LOCK:
         JOBS[job_id] = job
         save_job(JOB_DIR, job)
@@ -990,7 +1021,7 @@ def _build_audio(target: Path, plan: dict) -> Path:
     lines_path = target / "voice-lines.json"
     voice_dir = target / "voice"
     lines_path.write_text(json.dumps(lines, ensure_ascii=False, indent=2), encoding="utf-8")
-    subprocess.run([str(python), str(tts), str(lines_path), str(voice_dir), "--voice", "id-ID-ArdiNeural", "--rate", "+8%"], check=True, timeout=600)
+    subprocess.run([str(python), str(tts), str(lines_path), str(voice_dir), "--voice", "id-ID-ArdiNeural", "--rate", "+8%"], check=True, timeout=600,env=render_environment())
     inputs: list[str] = []
     filters: list[str] = []
     labels: list[str] = []
@@ -1019,7 +1050,7 @@ def _build_audio(target: Path, plan: dict) -> Path:
 def _mux_video(target: Path, silent: Path, audio: Path, duration: float) -> Path:
     ffmpeg = shutil.which("ffmpeg") or str(ROOT / "bin" / "ffmpeg.exe")
     output = target / "video.mp4"
-    subprocess.run([ffmpeg, "-y", "-i", str(silent), "-i", str(audio), "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-t", str(duration), "-movflags", "+faststart", str(output)], check=True, timeout=600)
+    subprocess.run([ffmpeg, "-y", "-i", str(silent), "-i", str(audio), "-map", "0:v:0", "-map", "1:a:0", "-map_metadata", "-1", "-map_chapters", "-1", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-t", str(duration), "-movflags", "+faststart", str(output)], check=True, timeout=600)
     return output
 
 
@@ -1042,12 +1073,13 @@ def _storyboard(plan: dict) -> list[dict]:
 def _run_job(job_id: str) -> None:
     job = job_status(job_id)
     try:
-        _update_job(job_id, {"status": "researching", "step": "Mencari dan memverifikasi sumber melalui Google Search", "progress": 10})
-        research = _research_web(job["topic"], job["script"])
+        provided=job.get('researchMode')=='provided'
+        _update_job(job_id, {"status": "researching", "step": "Menyusun naskah pengguna untuk review" if provided else "Mencari sumber melalui Google Search", "progress": 10})
+        research = {'provider':'Naskah pengguna','mode':'provided','summary':'Naskah digunakan tanpa riset web atau verifikasi fakta otomatis. Periksa fakta dan sumber sebelum menyetujui.','sources':[],'sourceCount':0} if provided else _research_web(job["topic"], job["script"])
         _update_job(job_id, {"research": research, "step": f"Riset selesai: {research['sourceCount']} sumber ditemukan", "progress": 20})
         explicit = parse_explicit_scenes(job["script"])
         grounded_script = job["script"] + "\n\n" + _research_context(research)
-        data = {} if explicit else _clean_json(_call_9router(build_scene_prompt(job["topic"], grounded_script, job["duration"], job["aspect"]), job["model"]))
+        data = {} if explicit or provided else _clean_json(_call_9router(build_scene_prompt(job["topic"], grounded_script, job["duration"], job["aspect"]), job["model"]))
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
         _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan})
     except Exception as exc:
@@ -1062,6 +1094,8 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
             _update_job(job_id, {"status": "awaiting_storyboard", "step": "Storyboard menunggu persetujuan", "progress": 45, "storyboard": storyboard})
             return
         plan = job["scenePlan"]
+        missing=runtime_issues(job['engine'])
+        if missing:raise RuntimeError('Runtime render belum siap: '+', '.join(missing)+'. Siapkan runtime atau gunakan adapter Lottie.')
         target = VIDEOS_DIR / _slugify(job["topic"])
         target.mkdir(parents=True)
         (target / "research.json").write_text(json.dumps(job["research"], ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1078,12 +1112,12 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
             _update_job(job_id, {"status": "succeeded", "step": "Animasi Lottie selesai", "progress": 100, "video": {"slug": target.name, "title": job["topic"], "htmlUrl": f"/api/videos/{target.name}/index.html", "lottieUrl": f"/api/videos/{target.name}/lottie.json", "duration": plan["duration"], "engine": "lottie"}})
             return
         engine_label = "Three.js 3D" if job["engine"] == "threejs" else "Opuscar / GSAP"
-        _update_job(job_id, {"status": "rendering", "step": f"Merender visual dinamis {engine_label}", "progress": 55})
+        _update_job(job_id, {"status": "rendering", "step": "Membuat dubbing, musik, foley, dan subtitle sebelum render visual", "progress": 55})
+        final_audio = _build_audio(target, plan)
+        _update_job(job_id, {"step": f"Merender visual dinamis {engine_label}", "progress": 72})
         renderer = HYPERFRAMES_APP_DIR / "node_modules" / "hyperframes" / "bin" / "hyperframes.mjs"
         silent = target / "silent.mp4"
-        subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", "30"], cwd=target, check=True, timeout=600)
-        _update_job(job_id, {"step": "Membuat dubbing, musik, foley, dan subtitle", "progress": 72})
-        final_audio = _build_audio(target, plan)
+        subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", "30", "--workers", "1"], cwd=target, check=True, timeout=600,env=render_environment())
         _update_job(job_id, {"step": "Melakukan mux audio dan video", "progress": 90})
         output = _mux_video(target, silent, final_audio, plan["duration"])
         from video_review import review

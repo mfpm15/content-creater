@@ -35,11 +35,13 @@ let activeReviewStage = null;
 let activeRevision = 0;
 let activeScenePlan = null;
 let resultSlug = null;
+let engineRuntime = {};
+let researchReady = false;
 
 function escapeHtml(value) {
   const span = document.createElement('span');
   span.textContent = String(value ?? '');
-  return span.innerHTML;
+  return span.innerHTML.replaceAll('"','&quot;').replaceAll("'",'&#39;');
 }
 
 function setWorkflowStep(stage) {
@@ -53,6 +55,8 @@ async function loadOptions() {
     const res = await fetch('/api/videos/options');
     if (!res.ok) throw new Error('Gagal memuat opsi animasi');
     const data = await res.json();
+    engineRuntime=Object.fromEntries(data.engines.map(engine=>[engine.id,engine.runtimeMissing||[]]));
+    researchReady=!!data.research?.ready;
     elements.engineSelect.innerHTML = data.engines.map(engine =>
       `<option value="${escapeHtml(engine.id)}" ${engine.id === data.defaultEngine ? 'selected' : ''} ${engine.disabled ? 'disabled' : ''}>${escapeHtml(engine.name)}${engine.disabled ? ' - segera' : ''}</option>`
     ).join('');
@@ -86,9 +90,15 @@ function updateEngineExperience() {
   } else {
     elements.engineNotice.innerHTML = `<strong style="color:#a855f7">Opuscar / GSAP Cinematic</strong><br>Motion graphics prosedural kaya ilustrasi dinamis (radar HUD, bar chart neon, network nodes, compare core) dengan continuous living motion tanpa dead frame (Output MP4).`;
   }
+  const provided=document.getElementById('researchMode').value==='provided';
+  elements.script.required=provided;elements.modelSelect.disabled=provided;
+  const note=document.createElement('p');
+  note.textContent=(engineRuntime[eng]?.length?`Runtime belum siap: ${engineRuntime[eng].join(', ')}. `:'')+(provided?'Rencana lokal dari naskah; periksa fakta sebelum menyetujui.':researchReady?'Riset web dikonfigurasi; klaim tetap perlu diperiksa.':'Riset web belum siap. Konfigurasi provider atau pilih mode naskah sendiri.');
+  elements.engineNotice.append(note);
 }
 
 elements.engineSelect.addEventListener('change', updateEngineExperience);
+document.getElementById('researchMode').addEventListener('change',updateEngineExperience);
 
 async function loadHistory() {
   try {
@@ -162,7 +172,7 @@ function showResult(result, aspectId) {
   reviewBox.replaceChildren();
   if(result.review){
     const heading=document.createElement('h3');heading.textContent='Pemeriksaan hasil render';
-    const status=document.createElement('p');status.textContent=`${result.review.status==='needs_attention'?'Ada temuan untuk ditinjau':'Pemeriksaan media selesai'}. Audio: ${result.review.audio?.status||'belum diukur'}. Visual: ${result.review.visual_review?.status||'belum diukur'}. Tetap periksa video secara manual.`;
+    const status=document.createElement('p');status.textContent=`${result.review.status==='passed_media_checks'?'Pemeriksaan media selesai':result.review.status==='needs_attention'?'Ada temuan untuk ditinjau':'Pemeriksaan belum lengkap atau gagal'}. Audio: ${result.review.audio?.status||'belum diukur'}. Visual: ${result.review.visual_review?.status||'belum diukur'}. Tetap periksa video secara manual.`;
     reviewBox.append(heading,status);
     for(const issue of result.review.issues||[]){const text=document.createElement('p');text.textContent=issue;reviewBox.append(text)}
     for(const name of result.review.visual_review?.screenshots||[]){if(!/^review-frame-\d{1,2}\.png$/.test(name))continue;const link=document.createElement('a');link.href=`/api/videos/${encodeURIComponent(result.slug)}/${name}`;link.textContent=`${name} · `;link.target='_blank';link.rel='noopener';reviewBox.append(link)}
@@ -289,6 +299,7 @@ elements.form.addEventListener('submit', async event => {
     aspect: elements.aspectSelect.value,
     duration: parseInt(elements.durationSelect.value, 10),
     model: elements.modelSelect.value,
+    researchMode: document.getElementById('researchMode').value,
   };
   if (!payload.topic) {
     elements.formStatus.textContent = 'Topik animasi wajib diisi.';

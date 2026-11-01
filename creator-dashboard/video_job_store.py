@@ -5,23 +5,13 @@ import stat
 import tempfile
 from pathlib import Path
 
-from security import redact
+from security import redact_tree as _redact_tree
 
 MAX_CHECKPOINT_BYTES = 4_000_000
 
 
 def _job_key(value: object) -> bool:
     return isinstance(value, str) and len(value) == 32 and all(c in '0123456789abcdef' for c in value)
-
-
-def _redact_tree(value):
-    if isinstance(value, str):
-        return redact(value)
-    if isinstance(value, list):
-        return [_redact_tree(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _redact_tree(item) for key, item in value.items()}
-    return value
 
 
 def save_job(directory: Path, job: dict) -> None:

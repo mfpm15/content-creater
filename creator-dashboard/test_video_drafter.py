@@ -9,6 +9,16 @@ import video_drafter
 
 
 class VideoDrafterTest(unittest.TestCase):
+    def setUp(self):
+        self.workspace=tempfile.TemporaryDirectory()
+        root=Path(self.workspace.name)
+        self.patches=[patch.object(video_drafter,'JOBS',{}),patch.object(video_drafter,'JOB_DIR',root/'jobs'),patch.object(video_drafter,'VIDEOS_DIR',root/'videos')]
+        for item in self.patches:item.start()
+
+    def tearDown(self):
+        for item in reversed(self.patches):item.stop()
+        self.workspace.cleanup()
+
     def test_options_expose_render_adapters_and_primary_models(self):
         opts = video_drafter.options()
         self.assertEqual([item["id"] for item in opts["engines"]], ["opuscar", "threejs", "lottie"])

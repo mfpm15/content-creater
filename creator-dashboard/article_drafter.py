@@ -24,6 +24,7 @@ from security import open_authenticated
 from xml.sax.saxutils import escape
 
 import humanizer
+import article_storage
 
 ROOT = Path(__file__).resolve().parent
 ARTICLES_DIR = ROOT / "output" / "articles"
@@ -174,10 +175,8 @@ def count_words(blocks: list[dict]) -> int:
 
 
 def _write_json(path: Path, data: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    with article_storage.LOCK:
+        article_storage.atomic_bytes(path, article_storage.json_bytes(data))
 
 
 def _read_json(path: Path, default: object = None) -> object:
@@ -827,6 +826,7 @@ def _dir(slug: str) -> Path:
     directory = (ARTICLES_DIR / slug).resolve()
     if directory.parent != ARTICLES_DIR.resolve() or not directory.is_dir():
         raise FileNotFoundError(slug)
+    article_storage.recover(directory)
     return directory
 
 
@@ -860,6 +860,11 @@ def image_size(data: bytes) -> tuple[int, int] | None:
 
 
 def get_article(slug: str) -> dict:
+    with article_storage.LOCK:
+        return _get_article(slug)
+
+
+def _get_article(slug: str) -> dict:
     directory = _dir(slug)
     inp = _read_json(directory / "input.json", {})
     article = _read_json(directory / "article.json")
@@ -930,6 +935,11 @@ def read_file(slug: str, name: str) -> tuple[bytes, str]:
 
 
 def save_image(slug: str, image_id: str, data: bytes) -> dict:
+    with article_storage.LOCK:
+        return _save_image(slug,image_id,data)
+
+
+def _save_image(slug: str, image_id: str, data: bytes) -> dict:
     directory = _dir(slug)
     article = _read_json(directory / "article.json")
     if article is None:
@@ -946,22 +956,25 @@ def save_image(slug: str, image_id: str, data: bytes) -> dict:
         raise ValueError("Hanya PNG atau JPG yang diterima")
     if image_size(data) is None:
         raise ValueError("Ukuran gambar tidak terbaca; file mungkin rusak")
-    for other in ("png", "jpg"):
-        (directory / "images" / f"{image_id}.{other}").unlink(missing_ok=True)
-    (directory / "images" / f"{image_id}.{ext}").write_bytes(data)
-    build_outputs(slug)
+    with article_storage.LOCK:
+        updates={f'images/{image_id}.{other}':data if other==ext else None for other in ('png','jpg')}
+        article_storage.commit(directory,updates,article,_render_output_files)
     return get_article(slug)
 
 
 def build_outputs(slug: str) -> dict:
-    directory = _dir(slug)
-    article = _read_json(directory / "article.json")
-    if article is None:
-        raise FileNotFoundError("article.json")
-    (directory / "article.md").write_text(to_markdown(article, directory), encoding="utf-8")
-    (directory / "image-prompts.md").write_text(to_prompts_markdown(article), encoding="utf-8")
-    to_docx(article, directory, directory / "article.docx")
-    return get_article(slug)
+    with article_storage.LOCK:
+        directory = _dir(slug)
+        article = _read_json(directory / "article.json")
+        if article is None:raise FileNotFoundError("article.json")
+        article_storage.commit(directory,{},article,_render_output_files)
+        return get_article(slug)
+
+
+def _render_output_files(article: dict, assets: Path, target: Path) -> None:
+    article_storage.atomic_bytes(target/'article.md',to_markdown(article,assets).encode('utf-8'))
+    article_storage.atomic_bytes(target/'image-prompts.md',to_prompts_markdown(article).encode('utf-8'))
+    to_docx(article,assets,target/'article.docx')
 
 
 # ----------------------------------------------------------- penomoran, DOC, MD

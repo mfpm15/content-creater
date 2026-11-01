@@ -230,3 +230,9 @@ pada PATH; bila tidak tersedia hasil dilabeli `unmeasured`. Sandbox browser teta
 Pengambilan teks sumber publik baru aktif bila admin mengisi `RESEARCH_SOURCE_HOSTS` dengan host
 HTTPS tepercaya (dipisahkan koma). Default kosong; kutipan manual tetap dapat dipakai. Fetch tersebut
 tidak menggunakan API key provider dan sumber tetap harus diperiksa pengguna.
+
+Mode video **Naskah sendiri** membuat rencana lokal tanpa provider; wajib mengisi naskah dan tetap menyetujui Scene Plan serta Storyboard. Gunakan adapter Lottie untuk hasil lokal tanpa TTS. Mode riset web tetap default dan memerlukan provider. UI menampilkan komponen runtime yang belum siap sebelum render MP4.
+
+Perubahan artikel diterbitkan melalui staging dan journal pemulihan. Jika render dokumen gagal, revisi tetap berupa usulan; saat proses terputus, pembacaan berikutnya memulihkan versi sebelumnya. Pemutaran MP4 mendukung seek melalui byte-range.
+
+Target akhir aplikasi adalah laptop Windows 10/11 x64. Jalankan `setup-core.bat` untuk empat fitur inti; `setup-dashboard.bat --core` setara. `start-dashboard.bat` memakai venv Windows yang sudah dipasang. Lihat [DISTRIBUTION.md](DISTRIBUTION.md) untuk ZIP source dan prasyarat. Jangan menyalin venv atau node_modules dari Linux/cloud ke laptop.

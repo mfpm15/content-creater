@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import stat
 import signal
 import socket
 import subprocess
@@ -17,7 +19,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from security import redact
+from security import redact, redact_tree, local_request_allowed
 from runtime_config import resolve_tool_command
 
 import article_drafter
@@ -275,23 +277,79 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         if not super().parse_request():
             return False
         host = self.headers.get("Host", "")
-        try:
-            valid = urlparse("http://" + host).hostname in {"127.0.0.1", "localhost", "::1"}
-            origin = self.headers.get("Origin")
-            if origin:
-                valid = valid and urlparse(origin).netloc.lower() == host.lower()
-        except ValueError:
-            valid = False
+        valid = len(self.headers.get_all('Host', [])) == 1 and len(self.headers.get_all('Origin', [])) <= 1
+        valid = valid and local_request_allowed(host, self.headers.get('Origin'), self.server.server_port, self.headers.get('Sec-Fetch-Site'))
         if not valid:
             self.send_error(403, "Local Host/Origin required")
+            return False
+        if self.headers.get_all('Transfer-Encoding') or len(self.headers.get_all('Content-Length', []))>1:
+            self.send_error(400, 'Ambiguous request framing')
             return False
         return True
 
     def log_message(self, format: str, *args) -> None:
         print(redact(f"[{self.log_date_time_string()}] {format % args}"))
 
+    def end_headers(self):
+        self.send_header('Referrer-Policy','no-referrer')
+        super().end_headers()
+
+    def send_head(self):
+        target=Path(self.translate_path(self.path))
+        if not target.resolve().is_relative_to(STATIC_DIR.resolve()) or any(part.startswith('.') for part in target.relative_to(STATIC_DIR).parts):
+            self.send_error(404);return None
+        if target.exists() and not target.is_dir() and not target.is_file():
+            self.send_error(404);return None
+        return super().send_head()
+
+    def list_directory(self,path):
+        self.send_error(404);return None
+
+    def _video_file(self,path,content_type):
+        """Stream one validated file descriptor, with real seek support for MP4."""
+        fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_NONBLOCK',0))
+        with os.fdopen(fd,'rb') as source:
+            info=os.fstat(source.fileno())
+            if not stat.S_ISREG(info.st_mode):raise FileNotFoundError(path.name)
+            size=info.st_size;start=0;end=size-1;status=HTTPStatus.OK
+            value=self.headers.get('Range') if content_type=='video/mp4' else None
+            if value:
+                match=re.fullmatch(r'bytes=(\d*)-(\d*)',value.strip())
+                try:
+                    if not match or not any(match.groups()):raise ValueError
+                    left,right=match.groups()
+                    if left:
+                        start=int(left);end=min(int(right),size-1) if right else size-1
+                    else:
+                        suffix=int(right)
+                        if suffix<=0:raise ValueError
+                        start=max(0,size-suffix)
+                    if start>=size or end<start:raise ValueError
+                except ValueError:
+                    self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                    self.send_header('Content-Range',f'bytes */{size}');self.send_header('Content-Length','0');self.end_headers();return
+                status=HTTPStatus.PARTIAL_CONTENT
+            self.send_response(status)
+            self.send_header('Content-Type',content_type)
+            self.send_header('Content-Length',str(max(0,end-start+1)))
+            self.send_header('Cache-Control','no-store')
+            self.send_header('X-Content-Type-Options','nosniff')
+            if content_type=='video/mp4':self.send_header('Accept-Ranges','bytes')
+            if status==HTTPStatus.PARTIAL_CONTENT:self.send_header('Content-Range',f'bytes {start}-{end}/{size}')
+            if path.name=='index.html':
+                self.send_header('Content-Security-Policy',"sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'")
+            self.end_headers()
+            if self.command=='HEAD':return
+            source.seek(start);remaining=end-start+1
+            try:
+                while remaining>0:
+                    block=source.read(min(512*1024,remaining))
+                    if not block:break
+                    self.wfile.write(block);remaining-=len(block)
+            except (BrokenPipeError,ConnectionResetError):pass
+
     def _json(self, status: int, payload: Any) -> None:
-        body = redact(json.dumps(payload, ensure_ascii=False)).encode("utf-8")
+        body = json.dumps(redact_tree(payload), ensure_ascii=False, allow_nan=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -300,7 +358,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self'")
         self.end_headers()
         try:
-            self.wfile.write(body)
+            if self.command!='HEAD':self.wfile.write(body)
         except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
             pass  # Browser menutup koneksi saat pindah halaman atau refresh; bukan error server.
 
@@ -315,17 +373,23 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         if length < 0 or length > limit:
             self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "Body terlalu besar atau tidak valid"})
             return None
-        return self.rfile.read(length)
+        body=self.rfile.read(length)
+        if len(body)!=length:
+            self._json(HTTPStatus.BAD_REQUEST, {"error":"Body tidak lengkap"})
+            return None
+        return body
 
     def _article_error(self, exc: Exception) -> None:
         if isinstance(exc, FileNotFoundError):
             self._json(HTTPStatus.NOT_FOUND, {"error": "Tidak ditemukan"})
+        elif isinstance(exc, PermissionError):
+            self._json(HTTPStatus.CONFLICT, {"error":"Tutup dokumen Word atau aplikasi yang mengunci file, lalu coba lagi"})
         elif isinstance(exc, ValueError):
             self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         elif isinstance(exc, article_drafter.LLMError):
             self._json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
         else:
-            raise exc
+            self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error":"Operasi artikel gagal; data sebelumnya dipertahankan bila transaksi belum selesai"})
 
     def _articles_get(self, parts: list[str]) -> None:
         try:
@@ -349,7 +413,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self.send_header("Content-Disposition", f'attachment; filename="{name}"')
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.end_headers()
-                self.wfile.write(data)
+                if self.command!='HEAD':self.wfile.write(data)
             else:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
         except Exception as exc:  # noqa: BLE001 - dipetakan ke status HTTP di _article_error
@@ -407,17 +471,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self._json(HTTPStatus.OK, video_drafter.get_video(unquote(parts[2])))
             elif len(parts) == 4:
                 slug, filename = unquote(parts[2]), unquote(parts[3])
-                data, content_type = video_drafter.read_video_file(slug, filename)
-                self.send_response(HTTPStatus.OK)
-                self.send_header("Content-Type", content_type)
-                self.send_header("Content-Length", str(len(data)))
-                if content_type == "video/mp4":
-                    self.send_header("Accept-Ranges", "bytes")
-                if filename == "index.html":
-                    self.send_header("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'")
-                self.send_header("X-Content-Type-Options", "nosniff")
-                self.end_headers()
-                self.wfile.write(data)
+                path, content_type = video_drafter.video_file_path(slug, filename)
+                self._video_file(path,content_type)
             else:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
         except KeyError as exc:
@@ -535,11 +590,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json(HTTPStatus.BAD_GATEWAY, {"error": "Sumber atau penyimpanan tidak tersedia"})
 
     def do_HEAD(self) -> None:
-        parts = self._route_parts()
-        if parts[:2] in (["api", "videos"], ["api", "articles"]):
+        if self._route_parts()[:1]==['api']:
             self.do_GET()
-            return
-        super().do_HEAD()
+        else:
+            super().do_HEAD()
 
     def _clipper_proxy(self, path: str) -> None:
         # ponytail: GET-only, fixed upstream; cukup untuk health/production. Tambah rute bila perlu.
@@ -643,6 +697,8 @@ def stop_all() -> None:
 
 
 def main() -> int:
+    if HOST not in {'127.0.0.1','localhost'}:
+        raise ValueError('Dashboard tanpa autentikasi wajib bind ke loopback IPv4')
     server = ReusableThreadingHTTPServer((HOST, PORT), DashboardHandler)
     address = f"http://{HOST}:{PORT}"
     print(f"Creator Control Center running at {address}")

@@ -1,6 +1,9 @@
 """Redaction for public logs and errors. Never persist runtime credentials."""
 import os
 import re
+import json
+import base64
+from urllib.parse import quote, unquote
 
 _SECRETS = set()
 
@@ -15,13 +18,26 @@ def redact(value: str, secrets=()) -> str:
     text = str(value)
     for secret in tuple(_SECRETS) + tuple(secrets):
         if isinstance(secret, str) and len(secret) >= 4:
-            text = text.replace(secret, "[REDACTED]")
+            for value in {secret,quote(secret,safe=''),json.dumps(secret)[1:-1]}:
+                text = text.replace(value, "[REDACTED]")
     for name, secret in os.environ.items():
         if any(tag in name.upper() for tag in ("API_KEY", "TOKEN", "PASSWORD", "SECRET")) and len(secret) >= 4:
-            text = text.replace(secret, "[REDACTED]")
+            for value in {secret,quote(secret,safe=''),json.dumps(secret)[1:-1]}:
+                text = text.replace(value, "[REDACTED]")
     text = re.sub(r"(?i)(Bearer\s+)[^\s\"']+", r"\1[REDACTED]", text)
+    def basic(match):
+        try:
+            if b':' in base64.b64decode(match[2],validate=True):return match[1]+'[REDACTED]'
+        except ValueError:pass
+        return match[0]
+    text = re.sub(r'(?i)(Basic\s+)([A-Za-z0-9+/]+=*)',basic,text)
     text = re.sub(r"(https?://)[^/\s@]+@", r"\1[REDACTED]@", text)
-    return re.sub(r"(?i)([?&](?:api_key|key|token|secret)=)[^&\s]+", r"\1[REDACTED]", text)
+    def query(match):
+        key=unquote(match[2])
+        if re.search(r'token|secret|signature|credential|authorization|password|(?:^|[_-])key$',key,re.I):
+            return match[1]+match[2]+'=[REDACTED]'
+        return match[0]
+    return re.sub(r'([?&])([^=&\s]+)=([^&\s]+)',query,text)
 
 
 def open_authenticated(request, timeout):
