@@ -43,7 +43,7 @@ def test_chat_request_contract_and_authorization():
         return Response(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
 
     c = {"base_url": "http://localhost:20128/v1", "api_key": "top-secret", "temperature": 0.2, "timeout": 7}
-    with patch("urllib.request.urlopen", fake_open):
+    with patch("clipper.llm.open_authenticated", fake_open):
         assert llm.chat("ag/gemini-3.8-flash-medium", "system", "user", c) == "ok"
     assert captured["url"].endswith("/v1/chat/completions")
     assert captured["headers"]["Authorization"] == "Bearer top-secret"
@@ -54,7 +54,7 @@ def test_chat_request_contract_and_authorization():
 
 
 def test_invalid_response_and_health_redaction():
-    with patch("urllib.request.urlopen", lambda *_args, **_kwargs: Response(b'{"unexpected":true}')):
+    with patch("clipper.llm.open_authenticated", lambda *_args, **_kwargs: Response(b'{"unexpected":true}')):
         try:
             llm.chat("model", "system", "user", {"base_url": "http://localhost:20128/v1", "api_key": "", "timeout": 1})
             assert False, "invalid response must fail"

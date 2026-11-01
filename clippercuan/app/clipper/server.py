@@ -1,6 +1,8 @@
 """Server lokal (hanya 127.0.0.1) yang melayani UI dan API."""
 from __future__ import annotations
 
+from .security import redact
+
 import base64
 import hmac
 import json
@@ -66,7 +68,7 @@ def _check_model_catalog() -> dict:
     except Exception as exc:  # noqa: BLE001
         _MODEL_CHECK = {
             "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "available": [], "missing": configured, "error": str(exc)[:300],
+            "available": [], "missing": configured, "error": redact(str(exc))[:300],
         }
         _log.warning("9Router model check gagal: %s", exc)
     return _MODEL_CHECK
@@ -376,7 +378,7 @@ def project_words(pid: str, start: float = 0, end: float = 1e9):
     f = project.pdir(pid) / "transcript.json"
     if not f.exists():
         return {"words": []}
-    words = json.loads(f.read_text("utf-8")).get("words", [])
+    words = project.resolve_caption_track(pid)
     return {"words": [{"w": w["w"], "s": w["s"], "e": w["e"]} for w in words if start - 0.05 <= w["s"] <= end + 0.05]}
 
 
@@ -390,8 +392,7 @@ def _clip_words_full(pid: str, cid: str):
         raise HTTPException(404, "Klip tidak ditemukan")
     if "start" not in clip or "end" not in clip:
         raise HTTPException(409, "Data klip lama belum memiliki waktu mulai/akhir. Buat ulang kandidat atau render klip ini.")
-    f = project.pdir(pid) / "transcript.json"
-    tw = json.loads(f.read_text("utf-8")).get("words", []) if f.exists() else []
+    tw = project.resolve_caption_track(pid)
     return p, clip, wordtools.clip_words_with_p(tw, clip)
 
 
@@ -421,7 +422,7 @@ def clip_subtitles(pid: str, cid: str, format: str = "srt", word_timing: bool = 
     try:
         body = wordtools.export_subtitles(words, format, max(1, min(12, per_line)), word_timing=word_timing)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, redact(str(e)))
     headers = {"Content-Disposition": f'attachment; filename="{cid}.{format.lower()}"'} if download else {}
     return Response(body, media_type=wordtools.FORMATS[format.lower()] + "; charset=utf-8", headers=headers)
 
@@ -439,9 +440,12 @@ def clip_delivery(pid: str, cid: str, platform: str = "all"):
     if not f or clip.get("status") != "done" or not f.is_file():
         raise HTTPException(409, "Klip belum selesai dirender")
     try:
+        cached = clip.get("delivery")
+        if cached and not clip.get("needs_rerender"):
+            return cached if platform == "all" else cached[delivery.platform_id(platform)]
         return delivery.check_all(f) if platform == "all" else delivery.check(f, platform)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, redact(str(e)))
 
 
 @app.get("/api/clips")
@@ -482,7 +486,7 @@ def candidate_action(pid: str, cid: str, body: CandidateAction):
     except KeyError:
         raise HTTPException(404, "Kandidat tidak ditemukan")
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, redact(str(e)))
 
 
 @app.post("/api/projects/{pid}/rerank")
@@ -514,7 +518,7 @@ def edit(pid: str, cid: str, body: ClipEdit):
     except KeyError:
         raise HTTPException(404, "Klip tidak ditemukan")
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, redact(str(e)))
 
 
 @app.get("/api/projects/{pid}/captions")
@@ -529,7 +533,7 @@ def save_caption_workspace(pid: str, body: CaptionWorkspaceSave):
     try:
         return project.save_caption_workspace(pid, body.data, body.revision)
     except ValueError as e:
-        raise HTTPException(409 if "proses lain" in str(e) else 400, str(e))
+        raise HTTPException(409 if "proses lain" in redact(str(e)) else 400, redact(str(e)))
 
 
 @app.post("/api/projects/{pid}/captions/action")
@@ -538,7 +542,7 @@ def caption_workspace_action(pid: str, body: CaptionWorkspaceAction):
     try:
         return project.caption_action(pid, body.action, body.payload)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, redact(str(e)))
 
 
 @app.get("/api/caption-templates")
@@ -563,7 +567,7 @@ def frame(pid: str, t: float = 0.0):
             try:
                 download.grab_remote_frame(p["source"], t, out, width=640, max_h=download.source_height(p.get("settings"), True))
             except Exception as e:  # noqa: BLE001
-                raise HTTPException(502, f"Frame dari sumber online gagal diambil: {str(e)[:200]}") from None
+                raise HTTPException(502, f"Frame dari sumber online gagal diambil: {redact(str(e))[:200]}") from None
         else:
             media.grab_frame(d / m["file"], t, out, width=640)
     return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "max-age=3600"})
@@ -575,7 +579,7 @@ def detect_facecam_api(pid: str):
     try:
         return project.redetect_facecam(pid)
     except ValueError as e:
-        raise HTTPException(409, str(e))
+        raise HTTPException(409, redact(str(e)))
 
 
 @app.get("/api/projects/{pid}/source")
@@ -654,7 +658,7 @@ def add_clip(pid: str, body: NewClip):
     try:
         return project.add_clip(pid, body.start, body.end, body.title)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, redact(str(e)))
 
 
 class ExportReq(BaseModel):
@@ -695,7 +699,7 @@ def test_webhook(body: HookTest):
         with urllib.request.urlopen(req, timeout=15) as r:
             return {"ok": True, "status": r.status}
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"Webhook gagal: {e}")
+        raise HTTPException(502, f"Webhook gagal: {redact(str(e))}")
 
 
 @app.get("/api/agent/info")
@@ -748,7 +752,7 @@ def save_template(body: Template):
     try:
         return project.save_template(body.name, body.settings)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, redact(str(e)))
 
 
 @app.delete("/api/templates/{name}")
@@ -771,7 +775,7 @@ def system():
         out["ffmpeg"] = {"path": FFMPEG, "version": r.stdout.split("\n")[0], "libass": " ass " in f.stdout}
         out["encoders"] = media.encoders()
     except Exception as e:  # noqa: BLE001
-        out["ffmpeg"] = {"path": FFMPEG, "error": str(e)}
+        out["ffmpeg"] = {"path": FFMPEG, "error": redact(str(e))}
     try:
         import ctranslate2
 
@@ -812,7 +816,7 @@ def asr_test(body: Settings):
         asr.test_api(c)
         return {"ok": True}
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, str(e)[:300])
+        raise HTTPException(502, redact(str(e))[:300])
 
 
 @app.get("/api/llm/catalog")
@@ -836,7 +840,7 @@ def llm_models(body: Settings):
     try:
         return {"models": llm.list_models(c)}
     except llm.LLMError as e:
-        raise HTTPException(502, str(e))
+        raise HTTPException(502, redact(str(e)))
 
 
 @app.post("/api/projects/{pid}/clips/{cid}/ai")
@@ -853,12 +857,12 @@ def clip_ai(pid: str, cid: str, kind: str = "titles"):
             return llm.make_post(text, clip.get("title", ""), p.get("language"), p.get("content_profile") or "general")
         return {"titles": llm.make_title(text, p.get("language"))}
     except llm.LLMError as e:
-        raise HTTPException(502, str(e))
+        raise HTTPException(502, redact(str(e)))
 
 
 @app.exception_handler(media.FFmpegError)
 def _ffmpeg_err(_, exc):
-    return JSONResponse({"detail": str(exc)[-600:]}, status_code=500)
+    return JSONResponse({"detail": redact(str(exc))[-600:]}, status_code=500)
 
 
 app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")  # preview caption memakai font yang sama dengan render

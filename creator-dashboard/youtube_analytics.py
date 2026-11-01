@@ -78,13 +78,17 @@ def analyze_retention(csv_body: bytes, transcript: str = "", duration: float | N
     value_key = next((fields[k] for k in fields if any(x in k for x in ("retention", "audience", "percent", "ratio")) and fields[k] != time_key), None)
     if not time_key or not value_key:
         raise ValueError("Header waktu dan retention tidak ditemukan")
+    rows = list(reader)
+    raw_values = [str(row.get(value_key) or "") for row in rows]
+    numbers = [_number(v) for v in raw_values]
+    ratio_units = not any("%" in v for v in raw_values) and not any(x in value_key.lower() for x in ("percent", "%")) and all(v is None or 0 <= v <= 1 for v in numbers)
     points: list[dict[str, float]] = []
-    for row in reader:
+    for row in rows:
         second = _timestamp_seconds(row.get(time_key), duration)
         value = _number(row.get(value_key))
         if second is None or value is None:
             continue
-        if value <= 1.5:
+        if ratio_units:
             value *= 100
         points.append({"second": round(second, 3), "retention": round(value, 3)})
     points = sorted({p["second"]: p for p in points}.values(), key=lambda p: p["second"])

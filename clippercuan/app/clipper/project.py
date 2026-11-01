@@ -1,6 +1,8 @@
 """Proyek = satu video sumber + hasil klip. Disimpan sebagai JSON di ~/ClipperCuan/projects/<id>/."""
 from __future__ import annotations
 
+from .security import redact
+
 import copy
 import json
 import os
@@ -249,9 +251,9 @@ def _pipeline(pid: str) -> None:
             moments = _llm_moments(tr, energy, pr.duration, count, mn, mx, visual)
             engine = model
         except Exception as e:  # noqa: BLE001 — selalu ada cadangan lokal
-            print(f"[llm] gagal, pakai skor lokal: {e}")
+            print(f"[llm] gagal, pakai skor lokal: {redact(str(e))}")
             update(pid, llm_warning="AI sedang lambat. Kandidat tetap dibuat dengan analisis lokal; jalankan ulang ranking AI bila diperlukan.",
-                   llm_error_detail=str(e)[:500])
+                   llm_error_detail=redact(str(e))[:500])
     if not moments:
         moments = highlights.find_moments(tr, energy, pr.duration, count, mn, mx, visual=visual)
     chapters_file = work / "chapters.json"
@@ -259,7 +261,7 @@ def _pipeline(pid: str) -> None:
         try:
             candidates.snap_chapters(moments, json.loads(chapters_file.read_text("utf-8")), mn, mx)
         except (OSError, ValueError, KeyError) as e:  # noqa: BLE001 — chapter hanya bonus, jangan gagalkan pipeline
-            print(f"[chapters] dilewati: {e}")
+            print(f"[chapters] dilewati: {redact(str(e))}")
     update(pid, engine=engine)
     lang = tr.get("language")
     prepared = []
@@ -421,14 +423,14 @@ def _transcript(pid: str, source: str, cfg: dict, work: Path, get_wav, duration:
             if not tr:
                 notes.append("Subtitle YouTube tidak tersedia")
         except Exception as e:  # noqa: BLE001
-            notes.append(f"Subtitle YouTube tidak dapat dibaca ({str(e)[:120]})")
+            notes.append(f"Subtitle YouTube tidak dapat dibaca ({redact(str(e))[:120]})")
     acfg = llm.load_settings()["asr"]
     use_api = mode == "api" or (mode == "auto" and bool(acfg.get("api_key")))
     if tr is None and use_api:
         try:
             tr = asr.api_transcribe(get_wav(), acfg, cfg["language"], cfg["translate_en"], duration, cb)
         except Exception as e:  # noqa: BLE001
-            notes.append(f"Transkripsi cloud gagal ({str(e)[:160]})")
+            notes.append(f"Transkripsi cloud gagal ({redact(str(e))[:160]})")
             tr = None
     if tr is None:
         cb(0.08, "Subtitle tidak tersedia; menyiapkan Whisper lokal…")
@@ -452,7 +454,15 @@ def _transcript(pid: str, source: str, cfg: dict, work: Path, get_wav, duration:
 def _llm_moments(tr: dict, energy, duration: float, count: int, mn: float, mx: float, visual=None) -> list[dict]:
     """Ambil ±30 kandidat beragam dari skor lokal, biarkan LLM memilih & memberi judul."""
     segs = tr["segments"]
-    pool = highlights.non_overlapping(highlights.score_candidates(tr, energy, mn, mx, visual=visual), 30, max_overlap=0.5)
+    scored = highlights.score_candidates(tr, energy, mn, mx, visual=visual)
+    if duration > 900:
+        pool = []
+        for a, b in candidates.chunk_ranges(duration):
+            local = [c for c in scored if a <= c["s"] < b]
+            pool.extend(highlights.non_overlapping(local, 6, max_overlap=0.5))
+        pool = list({(c["s"], c["e"]): c for c in pool}.values())
+    else:
+        pool = highlights.non_overlapping(scored, 30, max_overlap=0.5)
     pool.sort(key=lambda c: c["s"])
     picks = llm.pick_moments([{"id": i + 1, "start": c["s"], "end": c["e"], "text": c["text"]} for i, c in enumerate(pool)],
                              count, tr.get("language"))
@@ -478,6 +488,27 @@ def _llm_moments(tr: dict, energy, duration: float, count: int, mn: float, mx: f
     return out
 
 
+def resolve_caption_track(pid: str) -> list[dict]:
+    work = pdir(pid)
+    workspace_file = work / "caption-workspace.json"
+    if workspace_file.exists():
+        ws = json.loads(workspace_file.read_text("utf-8"))
+        if ws.get("editorial"):
+            words = []
+            for cue in ws.get("cues", []):
+                existing = cue.get("words") or []
+                tokens = str(cue.get("text", "")).split()
+                if tokens == [w.get("w") for w in existing]:
+                    words.extend(existing)
+                elif tokens:
+                    start, end = float(cue["start"]), float(cue["end"])
+                    step = (end - start) / len(tokens)
+                    words.extend({"w": t, "s": start + i * step, "e": start + (i + 1) * step} for i, t in enumerate(tokens))
+            return words
+    path = work / "transcript.json"
+    return json.loads(path.read_text("utf-8")).get("words", []) if path.exists() else []
+
+
 def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.Probe | None = None) -> None:
     p = load(pid)
     work = pdir(pid)
@@ -485,8 +516,7 @@ def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.P
     src = None if remote else work / p["media"]["file"]
     pr = pr or (None if remote else media.probe(src))
     if words is None:
-        tf = work / "transcript.json"
-        words = json.loads(tf.read_text("utf-8"))["words"] if tf.exists() else []
+        words = resolve_caption_track(pid)
     clip = next(c for c in p["clips"] if c["id"] == cid)
     cfg = deep_merge(p["settings"], clip.get("overrides"))
     _set_clip(pid, cid, status="rendering")
@@ -501,13 +531,23 @@ def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.P
             words = [{**w, "s": w["s"] - s0, "e": w["e"] - s0} for w in words]
             src = seg
         res = render.render_clip(work, src, pr, clip, cfg, words)
-        _set_clip(pid, cid, status="done", error=None, version=int(time.time()), **res)
+        from . import delivery
+        output = work / res["file"]
+        if output.is_file():
+            try:
+                report = delivery.check_all(output)
+                res["delivery"] = report
+                res["delivery_status"] = "passed" if all(r["ok"] for r in report.values()) else "needs_attention"
+            except (OSError, ValueError, media.FFmpegError):
+                res["delivery_status"] = "unmeasured"
+        res["caption_revision"] = load_caption_workspace(pid).get("revision", 0)
+        _set_clip(pid, cid, status="done", error=None, needs_rerender=False, version=int(time.time()), **res)
         with _LOCK:
             latest = load(pid)
             _write_manifest(latest)
             save(latest)
     except Exception as e:
-        _set_clip(pid, cid, status="error", error=str(e)[-1500:])
+        _set_clip(pid, cid, status="error", error=redact(str(e))[-1500:])
         raise
     finally:
         if seg is not None:
@@ -568,8 +608,7 @@ def add_clip(pid: str, start: float, end: float, title: str = "") -> dict:
         if e - s < 1:
             raise ValueError("Durasi klip minimal 1 detik")
         n = max([int(c["id"].split("_")[-1]) for c in p["clips"]] + [0]) + 1
-        tf = pdir(pid) / "transcript.json"
-        words = json.loads(tf.read_text("utf-8"))["words"] if tf.exists() else []
+        words = resolve_caption_track(pid)
         text = " ".join(w["w"] for w in words if s <= w["s"] <= e)
         title = title.strip() or (highlights.make_title([text]) if text else f"Klip {n}")
         clip = {"id": f"clip_{n:02d}", "start": round(s, 2), "end": round(e, 2), "score": 0, "title": title, "text": text,
@@ -653,18 +692,20 @@ def load_caption_workspace(pid: str) -> dict:
     return data
 
 
-def save_caption_workspace(pid: str, payload: dict, expected_revision: int | None = None) -> dict:
+def save_caption_workspace(pid: str, payload: dict, expected_revision: int | None = None, *, restore: bool = False) -> dict:
     with _LOCK:
         current = load_caption_workspace(pid)
         if expected_revision is not None and int(expected_revision) != int(current.get("revision", 0)):
             raise ValueError("Workspace berubah di proses lain; muat ulang sebelum menyimpan")
         allowed = {"cues", "glossary", "selected_template", "custom_templates", "audit_trail", "undo_stack", "redo_stack"}
-        previous = {k: current.get(k) for k in allowed}
+        previous = copy.deepcopy({k: current.get(k) for k in allowed - {"undo_stack", "redo_stack"}})
         for key in allowed:
-            if key in payload:
+            if key in payload and (restore or key not in {"undo_stack", "redo_stack"}):
                 current[key] = payload[key]
-        current["undo_stack"] = (current.get("undo_stack") or [])[-19:] + [previous]
-        current["redo_stack"] = []
+        if not restore:
+            current["undo_stack"] = (current.get("undo_stack") or [])[-19:] + [previous]
+            current["redo_stack"] = []
+        current["editorial"] = True
         current["revision"] = int(current.get("revision", 0)) + 1
         current["updated_at"] = time.time()
         current["cues"] = caption_workspace.normalize_cues(current.get("cues") or [])
@@ -678,6 +719,9 @@ def save_caption_workspace(pid: str, payload: dict, expected_revision: int | Non
         caption_workspace.atomic_json(pdir(pid) / "caption-workspace.json", current)
         p = load(pid)
         p["caption_workspace"] = {"schema_version": 3, "revision": current["revision"], "recommended_template": current.get("recommended_template")}
+        for clip in p.get("clips", []):
+            if clip.get("status") == "done":
+                clip["needs_rerender"] = True
         save(p)
         return current
 
@@ -689,7 +733,7 @@ def caption_action(pid: str, action: str, payload: dict) -> dict:
         ws["validation"] = caption_workspace.validate_cues(cues)
         return ws
     if action == "glossary":
-        words, audit = caption_workspace.apply_glossary(ws.get("transcript", {}).get("words") or [], ws.get("glossary") or [])
+        words, audit = caption_workspace.apply_glossary(resolve_caption_track(pid), ws.get("glossary") or [])
         ws["transcript"]["words"] = words
         ws["cues"] = caption_workspace.cues(words)
         ws["audit_trail"] = (ws.get("audit_trail") or []) + audit
@@ -719,7 +763,7 @@ def caption_action(pid: str, action: str, payload: dict) -> dict:
         ws.update(snapshot); ws[source] = stack; ws[target] = (ws.get(target) or []) + [current]
     else:
         raise ValueError("Aksi editor tidak valid")
-    return save_caption_workspace(pid, ws, ws.get("revision"))
+    return save_caption_workspace(pid, ws, ws.get("revision"), restore=action in {"undo", "redo"})
 
 
 def delete_template(name: str) -> dict:
@@ -879,9 +923,9 @@ def _worker() -> None:
         except KeyError:
             pass  # proyek dihapus saat antre
         except Exception as e:  # noqa: BLE001
-            traceback.print_exc()
+            print(redact(traceback.format_exc()))
             if kind == "pipeline":
-                safe_update(pid, status="error", message=_friendly(e), error=traceback.format_exc()[-3000:])
+                safe_update(pid, status="error", message=_friendly(e), error=redact(traceback.format_exc())[-3000:])
                 _notify(pid, "project.error")
         finally:
             _JOBS.task_done()
@@ -899,7 +943,7 @@ def _notify(pid: str, event: str, cid: str | None = None) -> None:
             event = "project.updated"
         automation.on_finished(pid, event)
     except Exception as e:  # noqa: BLE001
-        print(f"[otomatisasi] {e}")
+        print(f"[otomatisasi] {redact(str(e))}")
 
 
 def _pid_alive(pid: int) -> bool:
@@ -932,7 +976,7 @@ def safe_update(pid: str, **f) -> None:
 
 
 def _friendly(e: Exception) -> str:
-    s = str(e)
+    s = redact(str(e))
     if "Sign in to confirm" in s or "bot" in s.lower():
         return ("YouTube meminta verifikasi. Buka Pengaturan → Unduhan, pilih browser yang sudah login YouTube "
                 "(cookies), lalu klik Ulangi. Atau unduh videonya lalu pakai mode File.")

@@ -25,7 +25,7 @@ def _source_quality(url: str) -> str:
     host = (urlparse(url).hostname or "").lower()
     if host.endswith((".go.id", ".gov", ".gov.uk", ".europa.eu", ".int")):
         return "primary-government"
-    if host.endswith((".edu", ".ac.id", ".org")):
+    if host.endswith((".edu", ".ac.id")):
         return "institutional"
     return "web"
 
@@ -68,6 +68,9 @@ Gunakan Google Search. Prioritaskan sumber primer, situs resmi, regulator, dokum
             "url": url,
             "publisher": urlparse(url).hostname or "",
             "quality": _source_quality(url),
+            "publicationDate": None,
+            "retrievalStatus": "grounding_reference",
+            "claimVerification": "unverified",
         })
 
     if not sources:
@@ -83,7 +86,8 @@ Gunakan Google Search. Prioritaskan sumber primer, situs resmi, regulator, dokum
         "sources": sources,
         "sourceCount": len(sources),
         "researchedAt": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        "verified": True,
+        "verified": False,
+        "verificationStatus": "grounded_sources_found_claims_unverified",
     }
 
 

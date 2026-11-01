@@ -20,15 +20,16 @@ import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from security import open_authenticated
 from xml.sax.saxutils import escape
 
 import humanizer
 
 ROOT = Path(__file__).resolve().parent
 ARTICLES_DIR = ROOT / "output" / "articles"
-LLM_URL = os.getenv("ARTICLE_LLM_BASE_URL", "http://localhost:20128/v1").rstrip("/")
-LLM_MODEL = os.getenv("ARTICLE_LLM_MODEL", "ag/gemini-3.8-flash-high")
-LLM_KEY = os.getenv("ARTICLE_LLM_API_KEY", "9router-local")
+LLM_URL = os.getenv("ARTICLE_LLM_BASE_URL", os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:20128/v1").rstrip("/")
+LLM_MODEL = os.getenv("ARTICLE_LLM_MODEL", os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "ag/gemini-3.8-flash-high")
+LLM_KEY = os.getenv("ARTICLE_LLM_API_KEY", os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "9router-local")
 LLM_TIMEOUT = int(os.getenv("ARTICLE_LLM_TIMEOUT", "300"))
 CONCURRENCY = max(1, min(6, int(os.getenv("ARTICLE_LLM_CONCURRENCY", "3"))))
 RETRY_BASE_SECONDS = float(os.getenv("ARTICLE_LLM_RETRY_SECONDS", "3"))
@@ -197,7 +198,7 @@ def _chat(messages: list[dict]) -> str:
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {LLM_KEY}"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=LLM_TIMEOUT) as response:
+        with open_authenticated(request, timeout=LLM_TIMEOUT) as response:
             data = json.load(response)
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
         raise LLMError(f"LLM tidak terjangkau di {LLM_URL}: {exc}") from exc
@@ -650,6 +651,7 @@ def clean_input(raw: object) -> dict:
         "words": number("words", 1200, 200, MAX_WORDS),
         "points": text("points"),
         "sources": text("sources"),
+        "research": str(raw.get("research", "")).lower() in ("1", "true", "on", "yes"),
         "suggest_refs": str(raw.get("suggest_refs", "")).lower() in ("1", "true", "on", "yes"),
         "image_count": number("image_count", 0, 0, MAX_IMAGES),
         "image_requests": text("image_requests"),
@@ -684,6 +686,17 @@ def run_pipeline(slug: str, report=None) -> dict:
     inp = _read_json(directory / "input.json")
     if inp is None:
         raise FileNotFoundError(slug)
+
+    if inp.get("research"):
+        from research_service import research
+        result = _read_json(directory / "research.json")
+        if result is None:
+            report("research", 0, 1, "Mencari sumber; klaim tetap perlu verifikasi")
+            result = research(inp["title"], inp["points"])
+            _write_json(directory / "research.json", result)
+        inp = dict(inp)
+        inp["sources"] += "\n\n" + "\n".join(f"{s['title']} — {s['url']}" for s in result["sources"])
+        inp["points"] += "\n\nHasil riset berbasis sumber (verifikasi klaim sebelum publikasi):\n" + result.get("summary", "")
 
     outline = _read_json(directory / "outline.json")
     if outline is None:

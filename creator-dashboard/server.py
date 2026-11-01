@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from security import redact
+from runtime_config import resolve_tool_command
+
 import article_drafter
 import video_drafter
 import youtube_analytics
@@ -73,7 +76,10 @@ class ManagedProcess:
         with self.lock:
             if self.is_running():
                 return True, "Tool is already running"
-            command = self.tool.get("command")
+            try:
+                command = resolve_tool_command(self.tool)
+            except ValueError as exc:
+                return False, str(exc)
             if not isinstance(command, list) or not command:
                 return False, "This tool is CLI-only and has no persistent service"
             working_directory = Path(self.tool["_resolvedDirectory"])
@@ -99,6 +105,7 @@ class ManagedProcess:
                     errors="replace",
                     bufsize=1,
                     creationflags=creation_flags,
+                    start_new_session=os.name != "nt",
                 )
             except (OSError, ValueError) as exc:
                 self.process = None
@@ -117,7 +124,7 @@ class ManagedProcess:
                 )
                 thread.start()
                 self.reader_threads.append(thread)
-            threading.Thread(target=self._watch_exit, daemon=True).start()
+            threading.Thread(target=self._watch_exit, args=(self.process,), daemon=True).start()
             return True, "Start command submitted"
 
     def _read_pipe(self, label: str, pipe) -> None:
@@ -126,17 +133,17 @@ class ManagedProcess:
                 value = line.rstrip()
                 if value:
                     with self.lock:
-                        self.logs.append(f"[{label}] {value}")
+                        self.logs.append(redact(f"[{label}] {value}"))
         finally:
             pipe.close()
 
-    def _watch_exit(self) -> None:
-        process = self.process
+    def _watch_exit(self, process) -> None:
         if process is None:
             return
         exit_code = process.wait()
         with self.lock:
-            self.logs.append(f"[SYSTEM] Process exited with code {exit_code}")
+            if self.process is process:
+                self.logs.append(f"[SYSTEM] Process exited with code {exit_code}")
 
     def stop(self) -> tuple[bool, str]:
         with self.lock:
@@ -157,7 +164,11 @@ class ManagedProcess:
                 try:
                     process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
-                    process.kill()
+                    if os.name == "nt":
+                        process.kill()
+                    else:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    process.wait(timeout=5)
                 self.logs.append("[SYSTEM] Stop requested")
                 return True, "Tool stopped"
             except OSError as exc:
@@ -177,7 +188,7 @@ class ManagedProcess:
 
     def log_snapshot(self) -> list[str]:
         with self.lock:
-            return list(self.logs)
+            return [redact(line) for line in self.logs]
 
 
 PROCESSES = {tool["id"]: ManagedProcess(tool) for tool in TOOLS}
@@ -249,17 +260,38 @@ def public_tool(tool: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class DashboardHandler(SimpleHTTPRequestHandler):
     server_version = "CreatorDashboard/1.0"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_DIR), **kwargs)
 
+    def parse_request(self) -> bool:
+        if not super().parse_request():
+            return False
+        host = self.headers.get("Host", "")
+        try:
+            valid = urlparse("http://" + host).hostname in {"127.0.0.1", "localhost", "::1"}
+            origin = self.headers.get("Origin")
+            if origin:
+                valid = valid and urlparse(origin).netloc.lower() == host.lower()
+        except ValueError:
+            valid = False
+        if not valid:
+            self.send_error(403, "Local Host/Origin required")
+            return False
+        return True
+
     def log_message(self, format: str, *args) -> None:
-        print(f"[{self.log_date_time_string()}] {format % args}")
+        print(redact(f"[{self.log_date_time_string()}] {format % args}"))
 
     def _json(self, status: int, payload: Any) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        body = redact(json.dumps(payload, ensure_ascii=False)).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -442,7 +474,11 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def _clipper_proxy(self, path: str) -> None:
         # ponytail: GET-only, fixed upstream; cukup untuk health/production. Tambah rute bila perlu.
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:8765{path}", timeout=2) as r:
+            request = urllib.request.Request(f"http://127.0.0.1:8765{path}")
+            token = os.getenv("CLIPPER_TOKEN")
+            if token:
+                request.add_header("Authorization", f"Bearer {token}")
+            with urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect()).open(request, timeout=2) as r:
                 body = json.loads(r.read().decode("utf-8"))
             self._json(HTTPStatus.OK, body)
         except Exception as exc:

@@ -67,6 +67,7 @@ def evaluate(info: dict, platform: str) -> dict:
         elif abs(lufs - spec["lufs"]) > LUFS_TOLERANCE:
             issues.append(_issue("warn", "loudness", f"Loudness {lufs:.1f} LUFS; target {spec['lufs']:.0f} ±{LUFS_TOLERANCE:.0f}."))
     return {"platform": pid, "label": spec["label"], "ok": not any(i["level"] == "error" for i in issues),
+            "spec_source": "reference-skill-working-profile", "spec_verified_official": False,
             "issues": issues, "measured": {k: info.get(k) for k in ("duration", "width", "height", "fps", "has_audio", "lufs")}}
 
 

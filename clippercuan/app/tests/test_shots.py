@@ -1,5 +1,4 @@
 """Framing per-shot: batas shot, klasifikasi (satu wajah / dua wajah / B-roll), irisan potong jeda, filtergraph."""
-import numpy as np
 import pytest
 
 from clipper import facetrack, render, shots

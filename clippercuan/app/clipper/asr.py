@@ -8,6 +8,8 @@ Semua menghasilkan format yang sama dengan transcribe.transcribe():
 """
 from __future__ import annotations
 
+from .security import open_authenticated, register_secrets
+
 import json
 import re
 import statistics
@@ -214,9 +216,10 @@ def _api_chunk(path: Path, cfg: dict, language: str | None, translate: bool) -> 
     headers = {"Content-Type": ctype, "User-Agent": "ClipperCuan"}
     if cfg.get("api_key"):
         headers["Authorization"] = "Bearer " + cfg["api_key"]
+    register_secrets([cfg.get("api_key")])
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=float(cfg.get("timeout", 600))) as r:
+        with open_authenticated(req, timeout=float(cfg.get("timeout", 600))) as r:
             return json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"API transkripsi HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}") from None

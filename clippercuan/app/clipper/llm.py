@@ -8,6 +8,8 @@ Jika LLM mati / gagal, aplikasi otomatis kembali ke skor lokal.
 """
 from __future__ import annotations
 
+from .security import redact, register_secrets, open_authenticated
+
 import json
 import os
 import re
@@ -108,6 +110,7 @@ def load_settings() -> dict:
             data = {}
     configured = {**DEFAULT_LLM, **data.get("llm", {}), **environment_llm()}
     configured["base_url"] = normalize_base_url(configured["base_url"])
+    register_secrets([configured.get("api_key"), (data.get("asr") or {}).get("api_key")])
     return {"llm": configured,
             "automation": {**DEFAULT_AUTOMATION, **data.get("automation", {})},
             "asr": {**DEFAULT_ASR, **data.get("asr", {})},
@@ -191,7 +194,7 @@ def _req(path: str, body: dict | None = None, c: dict | None = None, timeout: fl
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, headers=headers, method="POST" if data else "GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout or c.get("timeout", 60)) as r:
+        with open_authenticated(req, timeout=timeout or c.get("timeout", 60)) as r:
             payload = json.loads(r.read().decode("utf-8"))
             if not isinstance(payload, dict):
                 raise LLMError(f"Respons JSON dari {url} harus berupa object")
@@ -271,7 +274,7 @@ def chat_chain(task: str, system: str, user: str, c: dict | None = None, max_tok
                         max_tokens=max_tokens, json_mode=json_mode)
             return (_json(text) if parse_json else text), model
         except LLMError as e:
-            errors.append(f"{model}: {str(e)[:120]}")
+            errors.append(f"{model}: {redact(str(e))[:120]}")
     raise LLMError("Semua model gagal → " + " | ".join(errors[-4:]))
 
 

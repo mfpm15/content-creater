@@ -99,6 +99,25 @@ def classify(info: list[dict], a: float, b: float, src_w: int, src_h: int) -> di
     big = [[bx for bx in fr.get("boxes", []) if bx[2] >= MIN_FACE] for fr in seg]
     both = [bs for bs in big if len(bs) >= 2]
     if len(both) / len(seg) >= facetrack.TOGETHER:
+        # Use a dominant moving mouth only with sustained evidence; silence,
+        # simultaneous speech and ambiguous motion retain the two-panel fallback.
+        dominant = []
+        for fr in seg:
+            faces = sorted(fr.get("faces", []), key=lambda f: -f[2])
+            if len(faces) >= 2 and faces[0][2] > 0.5 and faces[0][2] > 1.8 * faces[1][2] + 0.1:
+                dominant.append(faces[0][0])
+        if len(dominant) >= max(3, len(seg) * 0.7) and float(np.std(dominant)) < 0.08:
+            target = float(np.median(dominant))
+            selected = []
+            for fr in seg:
+                faces = fr.get("faces", [])
+                face = min(faces, key=lambda f: abs(f[0] - target), default=None)
+                selected.append(face[0] if face and abs(face[0] - target) < 0.12 else None)
+            boxes = [bx for bs in big for bx in bs if abs(bx[0] - target) < 0.12]
+            zoom, cy = framing_zoom(boxes, src_w, src_h)
+            return {"a": a, "b": b, "mode": "single", "keys": facetrack.smooth(selected, src_w, src_h),
+                    "confidence": round(len(dominant) / len(seg), 3), "zoom": zoom, "cy": cy,
+                    "reason": "sustained-mouth-activity"}
         left, right = [], []
         for bs in both:
             two = sorted(sorted(bs, key=lambda bx: -bx[2])[:2], key=lambda bx: bx[0])

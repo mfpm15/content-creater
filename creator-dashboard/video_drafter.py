@@ -14,17 +14,22 @@ import urllib.request
 import uuid
 import wave
 from pathlib import Path
+from security import open_authenticated
+
+from video_job_store import save_job, recover_jobs
+from runtime_config import resolve_python
+from security import redact
 
 ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
 HYPERFRAMES_APP_DIR = ROOT / "apps" / "hyperframes"
 OPUSCAR_DIR = ROOT / "apps" / "lemo-opuscar"
-PODCASTFY_PYTHON = ROOT / "apps" / "podcastfy" / ".venv" / "Scripts" / "python.exe"
+PODCASTFY_PYTHON = resolve_python(ROOT / "apps" / "podcastfy")
 RESEARCH_WORKER = ROOT / "google_search_research.py"
 RESEARCH_MODEL = os.getenv("VIDEO_RESEARCH_MODEL", "gemini-2.5-flash")
-LLM_URL = os.getenv("VIDEO_LLM_BASE_URL", "http://localhost:20128/v1").rstrip("/")
-LLM_MODEL = os.getenv("VIDEO_LLM_MODEL", "ms/GPT-5.6-Think-Deeper")
-LLM_KEY = os.getenv("VIDEO_LLM_API_KEY", "9router-local")
+LLM_URL = os.getenv("VIDEO_LLM_BASE_URL", os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:20128/v1").rstrip("/")
+LLM_MODEL = os.getenv("VIDEO_LLM_MODEL", os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "ms/GPT-5.6-Think-Deeper")
+LLM_KEY = os.getenv("VIDEO_LLM_API_KEY", os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "9router-local")
 LLM_TIMEOUT = int(os.getenv("VIDEO_LLM_TIMEOUT", "120"))
 
 STYLES = {
@@ -52,7 +57,8 @@ DEFAULT_MODELS = [
 ]
 ALLOWED_MODEL_IDS = {item["id"] for item in DEFAULT_MODELS}
 JOBS_LOCK = threading.Lock()
-JOBS: dict[str, dict] = {}
+JOB_DIR = VIDEOS_DIR / ".jobs"
+JOBS: dict[str, dict] = recover_jobs(JOB_DIR)
 TIMECODE_RE = re.compile(r"(?m)^\s*(?P<start>\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?)\s*(?:-->|-|–|—)\s*(?P<end>\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?)\s*[:|]?\s*(?P<body>.*?)(?=^\s*(?:\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?)\s*(?:-->|-|–|—)|\Z)", re.S)
 FIELD_RE = re.compile(r"(?im)^\s*(narasi|narration|visual|teks(?: layar)?|on.?screen|suara|sound|sfx|tipe|type)\s*:\s*(.+)$")
 
@@ -270,10 +276,10 @@ Input user:
 Balas JSON valid dengan creativeDirection berisi logline, visualThesis, pacingArc, paletteLogic, continuitySystem; dan scenes berisi start, end, narration, onScreenText, soundCue, type, shotPurpose, visualFamily, subject, action, setting, visual, metaphor, composition, foreground, midground, background, camera, lighting, colorMood, typography, transition, continuity. Teks layar maksimal 2-6 kata. Tanpa timecode, bagi durasi menurut kepadatan narasi dan kebutuhan pacing. Hook harus cepat terbaca dan payoff harus mendapat ruang bernapas."""
 
 def _research_web(topic: str, script: str) -> dict:
-    if not PODCASTFY_PYTHON.is_file():
-        raise RuntimeError("Environment Google Search belum tersedia")
     if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
         raise RuntimeError("Web Search wajib aktif. Atur GOOGLE_API_KEY atau GEMINI_API_KEY lalu restart dashboard")
+    if not PODCASTFY_PYTHON.is_file():
+        raise RuntimeError("Environment Google Search belum tersedia")
     payload = json.dumps({"topic": topic, "context": script, "model": RESEARCH_MODEL}, ensure_ascii=False)
     process = subprocess.run(
         [str(PODCASTFY_PYTHON), str(RESEARCH_WORKER)], input=payload, text=True,
@@ -301,7 +307,7 @@ def _research_context(research: dict) -> str:
 def _call_9router(prompt: str, model: str = "") -> str:
     body = {"model": model or LLM_MODEL, "stream": False, "response_format": {"type": "json_object"}, "messages": [{"role": "system", "content": "Return valid JSON only. Preserve user facts, narration, and explicit timecodes."}, {"role": "user", "content": prompt}]}
     request = urllib.request.Request(f"{LLM_URL}/chat/completions", data=json.dumps(body).encode(), headers={"Authorization": f"Bearer {LLM_KEY}", "Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(request, timeout=LLM_TIMEOUT) as response:
+    with open_authenticated(request, timeout=LLM_TIMEOUT) as response:
         data = json.loads(response.read().decode())
     return data["choices"][0]["message"]["content"]
 
@@ -803,11 +809,13 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         job["scenePlan"] = plan
         job["storyboard"] = _storyboard(plan) if stage == "storyboard" else None
         job["step"] = "Perubahan editor tersimpan"
+        job["revision"] = int(job.get("revision", 0)) + 1
+        save_job(JOB_DIR, job)
         return dict(job)
 
 
 def read_video_file(slug: str, filename: str) -> tuple[bytes, str]:
-    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "research.json"}: raise FileNotFoundError(filename)
+    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "research.json", "review.json"}: raise FileNotFoundError(filename)
     path = _video_directory(slug) / filename
     if not path.is_file(): raise FileNotFoundError(filename)
     return path.read_bytes(), {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8"}.get(path.suffix, "application/octet-stream")
@@ -828,6 +836,7 @@ def approve_job(job_id: str, stage: str) -> dict:
             raise ValueError(f"Tahap {stage} tidak dapat disetujui dari status {job['status']}")
         job["status"] = "queued"
         job["step"] = "Persetujuan diterima"
+        save_job(JOB_DIR, job)
     threading.Thread(target=_continue_job, args=(job_id, stage), daemon=True).start()
     return {"jobId": job_id, "status": "queued", "approved": stage}
 
@@ -837,7 +846,8 @@ def revise_job(job_id: str) -> dict:
         if job_id not in JOBS: raise KeyError(job_id)
         job = JOBS[job_id]
         if job["status"] != "awaiting_storyboard": raise ValueError("Revisi hanya tersedia pada tahap Storyboard")
-        job.update(status="awaiting_scene_plan", step="Scene Plan menunggu persetujuan", progress=30)
+        job.update(status="awaiting_scene_plan", step="Scene Plan menunggu persetujuan", progress=30, storyboard=None)
+        save_job(JOB_DIR, job)
         return dict(job)
 
 
@@ -853,13 +863,17 @@ def start_job(payload: dict) -> dict:
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
     job = {"jobId": job_id, "topic": topic, "script": str(payload.get("script") or "").strip(), "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan riset web", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None}
-    with JOBS_LOCK: JOBS[job_id] = job
+    with JOBS_LOCK:
+        JOBS[job_id] = job
+        save_job(JOB_DIR, job)
     threading.Thread(target=_run_job, args=(job_id,), daemon=True).start()
     return {"jobId": job_id, "status": "queued"}
 
 
 def _update_job(job_id: str, values: dict) -> None:
-    with JOBS_LOCK: JOBS[job_id].update(values)
+    with JOBS_LOCK:
+        JOBS[job_id].update(values)
+        save_job(JOB_DIR, JOBS[job_id])
 
 
 def _slugify(value: str) -> str:
@@ -889,7 +903,7 @@ def _write_procedural_audio(path: Path, plan: dict, sample_rate: int = 48000) ->
 def _build_audio(target: Path, plan: dict) -> Path:
     """Synthesize narration per scene, align it, mix music/foley, and normalize."""
     ffmpeg = shutil.which("ffmpeg") or str(ROOT / "bin" / "ffmpeg.exe")
-    python = OPUSCAR_DIR / ".venv" / "Scripts" / "python.exe"
+    python = resolve_python(OPUSCAR_DIR)
     tts = OPUSCAR_DIR / "core" / "tts" / "tts_zh.py"
     if not Path(ffmpeg).is_file() and not shutil.which("ffmpeg"):
         raise RuntimeError("FFmpeg tidak ditemukan untuk audio mux")
@@ -905,6 +919,10 @@ def _build_audio(target: Path, plan: dict) -> Path:
     labels: list[str] = []
     for index, scene in enumerate(plan["scenes"]):
         voice_file = voice_dir / f"{scene['id']}.wav"
+        with wave.open(str(voice_file), "rb") as voice:
+            voice_duration = voice.getnframes() / voice.getframerate()
+        if voice_duration > float(scene["end"]) - float(scene["start"]) + 0.05:
+            raise RuntimeError(f"Narasi {scene['id']} melebihi slot adegan; revisi timing atau narasi sebelum render")
         inputs.extend(["-i", str(voice_file)])
         delay = round(scene["start"] * 1000)
         label = f"v{index}"
@@ -989,6 +1007,10 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         final_audio = _build_audio(target, plan)
         _update_job(job_id, {"step": "Melakukan mux audio dan video", "progress": 90})
         output = _mux_video(target, silent, final_audio, plan["duration"])
+        from video_review import review
+        review_result = review(output, plan["duration"])
+        (target / "review.json").write_text(json.dumps(review_result), encoding="utf-8")
+        _update_job(job_id, {"review": review_result})
         silent.unlink(missing_ok=True)
         chosen_style = STYLES.get(job.get("style")) or STYLES["threejs_3d" if job["engine"] == "threejs" else "opuscar_cinematic"]
         meta = {"slug": target.name, "topic": job["topic"], "engine": job["engine"], "model": job["model"], "style": chosen_style, "aspect": ASPECT_RATIOS[job["aspect"]], "duration": plan["duration"], "sceneCount": len(plan["scenes"]), "scenePlan": plan, "research": job["research"], "audioManifest": audio_manifest(plan), "videoBytes": output.stat().st_size, "createdAt": time.time(), "formattedTime": time.strftime("%Y-%m-%d %H:%M:%S")}
