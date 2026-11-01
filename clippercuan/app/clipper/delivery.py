@@ -5,6 +5,7 @@ Ide dari ffmpeg-skill: jangan lapor "selesai" sebelum file hasil dibuka dan diuk
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -12,12 +13,9 @@ from . import media
 
 FPS_MAX = 60  # ffmpeg-skill: fps_max 60 untuk semua platform ini; 23,98 fps (sinema) sah, bukan "patah"
 # Angka disalin dari tabel PLATFORMS di ffmpeg-skill (scripts/_platforms.py), bukan dari dokumentasi resmi platform.
-# ponytail: ubah di sini bila platform berubah; upgrade: baca dari satu berkas JSON bila platform bertambah.
-PLATFORMS = {
-    "tiktok": {"label": "TikTok", "max_sec": 600, "min_height": 1080, "lufs": -14.0, "aspects": ("9:16", "1:1")},
-    "shorts": {"label": "YouTube Shorts", "max_sec": 180, "min_height": 1080, "lufs": -14.0, "aspects": ("9:16", "1:1")},
-    "reels": {"label": "Instagram Reels", "max_sec": 90, "min_height": 1080, "lufs": -14.0, "aspects": ("9:16", "4:5", "1:1")},
-}
+# Profil berversi dipakai bersama oleh pemeriksaan dan ekspor; lihat platform_specs.json.
+SPEC = json.loads((Path(__file__).with_name("platform_specs.json")).read_text("utf-8"))
+PLATFORMS = SPEC["platforms"]
 ALIASES = {"youtube": "shorts", "youtube-shorts": "shorts", "yt": "shorts", "ig": "reels", "instagram": "reels"}
 LUFS_TOLERANCE = 2.0
 ASPECT_TOLERANCE = 0.02
@@ -67,7 +65,8 @@ def evaluate(info: dict, platform: str) -> dict:
         elif abs(lufs - spec["lufs"]) > LUFS_TOLERANCE:
             issues.append(_issue("warn", "loudness", f"Loudness {lufs:.1f} LUFS; target {spec['lufs']:.0f} ±{LUFS_TOLERANCE:.0f}."))
     return {"platform": pid, "label": spec["label"], "ok": not any(i["level"] == "error" for i in issues),
-            "spec_source": "reference-skill-working-profile", "spec_verified_official": False,
+            "spec_source": "reference-skill-working-profile", "spec_verified_official": SPEC["verified_official"],
+            "spec_reference": SPEC["source"], "spec_commit": SPEC["source_commit"],
             "issues": issues, "measured": {k: info.get(k) for k in ("duration", "width", "height", "fps", "has_audio", "lufs")}}
 
 

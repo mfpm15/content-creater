@@ -141,7 +141,7 @@ async function pageProject(pid) {
     <div class="st-main">
       <div class="st-stage">
         <div class="st-phone" id="sPhone"><video playsinline preload="metadata"></video><img alt="" hidden><div class="cc-title"></div><div class="cc-cap"></div><div class="cc-decoration" hidden aria-hidden="true"></div><div class="cc-wm" hidden></div><div class="cc-pb" hidden></div><div class="safe" hidden></div><div class="layer-badge" id="sLayerBadge">1 layer subtitle</div><div class="st-empty" id="sEmpty"><span class="spin"></span><b>Menyiapkan kandidat…</b><small>Unduh · transkripsi · cari momen</small></div></div>
-        <div class="st-stage-bar"><button class="btn ghost sm" id="sPrev" title="Klip sebelumnya" aria-label="Klip sebelumnya"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button class="btn sm st-play" id="sPlay" aria-label="Putar preview"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></svg></button><button class="btn ghost sm" id="sNext" title="Klip berikutnya" aria-label="Klip berikutnya"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button><span id="sTime" class="muted">0:00</span><span class="sp"></span><span class="st-mode" id="sMode"></span><label class="check sm"><input type="checkbox" id="sSafe"> Safe area</label></div>
+        <div class="st-stage-bar"><button class="btn ghost sm" id="sPrev" title="Klip sebelumnya" aria-label="Klip sebelumnya"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button><button class="btn sm st-play" id="sPlay" aria-label="Putar preview"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></svg></button><button class="btn ghost sm" id="sNext" title="Klip berikutnya" aria-label="Klip berikutnya"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button><span id="sTime" class="muted">0:00</span><span class="sp"></span><span class="st-mode" id="sMode"></span><label class="check sm"><input type="checkbox" id="sSafe"> Zona aman</label><select id="sSafePlatform" class="in" aria-label="Profil zona aman"><option value="tiktok">TikTok</option><option value="shorts">Shorts</option><option value="reels">Reels</option></select></div>
       </div>
       <aside class="st-panel">
         <div class="st-tabs" role="tablist" aria-label="Inspector"><button role="tab" aria-selected="true" data-tab="style" class="on">Caption</button><button role="tab" aria-selected="false" data-tab="clip">Frame</button><button role="tab" aria-selected="false" data-tab="brand">Dekorasi</button><button role="tab" aria-selected="false" data-tab="audio">Audio</button></div>
@@ -163,6 +163,8 @@ async function pageProject(pid) {
   const phone = $('#sPhone'), vid = $('video', phone), img = $('img', phone);
   let P = null, cur = null, S = null, styleDirty = false, words = [], wordsFor = null, filter = 'all', prevStatus = null;
   const cardEls = new Map();
+  let exportPlatform = 'tiktok';
+  let exportProfiles = null;
 
   /* ---------- preview ---------- */
   const clipOf = id => P?.clips.find(c => c.id === id);
@@ -184,6 +186,19 @@ async function pageProject(pid) {
   vid.addEventListener('play', () => { $('#sPlay').textContent = '❚❚'; (function loop() { if (!vid.paused) { tick(); requestAnimationFrame(loop); } })(); });
   vid.addEventListener('pause', () => $('#sPlay').textContent = '▶');
   $('#sPlay').onclick = () => vid.paused ? vid.play().catch(() => {}) : vid.pause();
+  function updateSafeZone() {
+    const overlay = $('.safe', phone);
+    const profile = exportProfiles?.[exportPlatform];
+    if (!profile) { overlay.dataset.label = 'Zona umum · profil belum tersedia'; return; }
+    for (const edge of ['top', 'bottom', 'left', 'right']) overlay.style[edge] = `${Number(profile.safe[edge]) * 100}%`;
+    overlay.dataset.label = `Zona ${profile.label} · profil referensi`;
+  }
+  $('#sSafePlatform').onchange = event => {
+    exportPlatform = event.target.value;
+    const select = $('#cExportPlatform');
+    if (select) select.value = exportPlatform;
+    updateSafeZone(); drawPlatformExport();
+  };
   $('#sSafe').onchange = e => { $('.safe', phone).hidden = !e.target.checked; phone.classList.toggle('show-measure', e.target.checked); };
   const visible = () => ordered().filter(passes);
   $('#sPrev').onclick = () => { const l = visible(); const i = l.findIndex(c => c.id === cur?.id); if (i > 0) selectClip(l[i - 1].id); };
@@ -405,6 +420,34 @@ async function pageProject(pid) {
     const x = $('#bWmX', box); if (x) x.onclick = () => { S.watermark.image = ''; markDirty(); buildBrandTab(); };
   }
 
+  function drawPlatformExport() {
+    const panel = $('#cExportStatus');
+    if (!panel || !cur) return;
+    const state = cur.exports?.[exportPlatform] || {};
+    const labels = {queued: 'Menunggu antrean', processing: 'Memeriksa caption & mengekspor', passed: 'Lolos pemeriksaan', blocked: 'Perlu diperbaiki', error: 'Ekspor gagal', interrupted: 'Ekspor terputus'};
+    const stale = cur.needs_rerender || cur.status !== 'done' || styleDirty;
+    const busy = ['queued', 'processing'].includes(state.status);
+    $('#cExportRun').disabled = stale || busy;
+    let message = stale ? 'Simpan perubahan dan render klip terbaru sebelum ekspor.' : (labels[state.status] || 'Belum diekspor untuk platform ini.');
+    if (!stale && state.error) message += ' · ' + state.error;
+    panel.textContent = message;
+    if (!stale && state.delivery) {
+      const details = document.createElement('small');
+      const loudness = state.delivery.measured?.lufs;
+      const warnings = (state.delivery.issues || []).map(issue => issue.msg).join(' · ');
+      details.textContent = [Number.isFinite(loudness) ? `Audio: ${loudness.toFixed(1)} LUFS` : '', warnings].filter(Boolean).join(' · ');
+      panel.append(document.createElement('br'), details);
+    }
+    if (!stale && state.status === 'passed') {
+      const link = document.createElement('a');
+      link.className = 'btn ghost sm';
+      link.textContent = 'Unduh MP4 ' + exportPlatform;
+      link.href = `/api/projects/${encodeURIComponent(P.id)}/clips/${encodeURIComponent(cur.id)}/exports/${exportPlatform}/download`;
+      link.setAttribute('download', '');
+      panel.append(document.createElement('br'), link);
+    }
+  }
+
   function buildClipTab() {
     const box = $('.st-tab[data-tab="clip"]'), c = cur;
     if (!c) { box.innerHTML = '<p class="muted">Pilih klip di deretan bawah.</p>'; return; }
@@ -430,6 +473,25 @@ async function pageProject(pid) {
       ${c.status !== 'done' ? '<p class="hint render-hint">Video belum dirender, jadi belum bisa diputar. Klik <b>Simpan &amp; render klip ini</b> (±1–3 menit), lalu klip dapat diputar langsung di sini.</p>' : ''}<div class="pn-actions"><button class="btn" id="cSave">${c.status === 'done' ? 'Simpan & render ulang' : 'Simpan & render klip ini'}</button>
         <div class="acts">${c.status === 'done' ? `<a class="btn ghost sm" download="${esc((c.title || c.id).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60))}.mp4" href="/files/${P.id}/${c.file}?v=${c.version}">⬇ MP4</a><a class="btn ghost sm" download href="/files/${P.id}/${c.srt || c.id + '.srt'}?v=${c.version}">⬇ SRT</a>` : ''}
           <button class="btn ghost sm" id="cPin">${c.pinned ? 'Unpin' : 'Pin'}</button><button class="btn ghost sm" id="cBan">${c.banned ? 'Unban' : 'Ban'}</button><button class="btn ghost sm danger" id="cDel">Hapus</button></div></div>`;
+    box.insertAdjacentHTML('beforeend', `<div class="pn-sec"><h4>Ekspor per platform</h4><p class="hint">Profil kerja dari referensi. Posisi caption tambahan diperiksa pada setiap frame; teks bawaan video, hook dan watermark tetap perlu diperiksa manual. Rasio dipertahankan; perbaiki layout/caption lalu render ulang jika pemeriksaan gagal.</p><label>Tujuan<select class="in" id="cExportPlatform"><option value="tiktok">TikTok</option><option value="shorts">YouTube Shorts</option><option value="reels">Instagram Reels</option></select></label><button type="button" class="btn" id="cExportRun">Periksa & ekspor</button><p id="cExportStatus" class="hint" aria-live="polite"></p></div>`);
+    $('#cExportPlatform', box).value = exportPlatform;
+    $('#cExportPlatform', box).onchange = event => { exportPlatform = event.target.value; $('#sSafePlatform').value = exportPlatform; updateSafeZone(); drawPlatformExport(); };
+    $('#cExportRun', box).onclick = async event => {
+      if (styleDirty) return toast('Simpan gaya dan render ulang sebelum ekspor.', true);
+      event.currentTarget.disabled = true;
+      const clipId = cur.id, platform = exportPlatform, previous = cur.exports?.[platform];
+      cur.exports = {...cur.exports, [platform]: {status: 'queued'}};
+      drawPlatformExport(); // hide the previous download immediately when a new export starts
+      try {
+        await api(`/api/projects/${encodeURIComponent(P.id)}/clips/${encodeURIComponent(clipId)}/exports/${platform}`, {method: 'POST', body: {}});
+        toast('Ekspor platform masuk antrean');
+        await load();
+      } catch (error) {
+        if (cur?.id === clipId) cur.exports[platform] = previous || {status: 'error', error: error.message};
+        toast(error.message, true); drawPlatformExport();
+      }
+    };
+    drawPlatformExport();
     $('#cTitle', box).value = c.title || ''; $('#cS', box).value = c.start; $('#cE', box).value = c.end; $('#cLay', box).value = lay;
     // Judul YouTube punya kolom sendiri (kotak "Judul Shorts"); isi kotak caption hanya deskripsi + hashtag, tanpa baris "Judul:".
     const platText = (pk, src = post) => { const d = src.platforms?.[pk]; return d ? d.ready : [src.caption, (src.hashtags || []).join(' ')].filter(Boolean).join('\n\n'); };
@@ -533,7 +595,8 @@ async function pageProject(pid) {
     drawStrip();
     if (prevStatus && prevStatus !== 'done' && P.status === 'done') notify('ClipperCuan', `${P.title}: klip siap`);
     prevStatus = P.status;
-    const busy = busyProj || P.clips.some(c => ['queued', 'rendering'].includes(c.status));
+    drawPlatformExport();
+    const busy = busyProj || P.clips.some(c => ['queued', 'rendering'].includes(c.status) || Object.values(c.exports || {}).some(e => ['queued', 'processing'].includes(e.status)));
     clearInterval(pollT); if (busy) pollT = setInterval(load, 1500);
   }
   addEventListener('keydown', function keys(e) {
@@ -542,6 +605,8 @@ async function pageProject(pid) {
     if (e.key === ' ') { e.preventDefault(); $('#sPlay').click(); } else if (e.key === 'ArrowRight') $('#sNext').click(); else if (e.key === 'ArrowLeft') $('#sPrev').click();
   });
   await getRecipes().catch(() => null);
+  try { exportProfiles = (await api('/api/export-profiles')).profiles; } catch { /* generic overlay remains labelled as such */ }
+  updateSafeZone();
   await load();
 }
 

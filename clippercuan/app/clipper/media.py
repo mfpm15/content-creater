@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import hashlib
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,14 @@ import numpy as np
 from .config import FFMPEG
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as source:
+        for block in iter(lambda: source.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 class FFmpegError(RuntimeError):

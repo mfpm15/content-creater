@@ -458,7 +458,8 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
                     "burned_in": bool(cap.get("enabled")), "sidecar_autoload_safe": True}
     smart = smart or bool(shot_plan)
     crop_confidence = float(tracking["confidence"]) if smart and tracking else (1.0 if not smart else 0.0)
-    return {"file": out.name, "thumb": f"{cid}.jpg", "srt": f"subtitles/{cid}.srt",
+    return {"file": out.name, "artifact_digest": media.file_digest(out),
+            "caption_ass_digest": media.file_digest(exported_ass), "thumb": f"{cid}.jpg", "srt": f"subtitles/{cid}.srt",
             "ass": f"subtitles/{cid}.ass", "sidecar_autoload_safe": True,
             "crop_keys": keys, "words": cw,
             "duration": round(out_dur, 2), "cut_saved": round(dur - out_dur, 2), "emojis": [e["code"] for e in emojis],

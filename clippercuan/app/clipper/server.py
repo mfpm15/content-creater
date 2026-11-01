@@ -157,6 +157,18 @@ async def auth(request: Request, call_next):
             return Response("Butuh login ClipperCuan", status_code=401, headers={"WWW-Authenticate": 'Basic realm="ClipperCuan"'})
     elif not _local_request_ok(request.headers.get("host", ""), request.headers.get("origin", ""), request.method):
         return Response("Permintaan ditolak: Host/Origin bukan lokal", status_code=403)
+    # Basic credentials may be attached automatically by a browser. Reject
+    # cross-origin mutations even when authentication itself succeeded.
+    origin = request.headers.get("origin")
+    if origin and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        from urllib.parse import urlparse
+        try:
+            parsed = urlparse(origin)
+            same_origin = parsed.scheme == request.url.scheme and parsed.netloc.lower() == request.headers.get("host", "").lower()
+        except ValueError:
+            same_origin = False
+        if not same_origin:
+            return Response("Permintaan lintas-origin ditolak", status_code=403)
     return await call_next(request)
 
 
@@ -228,6 +240,15 @@ def health():
 def info():
     return {"version": __version__, "data_dir": str(DATA_DIR), "defaults": DEFAULTS, "fonts": list(FONT_PRESETS),
             "profiles": profiles.public_registry(), "inbox_dir": str(automation.INBOX_DIR)}
+
+
+@app.get("/api/export-profiles")
+def export_profiles():
+    from . import delivery
+
+    return {"source": delivery.SPEC["source"], "verified_official": delivery.SPEC["verified_official"],
+            "profiles": {name: {key: spec[key] for key in ("label", "safe", "max_sec", "lufs", "aspects")}
+                         for name, spec in delivery.PLATFORMS.items()}}
 
 
 @app.get("/api/profiles")
@@ -446,6 +467,49 @@ def clip_delivery(pid: str, cid: str, platform: str = "all"):
         return delivery.check_all(f) if platform == "all" else delivery.check(f, platform)
     except ValueError as e:
         raise HTTPException(400, redact(str(e)))
+
+
+@app.post("/api/projects/{pid}/clips/{cid}/exports/{platform}", status_code=202)
+def create_platform_export(pid: str, cid: str, platform: str):
+    from . import platform_export
+
+    _get(pid)
+    try:
+        return platform_export.enqueue(pid, cid, platform)
+    except KeyError:
+        raise HTTPException(404, "Klip tidak ditemukan") from None
+    except ValueError as exc:
+        raise HTTPException(409 if isinstance(exc, platform_export.ExportBlocked) else 400, redact(str(exc))) from None
+
+
+@app.get("/api/projects/{pid}/clips/{cid}/exports/{platform}")
+def platform_export_status(pid: str, cid: str, platform: str):
+    from . import delivery
+
+    p = _get(pid)
+    try:
+        platform = delivery.platform_id(platform)
+    except ValueError as exc:
+        raise HTTPException(400, redact(str(exc))) from None
+    clip = next((c for c in p.get("clips", []) if c["id"] == cid), None)
+    if clip is None:
+        raise HTTPException(404, "Klip tidak ditemukan")
+    return (clip.get("exports") or {}).get(platform, {"platform": platform, "status": "not_started"})
+
+
+@app.get("/api/projects/{pid}/clips/{cid}/exports/{platform}/download")
+def download_platform_export(pid: str, cid: str, platform: str):
+    from . import platform_export, delivery
+
+    _get(pid)
+    try:
+        file = platform_export.download(pid, cid, platform)
+        return FileResponse(file, media_type="video/mp4", filename=f"{cid}-{delivery.platform_id(platform)}.mp4",
+                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+    except KeyError:
+        raise HTTPException(404, "Klip tidak ditemukan") from None
+    except ValueError as exc:
+        raise HTTPException(409 if isinstance(exc, platform_export.ExportBlocked) else 400, redact(str(exc))) from None
 
 
 @app.get("/api/clips")

@@ -77,3 +77,16 @@ Atur di menu **AI Agent & otomatisasi**:
 - **Ekspor otomatis** — hasil setiap proyek disalin ke folder pilihan (`YYYY-MM-DD Judul/01 - Judul.mp4`, `.srt`, `caption-posting.txt`).
 
 Pengaturan per proyek juga bisa dikirim lewat `settings`: `"webhook_url"`, `"export_dir"`.
+
+
+## Varian platform yang diperiksa
+
+- `GET /api/export-profiles`: profil kerja TikTok, Shorts, Reels beserta zona aman dan asal referensinya.
+- `POST /api/projects/{pid}/clips/{cid}/exports/{platform}`: antrekan ekspor, respons 202. Klip harus memakai render terbaru dengan metadata hash MP4 dan ASS.
+- `GET /api/projects/{pid}/clips/{cid}/exports/{platform}`: status `not_started`, `queued`, `processing`, `passed`, `blocked`, `error`, atau `interrupted` beserta laporan caption/delivery.
+- `GET /api/projects/{pid}/clips/{cid}/exports/{platform}/download`: MP4 hanya tersedia pada status `passed`, dan hash sumber serta hasil harus tetap cocok. Respons unduhan tidak dicache.
+- MCP: `export_platform_clip` dan `platform_export_status` menyediakan jalur yang sama.
+
+Varian memakai hasil render tersimpan, mempertahankan rasio/resolusi dan tidak menimpa MP4 asli. Caption di luar zona atau durasi/rasio yang tidak sesuai harus diperbaiki lalu dirender ulang; ekspor tidak memotong kalimat atau menggeser caption diam-diam. Profil encoder memakai H.264/AAC, maksimum 60 FPS dan normalisasi audio dua tahap. Peringatan resolusi tetap ditampilkan. Zona caption diukur pada seluruh frame dari ASS dengan font/efek renderer, hanya untuk spoken caption tambahan. Teks bawaan video, hook/title, watermark dan dekorasi tetap perlu diperiksa manual.
+
+Profil bersumber dari `ffmpeg-skill` commit `a2c8433`; nilai tersebut adalah profil kerja, bukan verifikasi independen ketentuan platform. `MP4`, ZIP, dan auto-export lama tetap merupakan unduhan hasil render asli, tidak otomatis melalui gerbang varian platform ini. Dalam mode token, Basic/Bearer tetap wajib; mutasi dari browser juga menolak origin null/berbeda. Klien CLI boleh tanpa Origin. Konfigurasikan proxy TLS agar skema publik diteruskan oleh proxy yang dipercaya.

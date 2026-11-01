@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "source": "https://github.com/kajisho5/ffmpeg-skill/blob/a2c8433/scripts/_platforms.py",
+  "source_commit": "a2c8433",
+  "verified_official": false,
+  "note": "Working profiles from a reference skill, not independently verified platform limits. Encoder bitrate choices are internal presets.",
+  "platforms": {
+    "tiktok": {"label": "TikTok", "max_sec": 600, "min_height": 1080, "lufs": -14.0, "aspects": ["9:16", "1:1"], "safe": {"top": 0.10, "bottom": 0.22, "left": 0.05, "right": 0.14}, "maxrate": "10M", "bufsize": "20M"},
+    "shorts": {"label": "YouTube Shorts", "max_sec": 180, "min_height": 1080, "lufs": -14.0, "aspects": ["9:16", "1:1"], "safe": {"top": 0.06, "bottom": 0.18, "left": 0.05, "right": 0.12}, "maxrate": "10M", "bufsize": "20M"},
+    "reels": {"label": "Instagram Reels", "max_sec": 90, "min_height": 1080, "lufs": -14.0, "aspects": ["9:16", "4:5", "1:1"], "safe": {"top": 0.08, "bottom": 0.20, "left": 0.05, "right": 0.12}, "maxrate": "8M", "bufsize": "16M"}
+  }
+}

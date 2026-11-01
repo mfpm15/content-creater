@@ -51,7 +51,9 @@ def load(pid: str) -> dict:
 _RENDER_FIELDS = ("status", "file", "thumb", "srt", "ass", "words", "crop_keys", "overrides", "post", "title", "start", "end",
                   "duration", "version", "error", "cut_saved", "emojis", "caption_cues", "caption_layers",
                   "caption_provenance", "caption_render", "template_id", "template_name", "effective_caption_height_pct",
-                  "sidecar_autoload_safe", "crop_confidence", "tracking", "render_warnings", "manual")
+                  "sidecar_autoload_safe", "crop_confidence", "tracking", "render_warnings", "manual",
+                  "exports", "delivery", "delivery_status", "caption_revision", "needs_rerender",
+                  "artifact_digest", "caption_ass_digest")
 
 
 def _unify_clips(p: dict) -> None:
@@ -541,7 +543,7 @@ def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.P
             except (OSError, ValueError, media.FFmpegError):
                 res["delivery_status"] = "unmeasured"
         res["caption_revision"] = load_caption_workspace(pid).get("revision", 0)
-        _set_clip(pid, cid, status="done", error=None, needs_rerender=False, version=int(time.time()), **res)
+        _set_clip(pid, cid, status="done", error=None, needs_rerender=False, exports={}, version=int(time.time()), **res)
         with _LOCK:
             latest = load(pid)
             _write_manifest(latest)
@@ -591,6 +593,8 @@ def edit_clip(pid: str, cid: str, changes: dict, rerender: bool = True) -> dict:
         lay = changes["overrides"].get("layout")
         if lay and lay != deep_merge(p["settings"], clip.get("overrides")).get("layout"):
             changes.setdefault("crop_keys", None)
+    if any(changes[key] != clip.get(key) for key in set(changes) & {"title", "start", "end", "words", "crop_keys", "crop_manual", "overrides"}):
+        changes.update(needs_rerender=True, exports={})
     _set_clip(pid, cid, **changes, status="queued" if rerender else clip.get("status"))
     if rerender:
         _JOBS.put(("render", pid, {"cid": cid}))
@@ -722,6 +726,7 @@ def save_caption_workspace(pid: str, payload: dict, expected_revision: int | Non
         for clip in p.get("clips", []):
             if clip.get("status") == "done":
                 clip["needs_rerender"] = True
+                clip["exports"] = {}
         save(p)
         return current
 
@@ -776,7 +781,12 @@ def delete_template(name: str) -> dict:
 def update_settings(pid: str, settings: dict) -> dict:
     with _LOCK:
         p = load(pid)
-        p["settings"] = deep_merge(p["settings"], settings)
+        previous = p["settings"]
+        p["settings"] = deep_merge(previous, settings)
+        if any(p["settings"].get(key) != previous.get(key) for key in set(settings) - {"export_dir", "webhook_url"}):
+            for clip in p.get("clips", []):
+                if clip.get("status") == "done":
+                    clip.update(needs_rerender=True, exports={})
         p["updated"] = time.time()
         save(p)
         return p
@@ -892,6 +902,21 @@ def _finish_renders(pid: str) -> bool:
         return first
 
 
+def finish_cancellation(pid: str) -> bool:
+    """A delayed worker must not overwrite completed or explicitly retried work."""
+    with _LOCK:
+        if pid not in _CANCEL:
+            return False
+        try:
+            p = load(pid)
+        except KeyError:
+            return False
+        if p.get("status") not in {"queued", "running", "rendering"}:
+            return False
+        update(pid, status="cancelled", message="Dibatalkan")
+        return True
+
+
 def _worker() -> None:
     while True:
         kind, pid, extra = _JOBS.get()
@@ -905,6 +930,9 @@ def _worker() -> None:
                 if st == "candidates_ready":
                     _notify(pid, "project.candidates_ready")
                 # auto_render: notifikasi dikirim setelah render terakhir selesai
+            elif kind == "platform_export":
+                from . import platform_export
+                platform_export.process(pid, extra["cid"], extra["platform"], extra["token"])
             elif kind == "render":
                 err = None
                 try:
@@ -918,8 +946,8 @@ def _worker() -> None:
                 if err:
                     raise err
         except Cancelled:
-            safe_update(pid, status="cancelled", message="Dibatalkan")
-            _notify(pid, "project.cancelled")
+            if finish_cancellation(pid):
+                _notify(pid, "project.cancelled")
         except KeyError:
             pass  # proyek dihapus saat antre
         except Exception as e:  # noqa: BLE001
@@ -1000,6 +1028,18 @@ def recover_interrupted() -> None:
             p = json.loads(f.read_text("utf-8"))
         except Exception:
             continue
+        exports_interrupted = False
+        for clip in p.get("clips", []):
+            for entry in (clip.get("exports") or {}).values():
+                if entry.get("status") in {"queued", "processing"}:
+                    if _pid_alive(entry.get("owner", 0)) and entry.get("owner") != os.getpid():
+                        continue
+                    entry.update(status="interrupted", error="Ekspor terputus; jalankan ulang ekspor")
+                    exports_interrupted = True
+        if exports_interrupted:
+            # Persist both duplicated legacy lists consistently before migration.
+            p["candidates"] = p.get("clips", [])
+            save(p)
         if p.get("status") in ("queued", "running"):
             if _pid_alive(p.get("owner", 0)) and p.get("owner") != os.getpid():
                 continue  # sedang dikerjakan proses lain (mis. GUI dan CLI/agent berjalan bersamaan)

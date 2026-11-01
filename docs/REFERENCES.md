@@ -30,7 +30,7 @@ Kedalaman bacaan berbeda. "Kode" = file skrip dibaca langsung. "README" = hanya 
 - `scripts/check.py`: pola "ukur hasil, laporkan `ok` / `warn` / `error` plus saran perbaikan".
 - `templates/{tiktok,reels,shorts}.json`: ukuran zona aman dan default caption per platform (belum dipakai).
 - **Dipakai:** `clippercuan/app/clipper/delivery.py`, REST `.../delivery`, MCP `check_delivery`.
-- **Belum:** zona aman caption per platform, ekspor per platform.
+- **Dipakai berikutnya:** zona aman pada `platform_specs.json`, overlay Studio, pengukuran mask caption lewat libass, serta antrean ekspor/unduhan varian yang diperiksa. Profil tetap berlabel referensi; title/watermark/teks sumber di luar cakupan mask caption.
 
 ### claude-shorts (kode)
 - `scripts/compute_reframe.py`: pelacakan wajah dan pelacakan kursor untuk rekaman layar, perataan posisi.

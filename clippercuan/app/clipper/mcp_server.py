@@ -229,6 +229,20 @@ def check_delivery(project_id: str, clip_id: str, platform: str = "all") -> dict
 
 
 @mcp.tool()
+def export_platform_clip(project_id: str, clip_id: str, platform: str) -> dict:
+    """Antrekan ekspor tiktok/shorts/reels. Varian hanya dapat diunduh setelah pemeriksaan lolos."""
+    _ensure_server()
+    return _call("POST", f"/api/projects/{urllib.parse.quote(project_id, safe='')}/clips/{urllib.parse.quote(clip_id, safe='')}/exports/{urllib.parse.quote(platform, safe='')}")
+
+
+@mcp.tool()
+def platform_export_status(project_id: str, clip_id: str, platform: str) -> dict:
+    """Lihat status antrean/hasil pemeriksaan varian platform."""
+    _ensure_server()
+    return _call("GET", f"/api/projects/{urllib.parse.quote(project_id, safe='')}/clips/{urllib.parse.quote(clip_id, safe='')}/exports/{urllib.parse.quote(platform, safe='')}")
+
+
+@mcp.tool()
 def list_templates() -> dict:
     """Template gaya yang tersimpan (nama → pengaturan)."""
     _ensure_server()

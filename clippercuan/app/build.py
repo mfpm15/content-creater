@@ -7,7 +7,8 @@ import PyInstaller.__main__
 sep = os.pathsep
 here = os.path.dirname(os.path.abspath(__file__))
 data = [("clipper/web", "clipper/web"), ("clipper/fonts", "clipper/fonts"),
-        ("clipper/emoji", "clipper/emoji"), ("clipper/models", "clipper/models")]
+        ("clipper/emoji", "clipper/emoji"), ("clipper/models", "clipper/models"),
+        ("clipper/platform_specs.json", "clipper")]
 args = [
     os.path.join(here, "launcher.py"), "--name", "ClipperCuan", "--noconfirm", "--clean", "--onedir",
     "--distpath", os.path.join(here, "dist"), "--workpath", os.path.join(here, "build"),
