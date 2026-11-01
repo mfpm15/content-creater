@@ -67,11 +67,12 @@ $('#retentionForm').addEventListener('submit', async event => {
       csv: await file.text(),
       transcript: $('#retentionTranscript').value,
       duration: $('#retentionDuration').value || null,
+      units: $('#retentionUnits').value,
     });
     const s = result.summary;
     const events = result.events.length ? result.events.map(item => `<article class="event-row ${item.kind}"><span>${item.kind === 'cliff' ? '↓ CLIFF' : '↑ SPIKE'}</span><strong>${fmtTime(item.second)}</strong><b>${item.change > 0 ? '+' : ''}${item.change}%</b><p>${escapeHtml(item.spoken || 'Tambahkan SRT untuk melihat ucapan pada titik ini.')}</p></article>`).join('') : '<p class="result-note">Tidak ditemukan perubahan tajam berdasarkan ambang diagnostik.</p>';
     const warnings = result.warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('');
-    $('#retentionResult').innerHTML = `<div class="score-head"><div><small>RATA-RATA</small><strong>${s.average}%</strong></div><span>Diagnostik, bukan bukti sebab-akibat</span></div><div class="metric-strip"><div><small>AWAL</small><b>${s.start}%</b></div><div><small>AKHIR</small><b>${s.end}%</b></div><div><small>DROP 0–3 DETIK</small><b>${s.hook_drop}%</b></div><div><small>SAMPEL</small><b>${s.sample_count}</b></div></div><h3>Titik perubahan terkuat</h3><div class="event-list">${events}</div>${warnings ? `<h3>Catatan</h3><ul class="issue-list">${warnings}</ul>` : ''}`;
+    $('#retentionResult').innerHTML = `<div class="score-head"><div><small>RATA-RATA SAMPEL</small><strong>${s.average}%</strong></div><span>Diagnostik, bukan bukti sebab-akibat</span></div><div class="metric-strip"><div><small>AWAL</small><b>${s.start}%</b></div><div><small>AKHIR</small><b>${s.end}%</b></div><div><small>DROP 0–3 DETIK</small><b>${s.hook_drop}%</b></div><div><small>SAMPEL</small><b>${s.sample_count}</b></div></div><p class="result-note">Satuan: ${escapeHtml(result.normalization.units)}. Kolom lain: ${escapeHtml(result.normalization.unknown_columns.join(", ") || "tidak ada")}.</p><h3>Titik perubahan terkuat</h3><div class="event-list">${events}</div>${warnings ? `<h3>Catatan</h3><ul class="issue-list">${warnings}</ul>` : ''}`;
   } catch (error) {
     toast(error.message, true);
   } finally { busy(form, false); }

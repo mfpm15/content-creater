@@ -50,6 +50,7 @@
             <div class="panel-heading"><div><p class="eyebrow">AFTER PUBLISH</p><h2>Audience Retention</h2></div><span class="method-chip">diagnostik</span></div>
             <p class="muted-copy">Masukkan CSV audience retention dari YouTube Studio. SRT opsional akan mencocokkan cliff dengan ucapan yang sedang berlangsung.</p>
             <label class="file-drop" for="retentionFile"><strong>Pilih CSV retention</strong><span id="retentionFileName">Maksimal 2 MB</span><input id="retentionFile" type="file" accept=".csv,text/csv" required /></label>
+            <label>Satuan kolom retention<select id="retentionUnits" class="analysis-input"><option value="auto">Deteksi dari kolom</option><option value="percent">Persen (1 berarti 1%)</option><option value="ratio">Rasio (1 berarti 100%)</option></select></label>
             <label>Durasi video dalam detik <small>opsional untuk CSV berbasis persentase</small><input id="retentionDuration" class="analysis-input" type="number" min="1" step="0.1" placeholder="mis. 45" /></label>
             <label>Transkrip SRT <small>opsional</small><textarea id="retentionTranscript" class="analysis-input" rows="7" placeholder="Tempel isi file SRT agar cliff dapat dicocokkan dengan ucapan."></textarea></label>
             <button class="primary-button" type="submit">Analisis retention</button>

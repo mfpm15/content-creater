@@ -63,7 +63,11 @@ def _transcript_rows(text: str) -> list[tuple[float, float, str]]:
     return rows
 
 
-def analyze_retention(csv_body: bytes, transcript: str = "", duration: float | None = None) -> dict[str, Any]:
+def analyze_retention(csv_body: bytes, transcript: str = "", duration: float | None = None, units: str = "auto") -> dict[str, Any]:
+    if units not in {"auto", "percent", "ratio"}:
+        raise ValueError("Satuan retention harus auto, percent, atau ratio")
+    if duration is not None and (not math.isfinite(duration) or duration <= 0):
+        raise ValueError("Durasi harus berupa angka positif yang terbatas")
     if not csv_body or len(csv_body) > MAX_CSV_BYTES:
         raise ValueError("CSV kosong atau melebihi batas 2 MB")
     try:
@@ -81,16 +85,32 @@ def analyze_retention(csv_body: bytes, transcript: str = "", duration: float | N
     rows = list(reader)
     raw_values = [str(row.get(value_key) or "") for row in rows]
     numbers = [_number(v) for v in raw_values]
-    ratio_units = not any("%" in v for v in raw_values) and not any(x in value_key.lower() for x in ("percent", "%")) and all(v is None or 0 <= v <= 1 for v in numbers)
+    explicit_percent = any("%" in v for v in raw_values) or any(x in value_key.lower() for x in ("percent", "%"))
+    if units == "ratio" and explicit_percent:
+        raise ValueError("Kolom mengandung persen; pilih satuan persen")
+    selected_units = units
+    if units == "auto":
+        if explicit_percent:
+            selected_units = "percent"
+        elif "ratio" in value_key.lower():
+            selected_units = "ratio"
+        elif any(v is not None and v > 1 for v in numbers):
+            selected_units = "percent"
+        else:
+            raise ValueError("Satuan kolom ambigu. Pilih Persen atau Rasio sebelum analisis")
+    ratio_units = selected_units == "ratio"
+    invalid_rows = 0
     points: list[dict[str, float]] = []
     for row in rows:
         second = _timestamp_seconds(row.get(time_key), duration)
         value = _number(row.get(value_key))
-        if second is None or value is None:
+        if second is None or value is None or not math.isfinite(second) or second < 0 or value < 0:
+            invalid_rows += 1
             continue
         if ratio_units:
             value *= 100
         points.append({"second": round(second, 3), "retention": round(value, 3)})
+    duplicates = len(points) - len({p["second"] for p in points})
     points = sorted({p["second"]: p for p in points}.values(), key=lambda p: p["second"])
     if len(points) < 3:
         raise ValueError("CSV membutuhkan sedikitnya 3 titik retention valid")
@@ -112,13 +132,17 @@ def analyze_retention(csv_body: bytes, transcript: str = "", duration: float | N
     hook_drop = round(points[0]["retention"] - hook_window[-1]["retention"], 2) if len(hook_window) > 1 else 0.0
     ending = points[-1]["retention"]
     warnings = []
+    if invalid_rows:
+        warnings.append(f"{invalid_rows} baris invalid dilewati.")
+    if duplicates:
+        warnings.append(f"{duplicates} timestamp duplikat: nilai terakhir dipakai.")
     if hook_drop >= 15:
         warnings.append("Penurunan besar pada 3 detik pertama; periksa kecocokan janji pembuka dan isi.")
     if ending < 20:
         warnings.append("Retention akhir rendah; periksa durasi, pengulangan, dan payoff.")
     if not captions:
         warnings.append("Tambahkan transkrip SRT agar setiap cliff dapat dicocokkan dengan ucapan.")
-    return {"points": points, "events": strongest, "summary": {"start": points[0]["retention"], "end": ending, "hook_drop": hook_drop, "average": round(sum(p["retention"] for p in points) / len(points), 2), "sample_count": len(points)}, "warnings": warnings, "method": "diagnostic_not_causal"}
+    return {"normalization": {"units": selected_units, "time_column": time_key, "value_column": value_key, "invalid_rows": invalid_rows, "duplicate_timestamps": duplicates, "unknown_columns": [f for f in reader.fieldnames if f not in {time_key, value_key}]}, "points": points, "events": strongest, "summary": {"start": points[0]["retention"], "end": ending, "hook_drop": hook_drop, "average": round(sum(p["retention"] for p in points) / len(points), 2), "sample_count": len(points)}, "warnings": warnings, "method": "diagnostic_not_causal"}
 
 
 def lint_package(title: str, thumbnail: str, transcript: str = "") -> dict[str, Any]:

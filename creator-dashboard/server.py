@@ -379,6 +379,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         try:
             if parts == ["api", "videos"]:
                 self._json(HTTPStatus.OK, {"videos": video_drafter.list_videos()})
+            elif parts == ["api", "videos", "jobs"]:
+                self._json(HTTPStatus.OK, {"jobs": video_drafter.list_jobs()})
             elif parts == ["api", "videos", "options"]:
                 self._json(HTTPStatus.OK, video_drafter.options())
             elif len(parts) == 4 and parts[2] == "jobs":
@@ -416,21 +418,38 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 raw = self._read_body(10_000)
                 if raw is None:
                     return
-                stage = str(json.loads(raw or b"{}").get("stage") or "")
-                self._json(HTTPStatus.ACCEPTED, video_drafter.approve_job(unquote(parts[3]), stage))
-            elif len(parts) == 5 and parts[2] == "jobs" and parts[4] == "revise":
-                self._json(HTTPStatus.OK, video_drafter.revise_job(unquote(parts[3])))
+                payload = json.loads(raw or b"{}")
+                if not isinstance(payload, dict) or type(payload.get("revision")) is not int:
+                    raise ValueError("Revisi pekerjaan wajib disertakan")
+                stage = str(payload.get("stage") or "")
+                self._json(HTTPStatus.ACCEPTED, video_drafter.approve_job(unquote(parts[3]), stage, payload["revision"]))
+            elif len(parts) == 5 and parts[2] == "jobs" and parts[4] in {"revise", "resume"}:
+                raw = self._read_body(10_000)
+                if raw is None:
+                    return
+                payload = json.loads(raw or b"{}")
+                if not isinstance(payload, dict) or type(payload.get("revision")) is not int:
+                    raise ValueError("Revisi pekerjaan wajib disertakan")
+                action = video_drafter.resume_job if parts[4] == "resume" else video_drafter.revise_job
+                self._json(HTTPStatus.OK, action(unquote(parts[3]), payload["revision"]))
             elif len(parts) == 5 and parts[2] == "jobs" and parts[4] == "edit":
                 raw = self._read_body(500_000)
                 if raw is None:
                     return
-                self._json(HTTPStatus.OK, video_drafter.update_job_plan(unquote(parts[3]), json.loads(raw or b"{}")))
+                payload = json.loads(raw or b"{}")
+                if not isinstance(payload, dict) or type(payload.get("revision")) is not int:
+                    raise ValueError("Revisi pekerjaan wajib disertakan")
+                self._json(HTTPStatus.OK, video_drafter.update_job_plan(unquote(parts[3]), payload))
             else:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
         except json.JSONDecodeError:
             self._json(HTTPStatus.BAD_REQUEST, {"error": "Body bukan JSON valid"})
+        except video_drafter.RevisionConflict as exc:
+            self._json(HTTPStatus.CONFLICT, {"error": str(exc)})
         except ValueError as exc:
             self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except KeyError:
+            self._json(HTTPStatus.NOT_FOUND, {"error": "Pekerjaan tidak ditemukan"})
         except Exception as exc:
             self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
@@ -446,6 +465,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     csv_text.encode("utf-8"),
                     str(payload.get("transcript") or ""),
                     float(payload["duration"]) if payload.get("duration") not in (None, "") else None,
+                    str(payload.get("units") or "auto"),
                 )
             elif parts == ["api", "analytics", "package"]:
                 result = youtube_analytics.lint_package(

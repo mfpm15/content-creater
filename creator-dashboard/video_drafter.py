@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import copy
 import json
 import math
 import os
@@ -794,6 +795,42 @@ def delete_video(slug: str) -> dict:
     return {"ok": True, "slug": slug}
 
 
+class RevisionConflict(ValueError):
+    """The browser is acting on a superseded workflow revision."""
+
+
+def _check_revision(job: dict, expected_revision: int | None) -> None:
+    if expected_revision is not None and (type(expected_revision) is not int or expected_revision != job.get("revision", 0)):
+        raise RevisionConflict("Versi pekerjaan berubah; muat ulang sebelum melanjutkan")
+
+
+def list_jobs() -> list[dict]:
+    with JOBS_LOCK:
+        return [{k: copy.deepcopy(job.get(k)) for k in ("jobId", "topic", "aspect", "status", "revision", "step")}
+                for job in JOBS.values() if job.get("status") != "succeeded"]
+
+
+def resume_job(job_id: str, expected_revision: int) -> dict:
+    with JOBS_LOCK:
+        if job_id not in JOBS:
+            raise KeyError(job_id)
+        job = JOBS[job_id]
+        _check_revision(job, expected_revision)
+        if job["status"] not in {"interrupted", "failed"}:
+            raise ValueError("Pekerjaan ini tidak dapat dilanjutkan dari status sekarang")
+        # Restore review, never restart an expensive render without renewed approval.
+        job.update(revision=int(job.get("revision", 0)) + 1, error=None, approvals={}, storyboard=None)
+        has_plan = bool(job.get("scenePlan"))
+        job.update(status="awaiting_scene_plan" if has_plan else "queued",
+                   step="Periksa kembali Scene Plan sebelum menyetujui" if has_plan else "Mengulang riset",
+                   progress=35 if has_plan else 5)
+        save_job(JOB_DIR, job)
+        result = copy.deepcopy(job)
+    if not has_plan:
+        threading.Thread(target=_run_job, args=(job_id,), daemon=True).start()
+    return result
+
+
 def update_job_plan(job_id: str, payload: dict) -> dict:
     stage = str(payload.get("stage") or "")
     if stage not in {"scene_plan", "storyboard"}: raise ValueError("Tahap editor tidak valid")
@@ -802,10 +839,17 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         job = JOBS[job_id]
         expected = "awaiting_scene_plan" if stage == "scene_plan" else "awaiting_storyboard"
         if job["status"] != expected: raise ValueError("Project tidak sedang berada pada tahap yang dapat diedit")
+        _check_revision(job, payload.get("revision"))
         raw_plan = payload.get("scenePlan")
         if not isinstance(raw_plan, dict) or not isinstance(raw_plan.get("scenes"), list):
             raise ValueError("Scene plan tidak valid")
         plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
+        # Clicking approve also saves the editor. Preserve approval for an unchanged plan.
+        if plan == job.get("scenePlan"):
+            return copy.deepcopy(job)
+        job["approvals"] = {}
+        if stage == "storyboard":
+            job["status"] = "awaiting_scene_plan"
         job["scenePlan"] = plan
         job["storyboard"] = _storyboard(plan) if stage == "storyboard" else None
         job["step"] = "Perubahan editor tersimpan"
@@ -824,16 +868,18 @@ def read_video_file(slug: str, filename: str) -> tuple[bytes, str]:
 def job_status(job_id: str) -> dict:
     with JOBS_LOCK:
         if job_id not in JOBS: raise KeyError(job_id)
-        return dict(JOBS[job_id])
+        return copy.deepcopy(JOBS[job_id])
 
 
-def approve_job(job_id: str, stage: str) -> dict:
+def approve_job(job_id: str, stage: str, expected_revision: int | None = None) -> dict:
     with JOBS_LOCK:
         if job_id not in JOBS: raise KeyError(job_id)
         job = JOBS[job_id]
+        _check_revision(job, expected_revision)
         expected = {"scene_plan": "awaiting_scene_plan", "storyboard": "awaiting_storyboard"}.get(stage)
         if not expected or job["status"] != expected:
             raise ValueError(f"Tahap {stage} tidak dapat disetujui dari status {job['status']}")
+        job.setdefault("approvals", {})[stage] = job.get("revision", 0)
         job["status"] = "queued"
         job["step"] = "Persetujuan diterima"
         save_job(JOB_DIR, job)
@@ -841,11 +887,13 @@ def approve_job(job_id: str, stage: str) -> dict:
     return {"jobId": job_id, "status": "queued", "approved": stage}
 
 
-def revise_job(job_id: str) -> dict:
+def revise_job(job_id: str, expected_revision: int | None = None) -> dict:
     with JOBS_LOCK:
         if job_id not in JOBS: raise KeyError(job_id)
         job = JOBS[job_id]
+        _check_revision(job, expected_revision)
         if job["status"] != "awaiting_storyboard": raise ValueError("Revisi hanya tersedia pada tahap Storyboard")
+        job.update(revision=int(job.get("revision", 0)) + 1, approvals={})
         job.update(status="awaiting_scene_plan", step="Scene Plan menunggu persetujuan", progress=30, storyboard=None)
         save_job(JOB_DIR, job)
         return dict(job)
@@ -862,7 +910,7 @@ def start_job(payload: dict) -> dict:
     if engine not in ENGINES or ENGINES[engine].get("disabled"): raise ValueError("Render Adapter belum tersedia")
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
-    job = {"jobId": job_id, "topic": topic, "script": str(payload.get("script") or "").strip(), "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan riset web", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None}
+    job = {"jobId": job_id, "topic": topic, "script": str(payload.get("script") or "").strip(), "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan riset web", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
     with JOBS_LOCK:
         JOBS[job_id] = job
         save_job(JOB_DIR, job)

@@ -37,3 +37,20 @@ class HardeningTest(unittest.TestCase):
         for url in ('http://example.com/v1', 'https://user:password@example.com/v1', 'https://example.com/v1?key=x'):
             with self.assertRaises(ValueError):
                 security.open_authenticated(urllib.request.Request(url), 1)
+
+    def test_ambiguous_retention_requires_explicit_unit(self):
+        body = b'time,retention\n0,1\n1,0.5\n2,0.1\n'
+        with self.assertRaisesRegex(ValueError, 'ambigu'):
+            youtube_analytics.analyze_retention(body)
+        percent = youtube_analytics.analyze_retention(body, units='percent')
+        ratio = youtube_analytics.analyze_retention(body, units='ratio')
+        self.assertEqual(percent['points'][0]['retention'], 1)
+        self.assertEqual(ratio['points'][0]['retention'], 100)
+
+    def test_import_reports_invalid_rows_and_duplicates(self):
+        body = b'time,retention,extra\n0,100,x\n1,80,x\n1,75,x\n2,50,x\n3,-2,x\n'
+        result = youtube_analytics.analyze_retention(body)
+        self.assertEqual(result['normalization']['invalid_rows'], 1)
+        self.assertEqual(result['normalization']['duplicate_timestamps'], 1)
+        self.assertEqual(result['normalization']['unknown_columns'], ['extra'])
+        self.assertEqual(result['points'][1]['retention'], 75)

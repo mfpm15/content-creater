@@ -32,6 +32,8 @@ let pollTimer = null;
 let activeJobId = null;
 let activeAspect = '9:16';
 let activeReviewStage = null;
+let activeRevision = 0;
+let activeScenePlan = null;
 
 function escapeHtml(value) {
   const span = document.createElement('span');
@@ -175,6 +177,10 @@ function researchMarkup(research) {
 }
 
 function renderReview(job) {
+  activeScenePlan = structuredClone(job.scenePlan);
+  activeJobId = job.jobId;
+  activeRevision = job.revision || 0;
+  activeAspect = job.aspect || activeAspect;
   elements.reviewPanel.style.display = 'block';
   if (job.status === 'awaiting_scene_plan') {
     activeReviewStage = 'scene_plan';
@@ -196,7 +202,7 @@ function renderReview(job) {
 }
 
 function collectEditedPlan() {
-  const scenes = [];
+  const scenes = structuredClone(activeScenePlan?.scenes || []);
   elements.reviewGrid.querySelectorAll('[data-scene]').forEach(input => {
     const index = Number(input.dataset.scene);
     scenes[index] ||= {};
@@ -209,7 +215,7 @@ function collectEditedPlan() {
 async function saveEditedPlan() {
   const response = await fetch(`/api/videos/jobs/${encodeURIComponent(activeJobId)}/edit`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ stage: activeReviewStage, scenePlan: collectEditedPlan() }),
+    body: JSON.stringify({ stage: activeReviewStage, revision: activeRevision, scenePlan: collectEditedPlan() }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Gagal menyimpan perubahan');
@@ -229,7 +235,7 @@ async function postJobAction(action, body) {
   const response = await fetch(`/api/videos/jobs/${encodeURIComponent(activeJobId)}/${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body || {}),
+    body: JSON.stringify({ ...body, revision: activeRevision }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Aksi workflow gagal');
@@ -327,7 +333,7 @@ function startPolling(jobId, aspectId) {
         setWorkflowStep('render');
         if (job.video) showResult(job.video, aspectId);
         loadHistory();
-      } else if (job.status === 'failed') {
+      } else if (job.status === 'interrupted' || job.status === 'failed') {
         clearInterval(pollTimer);
         elements.generateBtn.disabled = false;
         elements.statusStep.textContent = `Gagal: ${job.error || 'Terjadi kesalahan saat proses'}`;
@@ -343,4 +349,39 @@ function startPolling(jobId, aspectId) {
 }
 
 loadOptions();
+loadPendingJobs();
 loadHistory();
+
+async function loadPendingJobs() {
+  const container = document.getElementById('pendingJobs');
+  try {
+    const response = await fetch('/api/videos/jobs');
+    if (!response.ok) throw new Error('Gagal memuat pekerjaan tersimpan');
+    const { jobs } = await response.json();
+    container.replaceChildren();
+    for (const job of jobs) {
+      if (!['interrupted', 'failed', 'awaiting_scene_plan', 'awaiting_storyboard'].includes(job.status)) continue;
+      const button = document.createElement('button');
+      button.className = 'secondary-button';
+      button.textContent = `${job.topic} — ${job.status.startsWith('awaiting_') ? 'Buka review' : 'Lanjutkan'}`;
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          const resume = ['interrupted', 'failed'].includes(job.status);
+          const result = await fetch(`/api/videos/jobs/${encodeURIComponent(job.jobId)}${resume ? '/resume' : ''}`,
+            resume ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: job.revision || 0 }) } : {});
+          const data = await result.json();
+          if (!result.ok) throw new Error(data.error || 'Gagal membuka pekerjaan');
+          activeJobId = data.jobId; activeAspect = data.aspect;
+          elements.statusContainer.style.display = 'block';
+          if (data.status.startsWith('awaiting_')) renderReview(data);
+          else startPolling(data.jobId, data.aspect);
+          await loadPendingJobs();
+        } catch (error) {
+          elements.formStatus.textContent = error.message;
+        } finally { button.disabled = false; }
+      });
+      container.append(button);
+    }
+  } catch (error) { container.textContent = error.message; }
+}
