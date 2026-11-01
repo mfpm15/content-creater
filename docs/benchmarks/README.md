@@ -11,7 +11,7 @@ Dua hal diukur terpisah: kemampuan pipeline pada fixture publik, dan fitur yang 
 
 Acuan cut berasal dari [tes ContentDetector upstream](https://github.com/Breakthrough/PySceneDetect/blob/55f20ff3448ed336df032ac6270cf47d215dc2c4/tests/test_detectors.py): frame 1226, 1260, 1281, 1334, 1365. Ini ekspektasi tes detector tersebut, bukan anotasi universal seluruh transisi. Detektor FFmpeg kita melewatkan frame **1260**. Ambang default tetap; menyetel berdasarkan satu film berisiko menambah false positive pada video lain.
 
-Laporan JSON menyertakan SHA256, ukuran, versi Python/FFmpeg, waktu ukur UTC, wall time, hasil ukur dan batasnya: [speech](whisper-jfk.json), [video](scenedetect-goldeneye.json). Wall time berasal dari cloud Linux, bukan jaminan kecepatan laptop Windows. Sampel ini tidak menguji akurasi pembicara/kursor, framing portrait, sinkronisasi TTS, kualitas editorial atau viralitas.
+Kode pengembangan yang diuji: [`117044e`](https://github.com/mfpm15/content-creater/commit/117044e). Laporan JSON menyertakan SHA256, ukuran, versi Python/FFmpeg, waktu ukur UTC, wall time, hasil ukur dan batasnya: [speech](whisper-jfk.json), [video](scenedetect-goldeneye.json). Wall time berasal dari cloud Linux, bukan jaminan kecepatan laptop Windows. Sampel ini tidak menguji akurasi pembicara/kursor, framing portrait, sinkronisasi TTS, kualitas editorial atau viralitas.
 
 Media disimpan hanya di `.data/benchmarks/` yang diabaikan Git. **Tidak didistribusikan bersama proyek.** Lisensi MIT Whisper dan BSD-3-Clause PySceneDetect berlaku pada kode repositori; hak redistribusi semua media uji tidak diasumsikan sama. Tidak ada kode/aset pihak ketiga yang diimpor ke produk.
 

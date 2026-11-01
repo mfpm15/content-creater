@@ -267,3 +267,5 @@ Indeks `1` memulai visual pada 1,25 detik. Kata harus cocok dengan seluruh naras
 Cakupan cue: Lottie bentuk/judul, Opuscar judul/panel visual, Three.js panel reticle. Ini timestamp yang diberikan pengguna, **bukan hasil forced alignment atau perubahan timing TTS otomatis**; cocokkan dengan audio hasil. Brand mengubah warna aksen UI visual, latar, font/warna teks dan wordmark, bukan seluruh material/partikel 3D atau aset gambar. Font sistem tidak di-embed; player memakai font yang tersedia. Periksa kontras dan keterbacaan pada preview.
 
 Clipper → Studio → **Pelajari tempo video ini** sekarang menampilkan bukti awal/tengah/akhir: jumlah cut/kata, kata/detik, cakupan timestamp dan kutipan. Ketiganya bagian waktu sama; bukan pemahaman struktur cerita. Tidak tersedianya transkrip dilaporkan jelas. Lihat [hasil benchmark publik](docs/benchmarks/README.md).
+
+Ekspor Lottie baru menyertakan field teks wajib untuk player standar (`t.m`). Untuk file Lottie hasil lama, buat pekerjaan/variasi baru dan selesaikan review agar mendapat ekspor yang diperbaiki; artefak lama tidak ditimpa otomatis.
