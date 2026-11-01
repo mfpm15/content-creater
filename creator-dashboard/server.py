@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 import webbrowser
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -231,7 +232,7 @@ def health_is_ready(url: str | None) -> bool:
         return False
     try:
         request = urllib.request.Request(url, method="GET", headers={"User-Agent": "CreatorDashboard/1.0"})
-        with urllib.request.urlopen(request, timeout=0.7) as response:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect()).open(request, timeout=0.7) as response:
             return 200 <= response.status < 500
     except (urllib.error.URLError, TimeoutError, ValueError):
         return False
@@ -260,6 +261,15 @@ def public_tool(tool: dict[str, Any]) -> dict[str, Any]:
     result["ready"] = ready
     result["repositoryExists"] = Path(tool["_resolvedDirectory"]).is_dir()
     return result
+
+
+def public_tools() -> list[dict[str, Any]]:
+    catalog=list(TOOLS)
+    if not catalog:return []
+    # Closed loopback ports can consume the full connect timeout on Windows.
+    # Independent probes should not accumulate into one multi-second delay.
+    with ThreadPoolExecutor(max_workers=min(8,len(catalog))) as pool:
+        return list(pool.map(public_tool,catalog))
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -610,6 +620,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parts = self._route_parts()
+        if parts == ["api", "health"]:
+            self._json(HTTPStatus.OK,{"ok":True,"service":"creator-dashboard","toolCount":len(TOOLS)})
+            return
         if parts == ["api", "clipper", "health"]:
             self._clipper_proxy("/api/health")
             return
@@ -628,7 +641,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         if parts == ["api", "tools"]:
             sync_tools()
-            self._json(HTTPStatus.OK, {"tools": [public_tool(tool) for tool in TOOLS]})
+            self._json(HTTPStatus.OK, {"tools": public_tools()})
             return
         if len(parts) == 4 and parts[:2] == ["api", "tools"] and parts[3] == "logs":
             tool_id = parts[2]

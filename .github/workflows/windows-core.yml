@@ -81,11 +81,13 @@ jobs:
               $process.Refresh()
               if ($process.HasExited) { throw "Windows launcher exited early with code $($process.ExitCode)" }
               try {
-                $response = Invoke-RestMethod http://127.0.0.1:3210/api/tools -TimeoutSec 2
-                if ($response.tools.Count -eq 9) { $ready = $true; break }
+                $response = Invoke-RestMethod http://127.0.0.1:3210/api/health -TimeoutSec 2
+                if ($response.ok -and $response.service -eq "creator-dashboard") { $ready = $true; break }
               } catch { Start-Sleep -Milliseconds 250 }
             }
             if (-not $ready) { throw "Windows launcher did not become ready" }
+            $catalog = Invoke-RestMethod http://127.0.0.1:3210/api/tools -TimeoutSec 15
+            if ($catalog.tools.Count -ne 9) { throw "Windows launcher returned an invalid tool catalog" }
           } catch {
             $failed = $true
             $details = ($_ | Out-String)

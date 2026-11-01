@@ -36,6 +36,12 @@ class RequestSecurityTests(unittest.TestCase):
             response=connection.getresponse();return response.status,dict(response.headers),response.read()
         finally:connection.close()
 
+    def test_dashboard_health_does_not_probe_optional_services(self):
+        with patch.object(server,'port_is_open',side_effect=AssertionError('No dependent health probes')):
+            status,_,body=self.request('GET','/api/health')
+        self.assertEqual(status,200)
+        self.assertEqual(json.loads(body),{'ok':True,'service':'creator-dashboard','toolCount':9})
+
     def test_exact_origin_and_cross_site_are_enforced(self):
         for origin in [f'https://{self.host}',f'ftp://{self.host}',f'http://{self.host}/path','null']:
             self.assertEqual(self.request('GET','/api/videos/jobs',{'Origin':origin})[0],403)
@@ -144,6 +150,14 @@ class ArticleTransactionTests(unittest.TestCase):
 
 
 class OriginUnitTests(unittest.TestCase):
+    def test_catalog_probes_run_concurrently_and_preserve_order(self):
+        barrier=threading.Barrier(4,timeout=2)
+        def probe(tool):
+            barrier.wait()
+            return {'id':tool['id']}
+        catalog=[{'id':str(i)} for i in range(4)]
+        with patch.object(server,'TOOLS',catalog),patch.object(server,'public_tool',side_effect=probe):
+            self.assertEqual(server.public_tools(),catalog)
     def test_encoded_log_credentials_are_redacted_without_breaking_other_parameters(self):
         from urllib.parse import quote
         value='quoted"\\value-example'
