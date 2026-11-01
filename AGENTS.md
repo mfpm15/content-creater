@@ -137,3 +137,5 @@ Bukti Windows core: GitHub Actions run 41300095514 (commit kode b051455) **Succe
 Paket hasil Video Studio: `video_bundle.py`, `GET /api/videos/{slug}/bundle`, tombol Unduh paket produksi. Hanya hasil selesai yang dapat dipaketkan; allowlist artefak, manifest SHA256 byte ekspor, redaksi teks/field credential, batas 2 GiB dan 4 MB per artefak teks, penolakan symlink/junction, satu persiapan arsip bersamaan. Unduhan ZIP di-stream dan direktori temporer dibersihkan; konfigurasi/metadata privat/job tidak diekspor. Ini paket hasil konten, bukan instalasi aplikasi (tetap Git clone/pull).
 
 Handoff juga menyertakan audio mix/voice/music yang tersedia pada allowlist. Review MP4 baru menyimpan `artifact_sha256`; manifest mengikat review ke hash video yang diekspor. Hasil lama ditandai `not_recorded`; video yang telah berubah ditandai `stale_review`, tanpa mengklaim review masih berlaku.
+
+Paket produksi telah lulus CI Windows native run 41317023982 (kode a20076f), termasuk tujuh tes bundle. Source instalasi tetap GitHub; ZIP bundle hanya untuk hasil konten.
