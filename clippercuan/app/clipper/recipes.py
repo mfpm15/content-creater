@@ -77,7 +77,7 @@ RECIPES: dict[str, dict] = {
         "label": "Podcast · Box merah", "niche": "podcast", "badge": "Paling populer",
         "desc": "Huruf campuran, kotak merah mengikuti kata aktif, judul hook dua baris. Gaya klip podcast yang paling sering dipakai.",
         "settings": {
-            "content_profile": "podcast", "duration_preset": "25-40", "layout": "portrait", "smart_crop": True, "cut_silence": True,
+            "content_profile": "podcast", "duration_preset": "auto", "layout": "portrait", "smart_crop": True, "cut_silence": True,
             "caption": {"preset": "box-merah", "style": "clean", "box": True, "effect": "none", "font": "Barlow Condensed", "size": 92,
                         "color": "#FFFFFF", "highlight": "#FF2D2D", "uppercase": False, "words_per_line": 3, "max_chars": 22,
                         "y_pct": 62, "animation": "pop"},
@@ -89,7 +89,7 @@ RECIPES: dict[str, dict] = {
         "label": "Podcast · Hormozi", "niche": "podcast", "badge": "Bisnis & uang",
         "desc": "2 kata per layar, HURUF BESAR, kata kunci kuning berfont aksen. Cocok untuk bisnis, keuangan, motivasi.",
         "settings": {
-            "content_profile": "podcast", "duration_preset": "15-25", "layout": "portrait", "smart_crop": True, "cut_silence": True,
+            "content_profile": "podcast", "duration_preset": "auto", "layout": "portrait", "smart_crop": True, "cut_silence": True,
             "caption": {"preset": "hormozi", "style": "keyword", "box": True, "effect": "none", "font": "Montserrat ExtraBold", "size": 88,
                         "color": "#FFFFFF", "highlight": "#FFC933", "uppercase": True, "words_per_line": 2, "max_chars": 18,
                         "y_pct": 58, "animation": "pop", "accent_font": "Instrument Serif Italic"},
@@ -101,7 +101,7 @@ RECIPES: dict[str, dict] = {
         "label": "Podcast · Quote glow", "niche": "podcast", "badge": "Cerita & insight",
         "desc": "Caption tenang dengan glow, satu kata kunci serif miring. Untuk cerita, insight, dan kutipan panjang.",
         "settings": {
-            "content_profile": "podcast", "duration_preset": "40-60", "layout": "portrait", "smart_crop": True, "cut_silence": False,
+            "content_profile": "podcast", "duration_preset": "auto", "layout": "portrait", "smart_crop": True, "cut_silence": False,
             "caption": {"preset": "quote-glow", "style": "keyword", "box": False, "effect": "glow", "glow_color": "#C6FF3D",
                         "font": "Barlow Condensed", "size": 90, "color": "#FFFFFF", "highlight": "#C6FF3D", "uppercase": False,
                         "words_per_line": 4, "max_chars": 26, "y_pct": 64, "animation": "none", "accent_font": "Instrument Serif Italic"},
@@ -113,7 +113,7 @@ RECIPES: dict[str, dict] = {
         "label": "Review / Tech Review", "niche": "tech_review", "badge": "Production", "status": "Production",
         "desc": "Satu caption dengan penekanan biru terkendali. Hook opsional tiga detik, produk tetap terlihat.",
         "settings": {
-            "content_profile": "tech_review", "duration_preset": "25-40", "layout": "portrait", "smart_crop": True,
+            "content_profile": "tech_review", "duration_preset": "auto", "layout": "portrait", "smart_crop": True,
             "cut_silence": True, "caption_layers": 1,
             "caption": {"enabled": True, "role": "spoken-caption", "preset": "tech", "style": "keyword", "box": False,
                         "effect": "none", "font": "Barlow Condensed", "size": 84, "color": "#F8FAFC",
@@ -128,8 +128,8 @@ RECIPES: dict[str, dict] = {
         "label": "Mobile Legends · Hype kuning", "niche": "mobile_legends", "badge": "Gaming",
         "desc": "Facecam terdeteksi otomatis → split; tanpa facecam → gameplay utuh + caption di bawah. Box kuning teks hitam (font Anton, kata kunci Bangers): paling kontras di peta hijau dan tidak bentrok dengan warna tim merah/biru.",
         "settings": {
-            "content_profile": "mobile_legends", "duration_preset": "15-25", "layout": "split", "cut_silence": False,
-            "split": {"auto": True, "face_ratio": 0.38},
+            "content_profile": "mobile_legends", "duration_preset": "auto", "layout": "split", "cut_silence": False,
+            "split": {"auto": True, "face_ratio": 0.32},
             "caption": {"preset": "gaming", "style": "keyword", "box": True, "effect": "none", "font": "Anton", "size": 128,
                         "color": "#FFFFFF", "highlight": "#FFD60A", "uppercase": True, "words_per_line": 3, "max_chars": 20,
                         "y_pct": 40, "animation": "pop", "accent_font": "Bangers"},
@@ -141,8 +141,8 @@ RECIPES: dict[str, dict] = {
         "label": "Mobile Legends · Neon pink", "niche": "mobile_legends", "badge": "Gaming alternatif",
         "desc": "Varian mencolok untuk montage/funny moment: box magenta. Kontras baik di peta hijau; pakai bila channel-mu identik warna neon.",
         "settings": {
-            "content_profile": "mobile_legends", "duration_preset": "15-25", "layout": "split", "cut_silence": False,
-            "split": {"auto": True, "face_ratio": 0.38},
+            "content_profile": "mobile_legends", "duration_preset": "auto", "layout": "split", "cut_silence": False,
+            "split": {"auto": True, "face_ratio": 0.32},
             "caption": {"preset": "gaming-neon", "style": "keyword", "box": True, "effect": "glow", "glow_color": "#FF2BD6",
                         "font": "Anton", "size": 128, "color": "#FFFFFF", "highlight": "#FF2BD6", "uppercase": True,
                         "words_per_line": 3, "max_chars": 20, "y_pct": 40, "animation": "pop", "accent_font": "Bangers"},
@@ -154,7 +154,7 @@ RECIPES: dict[str, dict] = {
         "label": "Educational / Explainer", "niche": "educational", "badge": "Beta", "status": "Beta",
         "desc": "Satu kata satu penekanan di tengah layar. Tempo cepat untuk tips, fakta, dan tutorial singkat.",
         "settings": {
-            "content_profile": "educational", "duration_preset": "25-40", "layout": "portrait", "smart_crop": True, "cut_silence": True,
+            "content_profile": "educational", "duration_preset": "auto", "layout": "portrait", "smart_crop": True, "cut_silence": True,
             "caption": {"preset": "wbw", "style": "wbw", "box": False, "effect": "glow", "glow_color": "#000000", "font": "Anton",
                         "size": 110, "color": "#FFFFFF", "highlight": "#FFE14D", "uppercase": True, "words_per_line": 1,
                         "y_pct": 55, "animation": "pop"},

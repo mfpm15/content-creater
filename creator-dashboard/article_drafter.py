@@ -22,6 +22,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+import humanizer
+
 ROOT = Path(__file__).resolve().parent
 ARTICLES_DIR = ROOT / "output" / "articles"
 LLM_URL = os.getenv("ARTICLE_LLM_BASE_URL", "http://localhost:20128/v1").rstrip("/")
@@ -866,6 +868,8 @@ def get_article(slug: str) -> dict:
         "path": str(directory),
         "wordCount": count_words(article["blocks"]),
         "referencesCount": len(article.get("references", [])),
+        # Pola linter khusus bahasa Indonesia; bahasa lain tidak dinilai daripada dinilai salah.
+        "writing": humanizer.lint(humanizer.article_text(article["blocks"])) if article.get("lang") == "Indonesia" else None,
     }
 
 

@@ -124,8 +124,9 @@ function paintOverlay(phone, cfg, words, t, title) {
 let RECIPES = null;
 const getRecipes = async () => RECIPES || (RECIPES = (await api('/api/recipes')).recipes);
 const statusLabel = { draft_candidate: 'Kandidat', selected: 'Terpilih', queued: 'Antre', rendering: 'Render…', done: 'Siap', error: 'Gagal' };
-const score10 = c => Math.max(0, Math.min(10, Math.round((c.score || 0) / 10)));
-const isHot = c => c.hot ?? (c.score || 0) >= 75;
+const score10 = c => Math.max(0, Math.min(10, (c.score || 0) / 10)).toFixed(1);
+const isHot = c => c.hot ?? (c.score || 0) >= 80;
+const tierOf = c => c.tier || ((c.score || 0) >= 88 ? 'Sangat kuat' : (c.score || 0) >= 75 ? 'Kuat' : (c.score || 0) >= 62 ? 'Cukup' : 'Lemah');
 
 /* ================= STUDIO PROYEK ================= */
 async function pageProject(pid) {
@@ -183,7 +184,7 @@ async function pageProject(pid) {
   vid.addEventListener('play', () => { $('#sPlay').textContent = '❚❚'; (function loop() { if (!vid.paused) { tick(); requestAnimationFrame(loop); } })(); });
   vid.addEventListener('pause', () => $('#sPlay').textContent = '▶');
   $('#sPlay').onclick = () => vid.paused ? vid.play().catch(() => {}) : vid.pause();
-  $('#sSafe').onchange = e => $('.safe', phone).hidden = !e.target.checked;
+  $('#sSafe').onchange = e => { $('.safe', phone).hidden = !e.target.checked; phone.classList.toggle('show-measure', e.target.checked); };
   const visible = () => ordered().filter(passes);
   $('#sPrev').onclick = () => { const l = visible(); const i = l.findIndex(c => c.id === cur?.id); if (i > 0) selectClip(l[i - 1].id); };
   $('#sNext').onclick = () => { const l = visible(); const i = l.findIndex(c => c.id === cur?.id); if (i >= 0 && i < l.length - 1) selectClip(l[i + 1].id); };
@@ -208,7 +209,7 @@ async function pageProject(pid) {
       $('#sMode').textContent = 'Hasil render'; $('#sMode').className = 'st-mode done';
     } else if (P.media.remote) {
       vid.hidden = true; img.hidden = false; img.src = `/api/projects/${P.id}/frame?t=${previewTime(c).toFixed(1)}`;
-      $('#sMode').textContent = 'Preview gaya (mode hemat: frame)'; $('#sMode').className = 'st-mode';
+      $('#sMode').textContent = 'Belum dirender · pilih “Render klip ini” untuk memutar video'; $('#sMode').className = 'st-mode';
       cropPreview(c, img); tick();
     } else {
       img.hidden = true; vid.hidden = false;
@@ -252,7 +253,7 @@ async function pageProject(pid) {
     const im = $('img', el); im.onerror = () => { im.onerror = null; im.removeAttribute('src'); }; if (im.dataset.src !== thumb) { im.dataset.src = thumb; im.src = thumb; }
     $('.no', el).textContent = c.rank ? '#' + String(c.rank).padStart(2, '0') : '··';
     $('.ck input', el).checked = !!c.selected;
-    $('.sc', el).textContent = c.manual ? 'manual' : `${isHot(c) ? '🔥 ' : ''}${score10(c)}/10`; $('.sc', el).classList.toggle('hot', isHot(c));
+    $('.sc', el).textContent = c.manual ? 'manual' : `${isHot(c) ? '🔥 ' : ''}${score10(c)}`; $('.sc', el).classList.toggle('hot', isHot(c)); $('.sc', el).title = c.manual ? '' : `${tierOf(c)} · skor ${c.score}/100`;
     $('.du', el).textContent = fmt(c.duration || (c.end - c.start));
     $('.stt', el).textContent = statusLabel[c.status] || c.status || ''; $('.stt', el).dataset.s = c.status || '';
     $('.tl', el).textContent = c.title || c.id;
@@ -278,7 +279,7 @@ async function pageProject(pid) {
     const chosen = P.clips.filter(c => c.selected).slice(0, 3);
     if (chosen.length < 2) return toast('Pilih minimal dua kandidat untuk dibandingkan', true);
     openDlg(body => {
-      body.innerHTML = `<h2>Bandingkan kandidat</h2><p class="muted">Bandingkan hook, skor, durasi, dan alasan sebelum render.</p><div class="compare-grid">${chosen.map(c => `<article><b>${esc(c.title || c.id)}</b><strong>${score10(c)}/10</strong><span>${fmt(c.duration || c.end - c.start)}</span><p>${esc(c.reason || c.text || 'Kandidat dipilih berdasarkan ranking keseluruhan.')}</p></article>`).join('')}</div>`;
+      body.innerHTML = `<h2>Bandingkan kandidat</h2><p class="muted">Bandingkan hook, skor, durasi, dan alasan sebelum render.</p><div class="compare-grid">${chosen.map(c => `<article><b>${esc(c.title || c.id)}</b><strong>${score10(c)}/10 · ${esc(tierOf(c))}</strong><span>${fmt(c.duration || c.end - c.start)}</span><p>${esc(c.reason || c.text || 'Kandidat dipilih berdasarkan ranking keseluruhan.')}</p></article>`).join('')}</div>`;
     });
   };
   $('#sGoal').onchange = drawStrip; $('#sSearch').oninput = drawStrip;
@@ -333,7 +334,12 @@ async function pageProject(pid) {
       chipGroup($('#pBox', box), c.box || c.style === 'box' ? 'on' : 'off', v => { c.box = v === 'on'; if (c.style === 'box') c.style = 'clean'; markDirty(); sync(); });
       chipGroup($('#pFx', box), c.effect || 'none', v => { c.effect = v; markDirty(); sync(); });
       chipGroup($('#pTtl', box), S.title.enabled ? S.title.preset : 'off', v => { S.title.enabled = v !== 'off'; S.title.role = 'hook'; S.title.duration = Math.min(5, Math.max(.5, +S.title.duration || 3)); if (v !== 'off') S.title.preset = v; markDirty(); sync(); showPreview(); });
-      chipGroup($('#pLay', box), S.layout, v => { S.layout = v; markDirty(); showPreview(); });
+      chipGroup($('#pLay', box), S.layout, v => {
+        S.layout = v; markDirty(); showPreview();
+        if (v === 'split') api(`/api/projects/${pid}/detect-facecam`, { method: 'POST' })
+          .then(r => { S.split = r.split || S.split; toast(r.facecam?.rect ? 'Facecam terdeteksi: gameplay di atas, facecam di bawah' : 'Facecam tidak terdeteksi. Atur area lewat tombol “Area split”.', !r.facecam?.rect); })
+          .catch(e => toast(e.message, true));
+      });
       chipGroup($('#pQ', box), String((S.quality || {}).output || '1080'), v => { S.quality = { ...(S.quality || {}), output: v }; markDirty(); });
       $$('[data-font]', box).forEach(b => b.classList.toggle('on', b.dataset.font === c.font));
       $('#pCol', box).value = c.color; $('#pHl', box).value = c.highlight; $('#pWpl', box).value = c.words_per_line; $('#pAcc', box).value = c.accent_font || c.font || 'Barlow Condensed';
@@ -406,7 +412,7 @@ async function pageProject(pid) {
     const opts = [...new Set([...(c.title_options || []), ...((c.post || {}).title_options || [])])].filter(Boolean).slice(0, 5);
     const bd = c.breakdown || {}, labels = { hook: 'Hook', novelty: 'Novelty', emotion_humor: 'Emosi', standalone_clarity: 'Clarity', payoff: 'Payoff', quotability: 'Quotability', visual_activity: 'Visual', information_density: 'Density', clean_ending: 'Ending' };
     const post = c.post || {};
-    box.innerHTML = `<div class="pn-sec"><div class="clip-head"><span class="sc ${isHot(c) ? 'hot' : ''}">${c.manual ? 'manual' : score10(c) + '/10'}</span><b>#${esc(String(c.rank || '–'))} · ${esc(statusLabel[c.status] || c.status)}</b><span class="muted">${fmt(c.start)}–${fmt(c.end)} · ${Math.round(c.end - c.start)} dtk</span></div>
+    box.innerHTML = `<div class="pn-sec"><div class="clip-head"><span class="sc ${isHot(c) ? 'hot' : ''}">${c.manual ? 'manual' : score10(c) + '/10 · ' + esc(tierOf(c))}</span><b>#${esc(String(c.rank || '–'))} · ${esc(statusLabel[c.status] || c.status)}</b><span class="muted">${fmt(c.start)}–${fmt(c.end)} · ${Math.round(c.end - c.start)} dtk</span></div>
         ${c.resolution ? `<p class="ready-line"><small>HASIL</small> <b>${esc(c.resolution)}</b> <span class="muted">· ${esc(c.encoder || '')}${c.upscale > 1.3 ? ` · diperbesar ${c.upscale}×` : ''}</span></p><p class="ready-line"><small>Template yang digunakan</small> <b>${esc(c.template_name || 'Belum tercatat')}</b> <span class="muted">· ${esc(CAPTION_SIZE_LABELS[c.caption_render?.size_level] || 'Kustom')} · ${esc(c.caption_render?.font || 'font belum tercatat')} · 1 layer subtitle · ${esc(String(c.caption_render?.ass_size || '–'))} ASS · ${esc(String(c.effective_caption_height_pct || '–'))}% tinggi</span></p>` : ''}
         <p class="ready-line"><small>CONTENT READINESS</small> <b>${c.readiness ?? c.score ?? 0}/100</b> <span class="muted">· alat review editorial · confidence ${Math.round((c.confidence ?? .5) * 100)}%</span></p>
         ${[...(c.warnings || []), ...(c.render_warnings || [])].length ? `<p class="warn">${esc([...(c.warnings || []), ...(c.render_warnings || [])].join(' · '))}</p>` : ''}
@@ -417,14 +423,22 @@ async function pageProject(pid) {
           <label>Selesai (dtk)<div class="inrow"><button class="btn ghost sm" data-n="e-">−</button><input class="in" id="cE" type="number" step="0.1"><button class="btn ghost sm" data-n="e+">+</button></div></label></div>
         <label>Crop mode klip ini<select class="in" id="cLay"><option value="">Ikut proyek (${esc(S.layout)})</option><option value="portrait">Portrait 9:16</option><option value="square">Square 1:1</option><option value="blur">Blur background</option><option value="split">Split gaming</option><option value="landscape">Landscape 16:9</option></select></label>
         <div class="acts"><button class="btn ghost sm" id="cCrop">✂ Crop studio</button><button class="btn ghost sm" id="cWords">✎ Editor caption</button></div></div>
-      <div class="pn-sec"><h4>Caption posting & hashtag</h4><textarea class="in" rows="4" id="cPost"></textarea>
+      <div class="pn-sec"><h4>Caption posting & hashtag</h4><div class="chips" id="cPlat">${['tiktok', 'youtube_shorts', 'instagram_reels'].filter(k => post.platforms?.[k]).map((k, i) => `<button type="button" data-p="${k}" class="${i ? '' : 'on'}">${{ tiktok: 'TikTok', youtube_shorts: 'YouTube Shorts', instagram_reels: 'Instagram Reels' }[k]}</button>`).join('')}</div><div class="inrow" id="cPostTitleRow" hidden><input class="in" id="cPostTitle" readonly aria-label="Judul YouTube Shorts"><button class="btn ghost sm" id="cCopyTitle" type="button">Salin judul</button></div><textarea class="in" rows="6" id="cPost"></textarea>${post.engine ? `<p class="muted"><small>Dibuat oleh: ${esc(post.engine)}${post.warning ? ' · ' + esc(post.warning) : ''}</small></p>` : ''}
         <div class="acts"><button class="btn ghost sm" id="cCopy">Salin</button><button class="btn ghost sm" id="cPostSave">Simpan</button>${llmOn() ? '<button class="btn ghost sm" id="cPostAi">✦ Buat dengan AI</button>' : ''}</div></div>
+      <div class="pn-sec" id="cQual"><h4>Kualitas transkrip <span class="muted"><small>saran, tidak otomatis</small></span></h4><p class="muted q-load">Memeriksa filler, kata ragu-ragu, dan jeda…</p></div>
       <div class="pn-sec"><h4>Kenapa dipilih</h4><p class="muted">${esc(c.reason || '—')}</p><div class="score-grid">${Object.entries(labels).filter(([k]) => typeof bd[k] === 'number').map(([k, l]) => `<span><b>${l}</b><i style="--v:${Math.max(0, Math.min(100, bd[k]))}%"></i><em>${bd[k]}</em></span>`).join('')}</div></div>
-      <div class="pn-actions"><button class="btn" id="cSave">${c.status === 'done' ? 'Simpan & render ulang' : 'Simpan & render klip ini'}</button>
+      ${c.status !== 'done' ? '<p class="hint render-hint">Video belum dirender, jadi belum bisa diputar. Klik <b>Simpan &amp; render klip ini</b> (±1–3 menit), lalu klip dapat diputar langsung di sini.</p>' : ''}<div class="pn-actions"><button class="btn" id="cSave">${c.status === 'done' ? 'Simpan & render ulang' : 'Simpan & render klip ini'}</button>
         <div class="acts">${c.status === 'done' ? `<a class="btn ghost sm" download="${esc((c.title || c.id).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60))}.mp4" href="/files/${P.id}/${c.file}?v=${c.version}">⬇ MP4</a><a class="btn ghost sm" download href="/files/${P.id}/${c.srt || c.id + '.srt'}?v=${c.version}">⬇ SRT</a>` : ''}
           <button class="btn ghost sm" id="cPin">${c.pinned ? 'Unpin' : 'Pin'}</button><button class="btn ghost sm" id="cBan">${c.banned ? 'Unban' : 'Ban'}</button><button class="btn ghost sm danger" id="cDel">Hapus</button></div></div>`;
     $('#cTitle', box).value = c.title || ''; $('#cS', box).value = c.start; $('#cE', box).value = c.end; $('#cLay', box).value = lay;
-    $('#cPost', box).value = [post.caption, (post.hashtags || []).join(' ')].filter(Boolean).join('\n\n');
+    // Judul YouTube punya kolom sendiri (kotak "Judul Shorts"); isi kotak caption hanya deskripsi + hashtag, tanpa baris "Judul:".
+    const platText = (pk, src = post) => { const d = src.platforms?.[pk]; return d ? d.ready : [src.caption, (src.hashtags || []).join(' ')].filter(Boolean).join('\n\n'); };
+    const platTitle = (pk, src = post) => pk === 'youtube_shorts' ? (src.platforms?.[pk]?.title || '') : '';
+    let curPlat = 'tiktok', lastPost = post;
+    const showPlat = () => { const t = platTitle(curPlat, lastPost); $('#cPostTitleRow', box).hidden = !t; $('#cPostTitle', box).value = t; $('#cPost', box).value = platText(curPlat, lastPost); };
+    showPlat();
+    $$('#cPlat button', box).forEach(b => b.onclick = () => { $$('#cPlat button', box).forEach(x => x.classList.toggle('on', x === b)); curPlat = b.dataset.p; showPlat(); });
+    $('#cCopyTitle', box).onclick = async () => { const v = $('#cPostTitle', box).value; try { await navigator.clipboard.writeText(v); } catch { $('#cPostTitle', box).select(); document.execCommand('copy'); } toast('Judul disalin'); };
     $('#cTitle', box).oninput = tick;
     $$('#cOpts button:not(.ai)', box).forEach(b => b.onclick = () => { $('#cTitle', box).value = b.textContent; tick(); });
     const ai = $('#cAi', box); if (ai) ai.onclick = async () => { ai.disabled = true; try { const r = await api(`/api/projects/${P.id}/clips/${c.id}/ai?kind=titles`, { method: 'POST' }); $('#cOpts', box).prepend(...r.titles.map(t => { const x = document.createElement('button'); x.type = 'button'; x.textContent = t; x.onclick = () => { $('#cTitle', box).value = t; tick(); }; return x; })); } catch (e) { toast(e.message, true); } finally { ai.disabled = false; } };
@@ -442,7 +456,34 @@ async function pageProject(pid) {
     $('#cWords', box).onclick = () => captionEditor(P, c, S, words, w => patch({ words: w }));
     $('#cCopy', box).onclick = async () => { try { await navigator.clipboard.writeText($('#cPost', box).value); } catch { $('#cPost', box).select(); document.execCommand('copy'); } toast('Caption disalin'); };
     $('#cPostSave', box).onclick = () => { const v = $('#cPost', box).value, tags = v.match(/#[\p{L}\p{N}_]+/gu) || []; patch({ post: { ...post, caption: v.replace(/#[\p{L}\p{N}_]+/gu, '').trim(), hashtags: tags } }, false); };
-    const pai = $('#cPostAi', box); if (pai) pai.onclick = async () => { pai.disabled = true; try { const r = await api(`/api/projects/${P.id}/clips/${c.id}/ai?kind=post`, { method: 'POST' }); $('#cPost', box).value = [r.caption, r.hashtags.join(' ')].join('\n\n'); } catch (e) { toast(e.message, true); } finally { pai.disabled = false; } };
+    const pai = $('#cPostAi', box); if (pai) pai.onclick = async () => { pai.disabled = true; try { const r = await api(`/api/projects/${P.id}/clips/${c.id}/ai?kind=post`, { method: 'POST' }); lastPost = r; showPlat(); toast(r.warning || `Caption dibuat (${r.engine})`, !!r.warning); } catch (e) { toast(e.message, true); } finally { pai.disabled = false; } };
+    const qBox = $('#cQual', box);
+    const relWords = () => (c.words?.length ? c.words : words.map(w => ({ ...w, s: +(w.s - c.start).toFixed(3), e: +(w.e - c.start).toFixed(3) })));
+    const seekTo = t => { if (vid.hidden) return; vid.currentTime = (cur.status === 'done' && cur.file ? 0 : c.start) + t; vid.play().catch(() => {}); };
+    (async () => {
+      let r; try { r = await api(`/api/projects/${P.id}/clips/${c.id}/quality`); } catch (e) { qBox.innerHTML = '<h4>Kualitas transkrip</h4><p class="muted">Belum ada kata transkrip untuk klip ini.</p>'; return; }
+      const q = r.quality, sl = r.silence, grp = (cls, items, label) => items.length ? `<div class="q-grp"><b>${label} <em>${items.length}</em></b><div class="q-chips">${items.slice(0, 16).map(x => `<button type="button" class="q-chip ${cls}" data-s="${x.s}" title="${x.p != null ? 'keyakinan ' + Math.round(x.p * 100) + '%' : 'lompat ke kata ini'}">${esc(x.w)} <small>${fmt(x.s)}</small></button>`).join('')}${items.length > 16 ? `<span class="muted">+${items.length - 16}</span>` : ''}</div></div>` : '';
+      const clean = !q.fillers.length && !q.repeats.length && !q.low_confidence.length;
+      qBox.innerHTML = `<h4>Kualitas transkrip <span class="muted"><small>saran, tidak otomatis</small></span></h4>
+        <div class="q-stats"><span><b>${q.words}</b> kata</span><span class="${q.fillers.length ? 'warn-t' : ''}"><b>${q.fillers.length}</b> filler</span><span class="${q.repeats.length ? 'warn-t' : ''}"><b>${q.repeats.length}</b> berulang</span><span class="${q.low_confidence.length ? 'warn-t' : ''}"><b>${q.low_confidence.length}</b> ragu-ragu</span></div>
+        ${clean ? '<p class="muted">Tidak ada filler atau kata mencurigakan. Transkrip terlihat bersih.</p>' : ''}${grp('fl', q.fillers, 'Filler (eh, hmm, anu…)')}${grp('rp', q.repeats, 'Kata berulang')}${grp('lc', q.low_confidence, 'Kata ragu-ragu (cek ejaan)')}
+        ${!q.has_probability ? '<p class="muted"><small>Sumber transkrip ini tidak menyimpan keyakinan per kata, jadi kata ragu-ragu tidak bisa dideteksi.</small></p>' : ''}
+        <div class="acts">${q.fillers.length + q.repeats.length ? '<button class="btn ghost sm" id="qRemove">Hapus filler & kata berulang</button>' : ''}${q.low_confidence.length ? '<button class="btn ghost sm" id="qFix">Perbaiki ejaan…</button>' : ''}</div>
+        <div class="q-sil"><b>Jeda hening</b><span>${sl.saved >= 0.3 ? `Dipotong: hemat <b>${sl.saved} dtk</b> (${sl.saved_pct}%) → ${sl.result} dtk dari ${sl.original} dtk, ${sl.cuts.length} potongan` : 'Hampir tidak ada jeda panjang; tidak banyak yang dihemat.'}</span>
+          <label class="check sm"><input type="checkbox" id="qCut" ${r.cut_silence ? 'checked' : ''}> Potong jeda saat render</label></div>
+        <div class="q-exp"><b>Ekspor subtitle</b><div class="acts">${['srt', 'vtt', 'ass', 'sbv', 'txt'].map(f => `<a class="btn ghost sm" data-f="${f}" href="/api/projects/${P.id}/clips/${c.id}/subtitles?format=${f}" download>${f.toUpperCase()}</a>`).join('')}</div>
+          <label class="check sm"><input type="checkbox" id="qWord"> Sertakan timing per kata (karaoke ASS / tag VTT)</label></div>`;
+      $$('.q-chip', qBox).forEach(b => b.onclick = () => seekTo(+b.dataset.s));
+      const rm = $('#qRemove', qBox); if (rm) rm.onclick = () => {
+        const kill = [...q.fillers, ...q.repeats].map(x => x.s), n = kill.length;
+        const keep = relWords().filter(w => !kill.some(t => Math.abs(t - w.s) < .02));
+        if (!keep.length) return toast('Semua kata akan terhapus. Dibatalkan.', true);
+        if (confirm(`Hapus ${n} kata (filler & berulang) dari caption klip ini, lalu render ulang?`)) patch({ words: keep });
+      };
+      const fx = $('#qFix', qBox); if (fx) fx.onclick = () => $('#cWords', box).click();
+      const cut = $('#qCut', qBox); cut.onchange = () => patch({ overrides: { cut_silence: cut.checked } });
+      const wt = $('#qWord', qBox); wt.onchange = () => $$('[data-f]', qBox).forEach(a => a.href = `/api/projects/${P.id}/clips/${c.id}/subtitles?format=${a.dataset.f}${wt.checked ? '&word_timing=true' : ''}`);
+    })();
     const act = (a, v) => api(`/api/projects/${P.id}/candidates/${c.id}/action`, { method: 'POST', body: { action: a, value: v } }).then(load).catch(e => toast(e.message, true));
     $('#cPin', box).onclick = () => act('pinned', !c.pinned); $('#cBan', box).onclick = () => act('banned', !c.banned);
     $('#cDel', box).onclick = async () => { if (!confirm(`Hapus klip "${c.title || c.id}"?`)) return; await api(`/api/projects/${P.id}/clips/${c.id}`, { method: 'DELETE' }); cur = null; load(); };
@@ -451,13 +492,15 @@ async function pageProject(pid) {
   function selectClip(id) {
     cur = clipOf(id) || null; vid.pause();
     buildClipTab(); drawStrip(); showPreview();
-    const el = cardEls.get(id); if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    const el = cardEls.get(id); const box = el && el.parentElement;   // geser hanya deretan kartu, bukan seluruh halaman
+    if (box && box.scrollWidth > box.clientWidth) box.scrollTo({ left: el.offsetLeft - box.clientWidth / 2 + el.clientWidth / 2, behavior: 'smooth' });
   }
 
   /* ---------- muat & polling ---------- */
   async function load(data) {
     try { P = data && data.id ? data : await api('/api/projects/' + pid); }
-    catch (e) { view.innerHTML = `<section class="page"><div class="empty">${esc(e.message)}</div></section>`; clearInterval(pollT); return; }
+    catch (e) { if (!document.body.contains(phone)) return; view.innerHTML = `<section class="page"><div class="empty">${esc(e.message)}</div></section>`; clearInterval(pollT); return; }
+    if (!document.body.contains(phone)) return;   // pengguna sudah pindah halaman saat data dimuat: jangan sentuh DOM atau hidupkan polling lagi
     P.clips = P.candidates || P.clips || [];
     if (!S || !styleDirty) S = structuredClone(P.settings);
     $('#sTitle').textContent = P.title;

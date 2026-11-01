@@ -94,7 +94,7 @@ def test_ui_assets_workflow_contract_and_no_credentials():
     for marker in (b'id="srcTabs"', b'id="url"', b'id="file"', b'id="start"', b'id="startTop"', b'id="localFallback"', b'id="recipes"',
                    b'id="experimentalRecipes"', b'id="storage_lite"', b'id="uiMode"', b'id="durationPreset"', b'id="capStyle"',
                    b'src="studio.js?v=', b'href="premium.css?v=', b'production-flow', b'decoration_mode', b'skip-link', b'bottom-nav', b'Buat Klip', b'Analisis Video', b'Production',
-                   b'General', b'Interview', b'Review', b'Gaming', b'Educational'):
+                   b'Dashboard Utama', b'http://127.0.0.1:3210/', b'General', b'Interview', b'Review', b'Gaming', b'Educational'):
         assert marker in html.content
     studio = client.get("/studio.js")
     assert studio.status_code == 200 and b"KANDIDAT" in studio.content and b"CONTENT READINESS" in studio.content
@@ -102,6 +102,7 @@ def test_ui_assets_workflow_contract_and_no_credentials():
     assert b"prefers-reduced-motion" in css.content and b"color-scheme:light" in css.content
     assert b":focus-visible" in css.content and b"min-height:44px" in css.content
     assert html.content.count(b'data-nav=') == 5 and html.content.count(b'data-mobile-nav=') == 4
+    assert html.content.count(b'Dashboard Utama') == 2
     assert all(route in js.content for route in (b"'new'", b"'history'", b"'results'", b"'advanced'", b"'settings'", b"'p'"))
     assert b"location.replace('#/new')" in js.content and b"aria-current" in js.content
     assert b"mobile-menu" not in html.content and b"nav-scrim" not in html.content

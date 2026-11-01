@@ -31,6 +31,11 @@ def test_profile_classifier_and_override_profiles():
     assert candidates.classify_profile(tech)["profile"] == "tech_review"
     assert candidates.classify_profile(game)["profile"] == "mobile_legends"
     assert candidates.classify_profile(podcast)["profile"] == "podcast"
+    # Kata utuh saja: 'worthless' bukan 'worth', 'turtleneck' bukan 'turtle'.
+    noisy = {"segments": [{"text": "He wore a turtleneck and called it worthless."}]}
+    result = candidates.classify_profile(noisy)
+    assert "turtle" not in result["evidence"] and "worth" not in result["evidence"]
+    assert "worth" in candidates.classify_profile({"segments": [{"text": "Is it worth the price?"}]})["evidence"]
     assert {"general", "podcast", "interview", "review", "tech_review",
             "gaming", "mobile_legends", "educational"} <= set(candidates.PROFILES)
 
@@ -63,6 +68,20 @@ def test_overlap_suppression_and_semantic_diversity():
     assert ranked[1]["text"] != ranked[0]["text"]
     overlapping = [sample(1, "satu", 0), sample(2, "dua", 5)]
     assert len(candidates.rerank(overlapping, "podcast", max_overlap=.2)) == 1
+
+
+def test_scores_are_spread_so_candidates_are_distinguishable():
+    items = [sample(i, f"topik unik berbeda nomor {i} kata{i}") for i in range(1, 9)]
+    for i, it in enumerate(items):
+        it["source_score"] = 70 + i              # skor LLM nyaris sama (70-77)
+        it["breakdown"]["hook"] = 50 + i * 3
+    ranked = candidates.rerank(items, "podcast")
+    scores = [x["score"] for x in ranked]
+    assert scores == sorted(scores, reverse=True)           # urutan peringkat tetap
+    assert max(scores) - min(scores) >= 15                  # tidak lagi menumpuk di satu angka
+    assert all("tier" in x for x in ranked)
+    assert sum(x["hot"] for x in ranked) <= max(2, round(len(ranked) * .4))
+    assert candidates.score_tier(90) == "Sangat kuat" and candidates.score_tier(40) == "Lemah"
 
 
 def test_ranking_determinism_and_goal_lists():

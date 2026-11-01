@@ -30,6 +30,8 @@ function paintAiHealth() {
   box.className = 'ai-health ' + (active ? 'ready' : 'fallback');
   box.title = active ? `9Router terhubung untuk workflow ini. Model: ${HEALTH.llm.model}` : '9Router tidak diaktifkan. Highlight tetap berjalan memakai analisis lokal.';
   box.innerHTML = `<span class="status-dot"></span><span><b>${active ? 'AI 9Router aktif' : 'Mode lokal'}</b><small>${active ? esc(HEALTH.llm.model) : 'fallback aman tanpa AI eksternal'}</small></span>`;
+  const st = $('#sideAiTitle'), sf = $('#sideFoot'), sa = $('#sideAi');   // kartu status di sidebar
+  if (st && sf && sa) { st.textContent = active ? 'AI 9Router aktif' : 'Mode lokal'; sf.textContent = active ? HEALTH.llm.model : 'Analisis lokal, tanpa AI eksternal'; sa.classList.toggle('ready', !!active); sa.title = box.title; }
 }
 function notify(title, body) {
   try { if ('Notification' in window && Notification.permission === 'granted' && document.hidden) new Notification(title, { body }); } catch {}
@@ -37,7 +39,13 @@ function notify(title, body) {
 }
 
 /* ---------------- router ---------------- */
+let routeSeq = 0;
 async function route() {
+  const seq = ++routeSeq;   // penanda rute aktif: halaman async lama yang tertinggal tidak boleh melempar error ke konsol
+  try { return await routeInner(); }
+  catch (e) { if (seq !== routeSeq) return; throw e; }
+}
+async function routeInner() {
   clearInterval(pollT);
   const h = location.hash.replace(/^#\/?/, '') || 'new';
   let [page, id] = h.split('/');
@@ -59,7 +67,18 @@ async function route() {
 }
 addEventListener('hashchange', route);
 // lencana "sedang diproses" di menu Riwayat
-async function badge() { try { const l = await api('/api/projects'); const n = l.filter(p => ['queued', 'running', 'rendering'].includes(p.status)).length; const b = $('#runBadge'); b.hidden = !n; b.textContent = n; } catch {} }
+async function badge() {
+  try {
+    const l = await api('/api/projects');
+    const busy = l.filter(p => ['queued', 'running', 'rendering'].includes(p.status)), n = busy.length;
+    const b = $('#runBadge'); b.hidden = !n; b.textContent = n;
+    const q = $('#sideQueue'); if (!q) return;          // kartu antrean live di sidebar
+    q.hidden = !n; if (!n) return;
+    const p = busy.find(x => x.status !== 'queued') || busy[0], pct = Math.round((p.progress || 0) * 100);
+    $('#sqTitle').textContent = n > 1 ? `${n} proses berjalan` : (p.status === 'queued' ? 'Dalam antrean' : 'Sedang memproses');
+    $('#sqPct').textContent = pct + '%'; $('#sqBar').style.width = Math.max(4, pct) + '%'; $('#sqMsg').textContent = p.message || p.title || '';
+  } catch {}
+}
 setInterval(badge, 4000); badge();
 
 /* ================= BERANDA ================= */
@@ -177,8 +196,8 @@ async function pageNew(override) {
   let contentProfile = cfg.content_profile || 'auto';
   chipGroup($('#contentProfile'), contentProfile, v => contentProfile = v);
   let durationPreset = cfg.duration_preset || 'auto';
-  const durationText = { auto: 'Auto: AI memilih rentang setelah transkripsi tanpa memotong kalimat.', '15-25': '15–25 detik: ujaran padat dan payoff cepat.', '25-40': '25–40 detik: konteks sedang sebelum payoff.', '40-60': '40–60 detik: penjelasan lebih utuh.' };
-  chipGroup($('#durationPreset'), durationPreset, v => { durationPreset = v; const [a, b] = v === 'auto' ? [15, 60] : v.split('-').map(Number); $('#min_sec').value = a; $('#max_sec').value = b; $('#durationEstimate').textContent = durationText[v]; });
+  const durationText = { auto: 'Auto: minimal 1 menit. Rentang dipilih setelah transkripsi (60–120 dtk) tanpa memotong kalimat.', '60-90': '60–90 detik: durasi Reels/Shorts standar dengan konteks + payoff.', '90-120': '90–120 detik: cerita atau penjelasan utuh.', '25-40': '25–40 detik: singkat; hanya untuk ide yang berdiri sendiri.', '15-25': '15–25 detik: sangat singkat.', '40-60': '40–60 detik: penjelasan menengah.' };
+  chipGroup($('#durationPreset'), durationPreset, v => { durationPreset = v; const [a, b] = v === 'auto' ? [60, 90] : v.split('-').map(Number); $('#min_sec').value = a; $('#max_sec').value = b; $('#durationEstimate').textContent = durationText[v]; });
   $('#durationEstimate').textContent = durationText[durationPreset] || durationText.auto;
   ['candidate_count', 'min_sec', 'max_sec', 'language', 'model', 'transcriber'].forEach(k => $('#' + k).value = cfg[k]);
   $('#translate_en').checked = !!cfg.translate_en; $('#cut_silence').checked = !!cfg.cut_silence;
@@ -187,8 +206,8 @@ async function pageNew(override) {
   $('#use_llm').checked = aiActive && cfg.use_llm !== false;
 
   // format
-  let layout = cfg.layout;
-  const syncLayout = () => { $('#smartRow').hidden = !['portrait', 'square'].includes(layout); $('#splitRow').hidden = layout !== 'split'; };
+  let layout = cfg.layout_mode === 'manual' ? cfg.layout : 'auto';   // bawaan Otomatis; pilihan manual hanya bila pengguna memilihnya
+  const syncLayout = () => { $('#smartRow').hidden = !['auto', 'portrait', 'square'].includes(layout); $('#splitRow').hidden = layout !== 'split'; };
   chipGroup($('#layouts'), layout, l => { layout = l; syncLayout(); }, 'l'); syncLayout();
   $('#smart_crop').checked = cfg.smart_crop;
   const f0 = cfg.split.face, guess = (f0[0] > .4 ? 'r' : 'l'), gy = (f0[1] > .4 ? 'b' : 't');
@@ -307,6 +326,7 @@ async function pageNew(override) {
   const loadMusic = async (selectFile) => {
     const list = await api('/api/music').catch(() => []);
     const selM = $('#mu_file');
+    if (!selM) return;   // halaman sudah ditinggalkan saat daftar musik dimuat
     selM.innerHTML = list.length ? list.map(m => `<option value="${esc(m.file)}">${esc(m.name)}</option>`).join('') : '<option value="">— belum ada musik, unggah dulu —</option>';
     const want = selectFile || cfg.music.file;
     if (want && list.some(m => m.file === want)) selM.value = want;
@@ -325,7 +345,7 @@ async function pageNew(override) {
     return {
       content_profile: contentProfile, candidate_count: +$('#candidate_count').value, auto_render: $('#auto_render').checked,
       clip_count: clipCount === 'auto' ? 'auto' : +clipCount, duration_preset: durationPreset, min_sec: +$('#min_sec').value, max_sec: +$('#max_sec').value, language: $('#language').value, model: $('#model').value, transcriber: $('#transcriber').value,
-      translate_en: $('#translate_en').checked, cut_silence: $('#cut_silence').checked, use_llm: $('#use_llm').checked, layout, smart_crop: $('#smart_crop').checked,
+      translate_en: $('#translate_en').checked, cut_silence: $('#cut_silence').checked, use_llm: $('#use_llm').checked, layout: layout === 'auto' ? 'portrait' : layout, layout_mode: layout === 'auto' ? 'auto' : 'manual', smart_crop: $('#smart_crop').checked,
       split: { face: [pos[0], pos[1], fs, fs], game: [0, 0, 1, 1], face_ratio: +$('#faceRatio').value / 100 },
       caption: { ...cfg.caption, enabled: $('#cap_enabled').checked, style: capStyle, box: $('#cap_box').checked, effect: $('#cap_glow').checked ? 'glow' : 'none', font: $('#cap_font').value, size: +$('#cap_size').value, color: $('#cap_color').value, highlight: $('#cap_highlight').value, uppercase: $('#cap_upper').checked, words_per_line: +$('#cap_wpl').value, position: $('#cap_position').value, y_pct: posTouched ? null : cfg.caption.y_pct, animation: $('#cap_pop').checked ? 'pop' : 'none' },
       title: { ...cfg.title, enabled: $('#ttl_enabled').checked, preset: ttlPreset, duration: +$('#ttl_duration').value },
@@ -341,7 +361,8 @@ async function pageNew(override) {
 
   const forSubmit = st => {   // resep otomatis: gaya dipilih server sesuai konten → jangan kirim gaya dari form
     if (st.recipe !== 'auto') return st;
-    const o = { ...st }; ['caption', 'title', 'decoration', 'emoji', 'progress_bar', 'layout', 'smart_crop', 'cut_silence', 'split', 'content_profile'].forEach(k => delete o[k]);
+    const o = { ...st }; ['caption', 'title', 'decoration', 'emoji', 'progress_bar', 'layout', 'layout_mode', 'smart_crop', 'cut_silence', 'split', 'content_profile'].forEach(k => delete o[k]);
+    if (layout !== 'auto') { o.layout = layout; o.layout_mode = 'manual'; o.split = st.split; }   // pilihan manual tetap menang
     if (o.duration_preset === 'auto') { delete o.min_sec; delete o.max_sec; }
     if (contentProfile !== 'auto') o.content_profile = contentProfile;
     return o;
@@ -397,7 +418,7 @@ function splitDialog(P, reload) {
   openDlg((b, close) => {
     b.innerHTML = `<h2>Atur area split gaming</h2><p class="muted">Seret kotak <b style="color:var(--acc)">FACECAM</b> dan <b style="color:#6ec1ff">GAMEPLAY</b> ke posisi yang benar. Tarik pojok kanan bawah untuk mengubah ukuran.</p>
       <div class="split-wrap"><img alt="Frame video"><div class="rect game"><span>GAMEPLAY</span><i></i></div><div class="rect face"><span>FACECAM</span><i></i></div></div>
-      <label>Porsi facecam di hasil (atas) <input type="range" id="sr" min="25" max="60" value="${Math.round(sp.face_ratio * 100)}"></label>
+      <label>Porsi facecam di hasil (bawah) <input type="range" id="sr" min="20" max="50" value="${Math.round(sp.face_ratio * 100)}"></label>
       <div class="acts"><button class="btn" id="sGo">Simpan &amp; render ulang semua</button></div>`;
     const wrap = $('.split-wrap', b);
     $('img', b).src = `/api/projects/${P.id}/frame?t=${(P.clips[0]?.start || 1).toFixed(1)}`;
@@ -481,11 +502,13 @@ async function pageHistory(initialTab = 'p') {
   view.innerHTML = `<section class="page history-page"><header class="page-h proj-h"><div><p class="eyebrow">${isResults ? 'OUTPUT PRODUKSI' : 'PUSTAKA KERJA'}</p><h1>${isResults ? 'Hasil' : 'Proyek'}</h1><p>${isResults ? 'Tinjau output siap pakai, proses render, dan kegagalan dari satu tempat.' : 'Cari, lanjutkan, dan kelola seluruh produksi.'}</p></div><a class="btn sm" href="#/new">Buat Klip</a></header><div class="library-toolbar"><div class="seg" id="hTab"><button data-v="p">Proyek</button><button data-v="c">Hasil klip</button></div><label class="library-search"><span aria-hidden="true">⌕</span><input class="in" id="hq" placeholder="Cari judul atau proyek"></label><select class="in" id="hStatus" aria-label="Filter status"><option value="">Semua status</option><option value="active">Aktif</option><option value="ready">Siap</option><option value="error">Gagal</option></select><select class="in" id="hSort" aria-label="Urutkan"><option value="new">Terbaru</option><option value="old">Terlama</option><option value="clips">Klip terbanyak</option></select></div><div class="result-tabs" id="resultTabs" ${isResults ? '' : 'hidden'}><button class="on" data-result="ready">Ready</button><button data-result="processing">Processing</button><button data-result="failed">Failed</button></div><div class="hist" id="hl"></div></section>`;
   let list = await api('/api/projects');
   const hl = $('#hl');
+  if (!hl) return;   // halaman sudah ditinggalkan saat daftar proyek dimuat
   const label = { done: 'selesai', running: 'diproses', queued: 'antre', error: 'gagal', cancelled: 'dibatalkan', candidates_ready: 'kandidat siap', rendering: 'render' };
   let tab = initialTab, clips = null, resultState = 'ready';
   const projectStatusGroup = p => ['queued', 'running', 'rendering'].includes(p.status) ? 'active' : ['done', 'candidates_ready'].includes(p.status) ? 'ready' : ['error', 'cancelled'].includes(p.status) ? 'error' : '';
   const drawClips = async () => {
     clips = clips || await api('/api/clips').catch(() => []);
+    if (!document.body.contains(hl)) return;
     const q = $('#hq').value.toLowerCase();
     const projectById = Object.fromEntries(list.map(project => [project.id, project]));
     let items = clips.filter(c => `${c.title} ${c.project_title}`.toLowerCase().includes(q));
@@ -497,10 +520,10 @@ async function pageHistory(initialTab = 'p') {
     if (!items.length) { hl.innerHTML = '<div class="empty">Belum ada klip yang dirender.</div>'; return; }
     hl.replaceChildren(...items.map(c => {
       const a = document.createElement('article'); a.className = 'gcard output-card';
-      a.innerHTML = `<a class="output-preview" href="#/p/${esc(c.project_id)}"><video muted loop playsinline preload="none"></video><span class="sc">${Math.round((c.score || 0) / 10)}/10</span><span class="du">${fmt(c.duration)}</span></a><div class="output-body"><b></b><small></small><div class="output-actions"><a href="#/p/${esc(c.project_id)}">Studio</a><a href="/files/${esc(c.project_id)}/${esc(c.file)}" download>Download</a></div></div>`;
+      a.innerHTML = `<div class="output-preview"><video controls playsinline preload="none"></video><span class="sc">${((c.score || 0) / 10).toFixed(1)}/10</span><span class="du">${fmt(c.duration)}</span></div><div class="output-body"><b></b><small></small><div class="output-actions"><a href="#/p/${esc(c.project_id)}">Studio</a><a href="/files/${esc(c.project_id)}/${esc(c.file)}" download>Download</a></div></div>`;
       const v = $('video', a); if (c.thumb) v.poster = `/files/${c.project_id}/${c.thumb}?v=${c.version}`;
-      a.onmouseenter = () => { if (!v.src) v.src = `/files/${c.project_id}/${c.file}?v=${c.version}`; v.play().catch(() => {}); };
-      a.onmouseleave = () => v.pause();
+      v.src = `/files/${c.project_id}/${c.file}?v=${c.version}`;   // controls: pengguna menekan play sendiri; preload="none" menjaga beban
+      v.addEventListener('play', () => $$('video', hl).forEach(o => { if (o !== v) o.pause(); }));
       $('.output-body b', a).textContent = c.title || c.id; $('.output-body small', a).textContent = c.project_title || '';
       return a;
     }));
@@ -665,6 +688,12 @@ addEventListener('DOMContentLoaded', () => {
   const sideToggle = $('#sideToggle');
   sideToggle.onclick = () => { const compact = document.body.classList.toggle('side-compact'); sideToggle.setAttribute('aria-expanded', String(!compact)); sideToggle.setAttribute('aria-label', compact ? 'Perluas sidebar' : 'Ringkas sidebar'); store.set('clipperSideCompact', compact); };
   if (store.get('clipperSideCompact', false)) { document.body.classList.add('side-compact'); sideToggle.setAttribute('aria-expanded', 'false'); sideToggle.setAttribute('aria-label', 'Perluas sidebar'); }
-  addEventListener('keydown', e => { if (e.key === 'Escape') { const d = $('dialog[open]'); if (d) d.close(); } });
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape') { const d = $('dialog[open]'); if (d) d.close(); return; }
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.target.closest?.('input,textarea,select,dialog,[contenteditable]')) return;
+    const go = { Digit1: '#/new', Digit2: '#/history', Digit3: '#/results', Digit4: '#/advanced' }[e.code];
+    if (e.altKey && go) { e.preventDefault(); location.hash = go; }          // Alt+1..4 pindah menu
+    else if (!e.altKey && e.key === '[') sideToggle.click();                 // [ = ringkas/perluas sidebar
+  });
   route().catch(e => { view.innerHTML = `<section class="page"><div class="empty">Gagal memuat: ${esc(e.message)}</div></section>`; });
 });

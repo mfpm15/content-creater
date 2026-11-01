@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import captions, effects, facetrack
+from . import captions, effects, facetrack, shots
 from .config import FONTS_DIR, SIZES
 from .recipes import RECIPES
 
@@ -64,6 +64,15 @@ def remap(t: float, plan: list[tuple[float, float]]) -> float:
     return acc
 
 
+def _game_focus(sp: dict) -> float:
+    """Pecahan lebar area gameplay yang ditampilkan (di-crop ke tengah aksi). 1.0 = seluruh frame."""
+    try:
+        f = float(sp.get("game_focus", 1.0))
+    except (TypeError, ValueError):
+        return 1.0
+    return f if 0.3 <= f < 0.99 else 1.0
+
+
 def upscale_factor(layout: str, pr: Probe, cfg: dict) -> float:
     """Seberapa besar area sumber diperbesar ke output (>1,3 = mulai terlihat lembek/"burik")."""
     Wt, Ht = out_size(layout, cfg)
@@ -73,7 +82,8 @@ def upscale_factor(layout: str, pr: Probe, cfg: dict) -> float:
         ch = H / zoom if W / H > Wt / Ht else (W / zoom) / (Wt / Ht)
         return Ht / max(ch, 1)
     if layout == "split":
-        return Wt / max(W * float((cfg.get("split") or {}).get("game", [0, 0, 1, 1])[2]), 1)
+        sp = cfg.get("split") or {}
+        return Wt / max(W * float(sp.get("game", [0, 0, 1, 1])[2]) * _game_focus(sp), 1)
     return min(Wt / W, Ht / H) if layout in ("blur", "landscape") else 1.0
 
 
@@ -124,8 +134,10 @@ def framing_filter(layout: str, pr: Probe, cfg: dict, keys: list | None, inp: st
                 f"[b]scale={Wt}:{Ht}:force_original_aspect_ratio=decrease:flags=lanczos{sh}[fg];"
                 f"[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1[fr]")
     if layout == "split":
+        # Split adaptif: region konteks/subject utama di atas, pembicara/subject kedua di bawah.
+        # Nama key game/face tetap dipertahankan untuk kompatibilitas proyek lama.
         sp = cfg["split"]
-        hf = _even(Ht * float(sp.get("face_ratio", 0.4)))
+        hf = _even(Ht * float(sp.get("face_ratio", 0.32)))
         hg = Ht - hf
 
         def rect(r):
@@ -133,12 +145,94 @@ def framing_filter(layout: str, pr: Probe, cfg: dict, keys: list | None, inp: st
             w, h = max(min(w, 1 - x), 0.05), max(min(h, 1 - y), 0.05)
             return f"crop={_even(W * w)}:{_even(H * h)}:{int(W * x)}:{int(H * y)}"
 
-        return tm + (f"[{inp}]split[a][b];[a]{rect(sp['face'])},scale={Wt}:{hf}:force_original_aspect_ratio=increase:flags=lanczos,crop={Wt}:{hf}{sh}[top];"
-                f"[b]{rect(sp['game'])},scale={Wt}:{hg}:force_original_aspect_ratio=increase:flags=lanczos,crop={Wt}:{hg}{sh}[bot];"
+        gx, gy, gw, gh = [float(v) for v in sp["game"]]
+        focus = _game_focus(sp)
+        if focus < 1.0:   # fokus ke tengah aksi; HUD tepi (minimap/skill) dikorbankan sedikit demi gameplay yang lebih besar
+            nw = gw * focus
+            gx, gw = gx + (gw - nw) / 2, nw
+        bw, bh = _even(Wt // 4), _even(hg // 4)
+        return tm + (f"[{inp}]split[a][b];"
+                f"[a]{rect(sp['face'])},scale={Wt}:{hf}:force_original_aspect_ratio=increase:flags=lanczos,crop={Wt}:{hf}{sh}[bot];"
+                f"[b]{rect([gx, gy, gw, gh])},split[g1][g2];"
+                f"[g1]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},boxblur=10:2,scale={Wt}:{hg},"
+                f"eq=brightness=-0.07:saturation=1.2[gbg];"
+                f"[g2]scale={Wt}:{hg}:force_original_aspect_ratio=decrease:flags=lanczos{sh}[gfg];"
+                f"[gbg][gfg]overlay=(W-w)/2:(H-h)/2[top];"
                 f"[top][bot]vstack,setsar=1[fr]")
     # landscape
     return tm + (f"[{inp}]scale={Wt}:{Ht}:force_original_aspect_ratio=decrease:flags=lanczos{sh},"
                  f"pad={Wt}:{Ht}:(ow-iw)/2:(oh-ih)/2,setsar=1[fr]")
+
+
+def _panel_rect(face, W: int, H: int, aspect: float) -> tuple[int, int, int, int]:
+    """Crop (lebar, tinggi, x, y) piksel untuk satu panel dua-orang: kepala sampai bahu di tengah panel."""
+    cx, cy, fw, fh = (float(v) for v in face)
+    ch = min(H, max(fh * H * 3.2, fw * W * 3.0 / aspect))
+    cw = ch * aspect
+    if cw > W:
+        cw, ch = W, W / aspect
+    cw, ch = _even(cw), _even(ch)
+    x = min(max(cx * W - cw / 2, 0), W - cw)
+    y = min(max(cy * H + ch * 0.08 - ch / 2, 0), H - ch)
+    return cw, ch, int(x), int(y)
+
+
+def shot_graph(pcs: list[dict], pr: Probe, cfg: dict, inp: str = "0:v") -> str:
+    """Filtergraph portrait per shot: tiap irisan dipotong dari sumber, dibingkai sesuai modenya, lalu digabung ke [fr].
+
+    single → crop 9:16 mengikuti wajah (pelacak mulai ulang di tiap shot, tanpa kamera tertinggal setelah cut)
+    multi  → dua panel bertumpuk, satu orang per panel
+    broll  → frame utuh di tengah dengan latar blur
+    """
+    Wt, Ht = out_size("portrait", cfg)
+    W, H = pr.width, pr.height
+    ar = Wt / Ht
+    cr = cfg.get("crop") or {}
+    zoom = max(1.0, min(3.0, float(cr.get("zoom", 1) or 1)))
+    cy = max(0.0, min(1.0, float(cr.get("y", 0.5) if cr.get("y") is not None else 0.5)))
+    sh = _sharp(upscale_factor("portrait", pr, cfg)) if (cfg.get("quality") or {}).get("sharpen", True) else ""
+    hp = _even(Ht // 2)
+    n, parts = len(pcs), []
+    if pr.hdr and media.has_filter("zscale") and media.has_filter("tonemap"):
+        parts.append(f"[{inp}]{_TONEMAP.rstrip(',')}[sdr]")
+        inp = "sdr"
+    parts.append(f"[{inp}]split={n}" + "".join(f"[s{i}]" for i in range(n)) if n > 1 else f"[{inp}]null[s0]")
+    for i, p in enumerate(pcs):
+        head = f"[s{i}]trim=start={p['a']:.3f}:end={p['b']:.3f},setpts=PTS-STARTPTS"
+        if p["mode"] == "multi" and p.get("faces") and len(p["faces"]) == 2:
+            (w1, h1, x1, y1), (w2, h2, x2, y2) = (_panel_rect(f, W, H, Wt / hp) for f in p["faces"])
+            parts += [f"{head},split[l{i}][r{i}]",
+                      f"[l{i}]crop={w1}:{h1}:{x1}:{y1},scale={Wt}:{hp}:flags=lanczos[t{i}]",
+                      f"[r{i}]crop={w2}:{h2}:{x2}:{y2},scale={Wt}:{hp}:flags=lanczos[u{i}]",
+                      f"[t{i}][u{i}]vstack,setsar=1,format=yuv420p[p{i}]"]
+        elif p["mode"] == "single":
+            z = max(zoom, float(p.get("zoom") or 1.0))          # zoom manual pengguna dan zoom adaptif shot: ambil yang lebih besar
+            ch = _even(H / z)
+            cw = _even(ch * ar)
+            x = facetrack.x_expr(p["keys"], W, cw) if p.get("keys") else f"{(W - cw) / 2:.1f}"
+            if p.get("zoom") and z > 1.05:                       # kepala di ~38% tinggi panel, tidak keluar frame
+                y = min(max(float(p.get("cy", 0.4)) * H - 0.38 * ch, 0.0), H - ch)
+            else:
+                y = (H - ch) * cy
+            parts.append(f"{head},crop=w={cw}:h={ch}:x='{x}':y={y:.1f},"
+                         f"scale={Wt}:{Ht}:flags=lanczos{sh},setsar=1,format=yuv420p[p{i}]")
+        else:
+            bw, bh = _even(Wt // 4), _even(Ht // 4)
+            parts += [f"{head},split[a{i}][b{i}]",
+                      f"[a{i}]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},boxblur=10:2,"
+                      f"scale={Wt}:{Ht},eq=brightness=-0.07:saturation=1.2[bg{i}]",
+                      f"[b{i}]scale={Wt}:{Ht}:force_original_aspect_ratio=decrease:flags=lanczos{sh}[fg{i}]",
+                      f"[bg{i}][fg{i}]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[p{i}]"]
+    parts.append("".join(f"[p{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[fr]" if n > 1 else "[p0]null[fr]")
+    return ";".join(parts)
+
+
+def _cut_audio_graph(plan: list[tuple[float, float]]) -> str:
+    """Audio saja untuk 'potong jeda hening' ketika video disusun per shot. Berakhir dengan ';'."""
+    n = len(plan)
+    g = (f"[0:a:0]asplit={n}" + "".join(f"[ca{i}]" for i in range(n)) + ";") if n > 1 else "[0:a:0]anull[ca0];"
+    g += "".join(f"[ca{i}]atrim=start={a}:end={b},asetpts=PTS-STARTPTS[a{i}];" for i, (a, b) in enumerate(plan))
+    return g + "".join(f"[a{i}]" for i in range(n)) + f"concat=n={n}:v=0:a=1[ac];"
 
 
 def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: list[dict]) -> dict:
@@ -150,8 +244,27 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
     size = out_size(layout, cfg)
 
     keys = clip.get("crop_keys")
-    if layout in ("portrait", "square") and cfg.get("smart_crop") and not keys and pr.width / pr.height > SIZES[layout][0] / SIZES[layout][1]:
-        keys = facetrack.track(src, start, end, pr.width, pr.height)
+    # crop_keys juga diisi otomatis oleh render sebelumnya. Hanya keyframe yang disimpan pengguna (Crop studio: hold, atau
+    # ditandai crop_manual lewat edit_clip) yang dipertahankan; selebihnya dihitung ulang agar perbaikan pelacakan berlaku.
+    if keys and not (clip.get("crop_manual") or (cfg.get("crop") or {}).get("hold")):
+        keys = None
+    tracking = None
+    wide = pr.width / pr.height > SIZES[layout][0] / SIZES[layout][1]
+    shot_plan = None
+    if layout == "portrait" and cfg.get("smart_crop") and cfg.get("shot_framing", True) and not keys and wide:
+        try:
+            shot_plan = shots.plan(src, start, end, pr.width, pr.height, duration=dur)
+        except Exception as e:  # noqa: BLE001 — deteksi shot gagal → jalur lama (satu jalur kamera), render tetap jalan
+            print(f"[shots] gagal ({e}); pakai pelacakan tunggal")
+    if shot_plan:
+        tracking = {**{k: v for k, v in shot_plan.items() if k != "shots"},
+                    "shots": [{"a": s["a"], "b": s["b"], "mode": s["mode"]} for s in shot_plan["shots"]]}
+    elif layout in ("portrait", "square") and cfg.get("smart_crop") and not keys and wide:
+        tracking = facetrack.tracking_result(src, start, end, pr.width, pr.height)
+        keys = tracking["keys"]
+    elif keys:
+        tracking = {"keys": keys, "confidence": 1.0, "source": "manual", "samples": len(keys),
+                    "face_samples": 0, "motion_samples": 0, "target_samples": len(keys)}
     cw = clip_words(words, start, end) if clip.get("words") is None else clip["words"]
 
     # potong jeda hening: susun ulang waktu kata & keyframe ke timeline baru
@@ -173,7 +286,12 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
 
     wm = cfg["watermark"]
     use_img = wm["enabled"] and wm.get("image") and Path(wm["image"]).is_file()
-    if cut:
+    pcs = shots.pieces(shot_plan["shots"], plan) if shot_plan else []
+    if shot_plan and not pcs:       # tidak mungkin terjadi (shot menutup seluruh klip), tetapi jangan gagal
+        shot_plan, tracking = None, None
+    if shot_plan:
+        graph = (_cut_audio_graph(plan) if cut and pr.has_audio else "") + shot_graph(pcs, pr, cfg)
+    elif cut:
         n = len(plan)
         vs = "".join(f"[cv{i}]" for i in range(n))
         graph = (f"[0:v]split={n}{vs};" if n > 1 else "[0:v]null[cv0];")
@@ -338,7 +456,8 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
                     "emphasis_mode": "box" if cap.get("style") == "box" or cap.get("box") else "active-word" if cap.get("style") == "karaoke" else cap.get("accent_mode") if cap.get("style") == "keyword" else "none",
                     "caption_source": "transcript", "caption_layers": 1,
                     "burned_in": bool(cap.get("enabled")), "sidecar_autoload_safe": True}
-    crop_confidence = (0.0 if not keys else min(1.0, max(.35, len(keys) / max(out_dur / 4, 1)))) if smart else 1.0
+    smart = smart or bool(shot_plan)
+    crop_confidence = float(tracking["confidence"]) if smart and tracking else (1.0 if not smart else 0.0)
     return {"file": out.name, "thumb": f"{cid}.jpg", "srt": f"subtitles/{cid}.srt",
             "ass": f"subtitles/{cid}.ass", "sidecar_autoload_safe": True,
             "crop_keys": keys, "words": cw,
@@ -359,8 +478,15 @@ def render_clip(work: Path, src: Path, pr: Probe, clip: dict, cfg: dict, words: 
             "hook_provenance": "ASS:hook" if cfg["title"].get("enabled") else None,
             "source_has_burned_captions": cfg.get("source_has_burned_captions", "unknown"),
             "crop_confidence": round(crop_confidence, 2),
+            "split_decision": cfg.get("split_decision"),
+            "split_strategy": (cfg.get("split") or {}).get("strategy") if layout == "split" else None,
+            "tracking": ({k: v for k, v in tracking.items() if k != "keys"} if tracking else
+                         {"source": "not-required", "confidence": 1.0, "samples": 0}),
+            "framing": "shots" if shot_plan else ("tracking" if tracking else "static"),
             "resolution": f"{size[0]}x{size[1]}", "encoder": enc, "upscale": round(up, 2),
             "render_warnings": (["Crop confidence rendah — cek framing di Crop studio"] if smart and crop_confidence < .5 else [])
+            + (["Split confidence rendah — cek komposisi panel sebelum publikasi"]
+               if layout == "split" and float((cfg.get("split") or {}).get("confidence", 1)) < .55 else [])
             + (["Potensi subtitle ganda: status caption bawaan sumber belum diketahui"]
                if cfg.get("source_has_burned_captions", "unknown") == "unknown" else [])
             + _quality_warning(up, pr, size)}

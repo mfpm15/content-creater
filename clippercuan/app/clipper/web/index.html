@@ -7,23 +7,39 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ffc933'/%3E%3Cpath d='M24 18l22 14-22 14z' fill='%2307080a'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css?v=5183bef-ui2">
 <link rel="stylesheet" href="premium.css?v=5183bef-ui2">
+<link rel="stylesheet" href="dark.css?v=ui17-transcription-polish">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e1c">
 </head>
 <body>
 <a class="skip-link" href="#view">Lewati ke konten utama</a>
-<aside class=side aria-label=Navigasi utama>
-  <div class=side-head><a class=brand href=#/new aria-label=Clipper Cuan><span class=logo aria-hidden=true>C</span><span class=brand-copy><b>Clipper Cuan</b><small>Video workspace</small></span></a><button class=side-toggle id=sideToggle type=button aria-label=Ringkas sidebar aria-expanded=true><span aria-hidden=true>&lsaquo;</span></button></div>
+<aside class="side" aria-label="Navigasi utama">
+  <div class="side-head"><a class="brand" href="#/new" aria-label="Clipper Cuan"><span class="logo" aria-hidden="true">C</span><span class="brand-copy"><b>Clipper Cuan</b><small>Video workspace</small></span></a><button class="side-toggle" id="sideToggle" type="button" aria-label="Ringkas sidebar" aria-expanded="true" title="Ringkas / perluas sidebar ( [ )"><span aria-hidden="true">&lsaquo;</span></button></div>
+  <p class="side-label">Workspace</p>
   <nav aria-label="Area utama">
-    <a href=#/new data-nav=new><i class="nav-icon nav-new" aria-hidden=true></i><span>Buat Klip</span></a>
-    <a href=#/history data-nav=history><i class="nav-icon nav-projects" aria-hidden=true></i><span>Proyek</span><span class=badge id=runBadge hidden></span></a>
-    <a href=#/results data-nav=results><i class="nav-icon nav-results" aria-hidden=true></i><span>Hasil</span></a>
-    <a href=#/advanced data-nav=advanced><i class="nav-icon nav-studio" aria-hidden=true></i><span>Studio</span></a>
+    <a class="nav-cta" href="#/new" data-nav="new" data-tip="Buat Klip" title="Buat klip baru (Alt+1)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg><span>Buat Klip</span><kbd>Alt 1</kbd></a>
+    <a href="#/history" data-nav="history" data-tip="Proyek" title="Semua proyek (Alt+2)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Proyek</span><kbd>Alt 2</kbd><span class="badge" id="runBadge" hidden></span></a>
+    <a href="#/results" data-nav="results" data-tip="Hasil" title="Klip yang sudah jadi (Alt+3)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span>Hasil</span><kbd>Alt 3</kbd></a>
+    <a href="#/advanced" data-nav="advanced" data-tip="Studio" title="Editor studio (Alt+4)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg><span>Studio</span><kbd>Alt 4</kbd></a>
   </nav>
-  <a class="secondary-nav" href=#/settings data-nav=settings><i class="nav-icon nav-settings" aria-hidden=true></i><span>Pengaturan</span></a>
-  <div class=side-foot><div class=local-note><span class=status-dot></span><div><b>Service lokal</b><small id=sideFoot>Memuat sistem...</small></div></div></div>
+  <p class="side-label">Sistem</p>
+  <a class="secondary-nav" href="http://127.0.0.1:3210/" data-tip="Dashboard Utama" title="Kembali ke Creator Control Center"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>Dashboard Utama</span></a>
+  <a class="secondary-nav" href="#/settings" data-nav="settings" data-tip="Pengaturan" title="Pengaturan AI, transkripsi, otomatisasi"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Pengaturan</span></a>
+  <div class="side-foot">
+    <a class="side-card side-queue" id="sideQueue" href="#/history" hidden aria-live="polite" title="Lihat proses yang berjalan">
+      <span class="sq-top"><span class="spin" aria-hidden="true"></span><b id="sqTitle">Memproses</b><em id="sqPct">0%</em></span>
+      <span class="sq-bar"><i id="sqBar"></i></span>
+      <small id="sqMsg"></small>
+    </a>
+    <a class="side-card side-ai" id="sideAi" href="#/settings" title="Status AI dan service lokal">
+      <span class="status-dot" id="sideAiDot" aria-hidden="true"></span>
+      <span class="sa-text"><b id="sideAiTitle">Memeriksa AI…</b><small id="sideFoot">Memuat sistem...</small></span>
+    </a>
+  </div>
 </aside>
 
-<main><div class=topbar><div class=topbar-context><div><p class=eyebrow id=pageContext>CLIPPER CUAN</p><strong id=pageTitle>Buat Klip</strong></div></div><div class=top-actions><div class=ai-health id=aiHealth role=status aria-live=polite><span class=status-dot></span><span>Memeriksa service...</span></div><a class="settings-action" href=#/settings aria-label="Buka Pengaturan" title="Pengaturan"><i class="nav-icon nav-settings" aria-hidden=true></i></a><a class=btn sm href=#/new>Buat Klip</a></div></div><div id=view aria-live=polite><section class=page><div class=loading-state><span class=spin></span><b>Menyiapkan workspace...</b></div></section></div></main>
-<nav class="bottom-nav" aria-label="Navigasi utama seluler"><a href="#/new" data-mobile-nav="new"><i class="nav-icon nav-new" aria-hidden="true"></i><span>Buat Klip</span></a><a href="#/history" data-mobile-nav="history"><i class="nav-icon nav-projects" aria-hidden="true"></i><span>Proyek</span></a><a href="#/results" data-mobile-nav="results"><i class="nav-icon nav-results" aria-hidden="true"></i><span>Hasil</span></a><a href="#/advanced" data-mobile-nav="advanced"><i class="nav-icon nav-studio" aria-hidden="true"></i><span>Studio</span></a></nav>
+<main><div class=topbar><div class=topbar-context><span class="mob-brand" aria-hidden="true">C</span><div><p class=eyebrow id=pageContext>CLIPPER CUAN</p><strong id=pageTitle>Buat Klip</strong></div></div><div class=top-actions><div class=ai-health id=aiHealth role=status aria-live=polite><span class=status-dot></span><span>Memeriksa service...</span></div><a class="settings-action" href=#/settings aria-label="Buka Pengaturan" title="Pengaturan"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a><a class=btn sm href=#/new>Buat Klip</a></div></div><div id=view aria-live=polite><section class=page><div class=loading-state><span class=spin></span><b>Menyiapkan workspace...</b></div></section></div></main>
+<nav class="bottom-nav" aria-label="Navigasi utama seluler"><a href="#/new" data-mobile-nav="new"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg><span>Buat Klip</span></a><a href="#/history" data-mobile-nav="history"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Proyek</span></a><a href="#/results" data-mobile-nav="results"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span>Hasil</span></a><a href="#/advanced" data-mobile-nav="advanced"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg><span>Studio</span></a></nav>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- ================= TEMPLATES ================= -->
@@ -42,7 +58,7 @@
         <div class="source-feedback"><p class="hint" id="urlHelp">YouTube, TikTok, Instagram, atau URL video publik.</p><p class="field-error" id="urlError" role="alert"></p></div>
         <div class="recent-sources" id="recentSources" hidden><span>Terakhir dipakai</span><div></div></div>
         <p class="hint" id="urlCount"></p>
-        <div class="fx-row lite-row"><div><b>Hemat disk — jangan unduh video penuh</b><span>Momen terbaik dicari dari subtitle YouTube (tanpa unduh apa pun) atau dari audio saja. Yang diunduh hanya potongan klip terpilih, lalu langsung dihapus setelah dirender. Butuh internet saat render.</span><span class="lite-est" id="liteEst"></span></div><label class="sw"><input type="checkbox" id="storage_lite"><span></span></label></div>
+        <div class="fx-row lite-row"><div><b>Hemat disk — jangan unduh video penuh</b><span>Momen terbaik dicari dari subtitle YouTube (tanpa unduh apa pun) atau dari audio saja. Yang diunduh hanya potongan klip terpilih, lalu langsung dihapus setelah dirender. Butuh internet saat render.</span><span class="lite-est" id="liteEst"></span></div><label class="sw" title="Aktifkan mode hemat disk"><input type="checkbox" id="storage_lite" role="switch" aria-label="Hemat disk, jangan unduh video penuh"><span aria-hidden="true"></span></label></div>
       </div>
       <div id="srcFile" class="src-pane" hidden>
         <label class="drop" id="drop"><input type="file" id="file" accept="video/*" hidden>
@@ -58,7 +74,7 @@
       <details class="experimental-recipes"><summary>Experimental / Legacy</summary><div class="recipe-grid" id="experimentalRecipes"></div></details>
     </div>
     <div class="card auto-card progressive-panel" data-stage="candidates">
-      <div class="section-title"><span class="step-number">04</span><div><h2>Mode otomatis</h2><p>Setelah kandidat diranking, klip terbaik langsung dirender. Kandidat lain tetap bisa kamu pilih dan render nanti di Studio.</p></div><label class="sw"><input type="checkbox" id="auto_render"><span></span></label></div>
+      <div class="section-title"><span class="step-number">04</span><div><h2>Mode otomatis</h2><p>Setelah kandidat diranking, klip terbaik langsung dirender. Kandidat lain tetap bisa kamu pilih dan render nanti di Studio.</p></div><label class="sw" title="Aktifkan render otomatis"><input type="checkbox" id="auto_render" role="switch" aria-label="Render kandidat terbaik secara otomatis"><span aria-hidden="true"></span></label></div>
       <div class="pn-row"><span>Jumlah klip yang dibuat</span><div class="seg" id="clipCount"><button data-v="auto">Otomatis</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="8">8</button><button data-v="10">10</button></div></div>
       <p class="hint" id="autoHint"></p>
       <div class="pn-row"><span>Kualitas hasil</span><div class="seg" id="qOut"><button data-v="1080">1080p · disarankan</button><button data-v="1440">1440p</button><button data-v="2160">4K</button></div></div>
@@ -89,50 +105,36 @@
     </div>
     <div class="mode-switch progressive-panel" data-stage="analysis" id="uiMode" role="group" aria-label="Mode pengaturan"><button type="button" data-mode="basic" class="on">Dasar</button><button type="button" data-mode="advanced">Lanjutan</button><span>Analisis Video memakai pilihan ini untuk menyiapkan kandidat.</span></div>
     <div class="grid2 primary-settings progressive-panel" data-stage="analysis">
-      <div class="card">
+      <div class="card duration-transcription-card">
         <h3>Durasi & transkripsi</h3>
         <label>Preset durasi</label>
         <div class="preset-cards" id="durationPreset">
-          <button type="button" data-v="auto"><b>Auto</b><small>Sesuai struktur ide</small></button>
-          <button type="button" data-v="15-25"><b>15–25 dtk</b><small>Padat, payoff cepat</small></button>
-          <button type="button" data-v="25-40"><b>25–40 dtk</b><small>Konteks sedang</small></button>
-          <button type="button" data-v="40-60"><b>40–60 dtk</b><small>Penjelasan utuh</small></button>
+          <button type="button" data-v="auto"><b>Auto · min. 1 menit</b><small>Sesuai struktur ide</small></button>
+          <button type="button" data-v="60-90"><b>60–90 dtk</b><small>Reels/Shorts standar</small></button>
+          <button type="button" data-v="90-120"><b>90–120 dtk</b><small>Cerita utuh</small></button>
+          <button type="button" data-v="25-40"><b>25–40 dtk</b><small>Singkat, tanpa konteks</small></button>
         </div>
         <p class="estimate" id="durationEstimate">Estimasi Auto ditentukan setelah transkripsi berdasarkan hook, payoff, kepadatan ujaran, dan jeda.</p>
         <div class="row3">
           <label>Jumlah kandidat<input id="candidate_count" class="in" type="number" min="5" max="30"></label>
-          <label>Durasi min (dtk)<input id="min_sec" class="in" type="number" min="5" max="180"></label>
-          <label>Durasi maks (dtk)<input id="max_sec" class="in" type="number" min="10" max="300"></label>
+          <label>Durasi min (dtk)<input id="min_sec" class="in" type="number" min="5" max="300"></label>
+          <label>Durasi maks (dtk)<input id="max_sec" class="in" type="number" min="10" max="600"></label>
         </div>
         <div class="row2">
-          <label>Bahasa
-            <select id="language" class="in">
-              <option value="auto">Auto-detect</option><option value="id">Indonesia</option><option value="en">Inggris</option>
-              <option value="ms">Melayu</option><option value="jw">Jawa</option><option value="su">Sunda</option><option value="ar">Arab</option>
-              <option value="ja">Jepang</option><option value="ko">Korea</option><option value="zh">Mandarin</option><option value="es">Spanyol</option>
-              <option value="hi">Hindi</option><option value="th">Thai</option><option value="vi">Vietnam</option>
-              <option value="tl">Filipino / Tagalog</option><option value="pt">Portugis</option><option value="fr">Prancis</option><option value="de">Jerman</option><option value="it">Italia</option><option value="nl">Belanda</option><option value="tr">Turki</option><option value="ru">Rusia</option><option value="uk">Ukraina</option></select></label>
-          <label>Kualitas transkripsi
-            <select id="model" class="in">
-              <option value="tiny">Tiny — tercepat</option><option value="base">Base — cepat</option>
-              <option value="small">Small — seimbang (disarankan)</option><option value="medium">Medium — akurat, lambat</option>
-              <option value="large-v3-turbo">Large v3 Turbo — hampir seakurat Large, jauh lebih cepat (GPU/RAM 8 GB+)</option><option value="large-v3">Large v3 — paling akurat, butuh RAM 16 GB</option></select></label>
+          <label>Bahasa<select id="language" class="in"><option value="auto">Auto-detect</option><option value="id">Indonesia</option><option value="en">Inggris</option><option value="ms">Melayu</option><option value="jw">Jawa</option><option value="su">Sunda</option><option value="ar">Arab</option><option value="ja">Jepang</option><option value="ko">Korea</option><option value="zh">Mandarin</option><option value="es">Spanyol</option><option value="hi">Hindi</option><option value="th">Thai</option><option value="vi">Vietnam</option><option value="tl">Filipino / Tagalog</option><option value="pt">Portugis</option><option value="fr">Prancis</option><option value="de">Jerman</option><option value="it">Italia</option><option value="nl">Belanda</option><option value="tr">Turki</option><option value="ru">Rusia</option><option value="uk">Ukraina</option></select></label>
+          <label>Kualitas transkripsi<select id="model" class="in"><option value="tiny">Tiny — tercepat</option><option value="base">Base — cepat</option><option value="small">Small — seimbang (disarankan)</option><option value="medium">Medium — akurat, lambat</option><option value="large-v3-turbo">Large v3 Turbo — cepat dan akurat</option><option value="large-v3">Large v3 — paling akurat</option></select></label>
         </div>
-        <label>Sumber subtitle
-          <select id="transcriber" class="in">
-            <option value="auto">Otomatis — subtitle YouTube → API cloud → Whisper di laptop (disarankan)</option>
-            <option value="youtube">Subtitle YouTube (tercepat, tanpa beban komputer)</option>
-            <option value="api">API cloud (Groq/OpenAI/9router — atur di Pengaturan)</option>
-            <option value="local">Whisper di laptop (offline, paling akurat untuk timing)</option></select></label>
+        <label>Sumber subtitle<select id="transcriber" class="in"><option value="auto">Otomatis — YouTube → cloud → Whisper lokal</option><option value="youtube">Subtitle YouTube</option><option value="api">API cloud</option><option value="local">Whisper lokal</option></select></label>
         <label class="check"><input type="checkbox" id="translate_en"> Terjemahkan caption ke bahasa Inggris</label>
-        <label class="check"><input type="checkbox" id="cut_silence"> Potong jeda hening otomatis (jump cut, lebih padat)</label>
+        <label class="check"><input type="checkbox" id="cut_silence"> Potong jeda hening otomatis</label>
         <div class="ai-choice" id="llmRow" hidden><label class="check"><input type="checkbox" id="use_llm" checked> Pilih momen & judul dengan AI</label><small>Model aktif: <b id="llmModel"></b></small></div>
-        <div class="ai-choice fallback" id="localFallback"><span class="status-dot"></span><div><b>Seleksi lokal aktif</b><small>Highlight dipilih dengan analisis transkrip lokal. Tidak memakai 9Router.</small></div></div>
+        <div class="ai-choice fallback" id="localFallback"><span class="status-dot"></span><div><b>Seleksi lokal aktif</b><small>Highlight dipilih dengan analisis transkrip lokal.</small></div></div>
       </div>
-
-      <div class="card">
+      <div class="card format-video-card">
         <h3>Format video</h3>
+        <p class="hint">Otomatis: server mendeteksi konten. Gaming dengan facecam (di sudut mana pun) → gameplay di atas, facecam di bawah. Podcast/talking head → 9:16 mengikuti wajah.</p>
         <div class="layouts" id="layouts">
+          <button data-l="auto"><i class="ly ly-p"></i>Otomatis</button>
           <button data-l="portrait"><i class="ly ly-p"></i>Portrait 9:16</button>
           <button data-l="square"><i class="ly ly-s"></i>Square 1:1</button>
           <button data-l="blur"><i class="ly ly-b"></i>Blur background</button>
@@ -144,14 +146,14 @@
           <p class="hint">Posisi facecam di video asli:</p>
           <div class="chips" id="facePos"><button data-f="tl">Kiri atas</button><button data-f="tr">Kanan atas</button><button data-f="bl">Kiri bawah</button><button data-f="br">Kanan bawah</button></div>
           <label>Ukuran facecam di video asli <input type="range" id="faceSize" min="15" max="50" value="30"></label>
-          <label>Porsi facecam di hasil <input type="range" id="faceRatio" min="25" max="55" value="40"></label>
+          <label>Porsi facecam di hasil (bawah) <input type="range" id="faceRatio" min="20" max="50" value="32"></label>
         </div>
       </div>
     </div>
 
     <details class="advanced advanced-only" open><summary><span><b>03 · Subtitle & identitas</b><small>Caption, judul, dan watermark</small></span><em>Atur</em></summary><div class="advanced-body grid2">
       <div class="card" id="capCard">
-        <h3>Caption <label class="sw"><input type="checkbox" id="cap_enabled"><span></span></label></h3>
+        <h3>Caption <label class="sw" title="Aktifkan caption"><input type="checkbox" id="cap_enabled" role="switch" aria-label="Aktifkan caption"><span aria-hidden="true"></span></label></h3>
         <div class="chips" id="capStyle"><button data-v="clean">Plain</button><button data-v="karaoke">Karaoke</button><button data-v="wbw">Word by word</button><button data-v="keyword">Subtract &amp; font</button></div>
         <div class="pn-row"><label class="check"><input type="checkbox" id="cap_box"> Box highlight (kotak ikut kata aktif)</label><label class="check"><input type="checkbox" id="cap_glow"> Efek glow</label></div>
         <div class="row2">
@@ -170,10 +172,10 @@
       </div>
 
       <div class="card">
-        <h3>Judul pembuka <label class="sw"><input type="checkbox" id="ttl_enabled"><span></span></label></h3>
+        <h3>Judul pembuka <label class="sw" title="Aktifkan judul pembuka"><input type="checkbox" id="ttl_enabled" role="switch" aria-label="Aktifkan judul pembuka"><span aria-hidden="true"></span></label></h3>
         <div class="chips" id="ttlPreset"><button data-v="duo">Duo glow</button><button data-v="bar">Bar</button><button data-v="outline">Outline</button><button data-v="neon">Neon</button><button data-v="clean">Clean</button></div>
         <label>Tampil selama (detik, 0 = sepanjang klip)<input type="number" id="ttl_duration" class="in" min="0" max="120"></label>
-        <h3 class="mt">Watermark <label class="sw"><input type="checkbox" id="wm_enabled"><span></span></label></h3>
+        <h3 class="mt">Watermark <label class="sw" title="Aktifkan watermark"><input type="checkbox" id="wm_enabled" role="switch" aria-label="Aktifkan watermark"><span aria-hidden="true"></span></label></h3>
         <div class="row2">
           <label>Teks<input id="wm_text" class="in" maxlength="40"></label>
           <label>Logo PNG (opsional)<span class="inrow"><label class="btn ghost sm upbtn">＋ Pilih logo<input type="file" id="wm_file" accept="image/png,image/jpeg,image/webp" hidden></label><span class="muted ell" id="wmName">belum ada</span></span></label>
@@ -188,15 +190,15 @@
         <h3>Efek visual</h3>
         <fieldset class="decoration-choice"><legend>Dekorasi</legend><label><input type="radio" name="decoration_mode" value="none" checked> Tanpa dekorasi</label><label><input type="radio" name="decoration_mode" value="smart_emoji"> Emoji cerdas</label><label><input type="radio" name="decoration_mode" value="light_illustration"> Ilustrasi ringan</label></fieldset>
         <p class="hint">Berbasis keyword, saran LLM, atau manual. Otomatis dibatalkan bila wajah, produk, HUD, atau caption tidak menyisakan area aman.</p>
-        <div class="fx-row"><div><b>Emoji cerdas</b><span>Muncul singkat hanya untuk event semantik relevan</span></div><label class="sw"><input type="checkbox" id="emoji_on" aria-label="Aktifkan emoji cerdas"><span></span></label></div>
+        <div class="fx-row"><div><b>Emoji cerdas</b><span>Muncul singkat hanya untuk event semantik relevan</span></div><label class="sw" title="Aktifkan emoji cerdas"><input type="checkbox" id="emoji_on" role="switch" aria-label="Aktifkan emoji cerdas"><span aria-hidden="true"></span></label></div>
         <label id="emojiSizeRow">Ukuran emoji <input type="range" id="emoji_size" min="60" max="160"></label>
-        <div class="fx-row"><div><b>Progress bar</b><span>Garis tipis yang berjalan, bikin penonton bertahan sampai akhir</span></div><label class="sw"><input type="checkbox" id="pb_on"><span></span></label></div>
+        <div class="fx-row"><div><b>Progress bar</b><span>Garis tipis yang berjalan, bikin penonton bertahan sampai akhir</span></div><label class="sw" title="Aktifkan progress bar"><input type="checkbox" id="pb_on" role="switch" aria-label="Aktifkan progress bar"><span aria-hidden="true"></span></label></div>
         <div class="row2" id="pbRow"><label>Warna<input type="color" id="pb_color" class="in color"></label><label>Posisi<select id="pb_pos" class="in"><option value="bottom">Bawah</option><option value="top">Atas</option></select></label></div>
-        <div class="fx-row"><div><b>Ajakan di akhir (CTA)</b><span>Teks penutup, mis. "Follow untuk part 2"</span></div><label class="sw"><input type="checkbox" id="cta_on"><span></span></label></div>
+        <div class="fx-row"><div><b>Ajakan di akhir (CTA)</b><span>Teks penutup, mis. "Follow untuk part 2"</span></div><label class="sw" title="Aktifkan CTA"><input type="checkbox" id="cta_on" role="switch" aria-label="Aktifkan ajakan di akhir"><span aria-hidden="true"></span></label></div>
         <div class="row2" id="ctaRow"><label>Teks<input id="cta_text" class="in" maxlength="50"></label><label>Durasi (dtk)<input id="cta_dur" type="number" class="in" min="1" max="10"></label></div>
       </div>
       <div class="card">
-        <h3>Musik latar <label class="sw"><input type="checkbox" id="mu_on"><span></span></label></h3>
+        <h3>Musik latar <label class="sw" title="Aktifkan musik latar"><input type="checkbox" id="mu_on" role="switch" aria-label="Aktifkan musik latar"><span aria-hidden="true"></span></label></h3>
         <p class="hint">Volume musik turun otomatis saat ada suara (ducking). Pakai musik bebas royalti / milikmu sendiri.</p>
         <div id="muBody">
           <div class="inrow"><select id="mu_file" class="in"></select><label class="btn ghost sm upbtn">＋ Unggah<input type="file" id="mu_up" accept="audio/*" hidden></label></div>
@@ -220,7 +222,7 @@
 </template>
 
 <dialog id="dlg"><form method="dialog"><button class="x" aria-label="Tutup"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></form><div id="dlgBody"></div></dialog>
-<script src="app.js?v=5183bef-ui2"></script>
-<script src="studio.js?v=5183bef-ui2"></script>
+<script src="app.js?v=ui10-race-fix"></script>
+<script src="studio.js?v=ui10-race-fix"></script>
 </body>
 </html>

@@ -20,15 +20,34 @@ from .config import DATA_DIR
 SETTINGS_FILE = DATA_DIR / "settings.json"
 DEFAULT_LLM_BASE_URL = "http://localhost:20128/v1"
 DEFAULT_LLM_MODEL = "ag/gemini-3.8-flash-medium"
+GPT_THINKER = "ms/GPT-5.6-Think-Deeper"
+# Semua model Gemini di 9Router, urut dari yang paling seimbang (cepat + akurat) ke cadangan.
+GEMINI_MODELS = [
+    "ag/gemini-3.8-flash-medium", "ag/gemini-3.8-flash-high", "ag/gemini-3.8-flash", "ag/gemini-3.8-flash-low",
+    "ag/gemini-4-argon-medium", "ag/gemini-4-argon-high", "ag/gemini-4-argon-low",
+    "ag/gemini-3.1-pro-high", "ag/gemini-3.1-pro-low", "ag/gemini-pro-agent",
+    "ag/gemini-3.7-flash-medium", "ag/gemini-3.7-flash-high", "ag/gemini-3.7-flash-low",
+    "ag/gemini-3.6-flash-medium", "ag/gemini-3.6-flash-high", "ag/gemini-3.6-flash-low",
+]
+# Seleksi momen harus responsif. Gunakan varian Flash aktif terlebih dahulu dan jangan
+# menghabiskan anggaran pada model reasoning sebelum kandidat lokal tersedia.
+DEFAULT_FALLBACKS = ["ag/gemini-3.8-flash-medium", "ag/gemini-3.8-flash-low",
+                     "ag/gemini-3.8-flash-high", "ag/gemini-3.8-flash"]
 DEFAULT_LLM = {
     "enabled": False,
     "base_url": DEFAULT_LLM_BASE_URL,
     "api_key": "",
     "model_moments": DEFAULT_LLM_MODEL,
     "model_titles": DEFAULT_LLM_MODEL,
+    "model_posts": GPT_THINKER,          # caption posting: model penalaran untuk copy yang rapi
+    "fallback_models": DEFAULT_FALLBACKS,
     "temperature": 0.4,
     "timeout": 60,
 }
+
+
+def model_catalog() -> dict:
+    return {"gemini": GEMINI_MODELS, "gpt": [GPT_THINKER], "default_fallbacks": DEFAULT_FALLBACKS}
 
 
 def normalize_base_url(value: str) -> str:
@@ -218,6 +237,44 @@ def chat(model: str, system: str, user: str, c: dict | None = None, max_tokens: 
     return content
 
 
+def chain_for(task: str, c: dict | None = None) -> list[str]:
+    """Model utama untuk tugas + fallback unik, urutan dipertahankan."""
+    c = c or cfg()
+    first = c.get(f"model_{task}") or c.get("model_titles") or c.get("model_moments")
+    extra = c.get("fallback_models") or []
+    if isinstance(extra, str):
+        extra = [m.strip() for m in extra.split(",")]
+    out: list[str] = []
+    for m in [first, *extra]:
+        if m and m not in out:
+            out.append(m)
+    return out
+
+
+def chat_chain(task: str, system: str, user: str, c: dict | None = None, max_tokens: int = 4000,
+               json_mode: bool = False, parse_json: bool = True) -> tuple:
+    """Coba tiap model di rantai sampai satu berhasil. Return (hasil, model_dipakai)."""
+    import time
+    c = c or cfg()
+    errors = []
+    # Batas waktu total menjaga pipeline tetap responsif. Tiap model mendapat kesempatan
+    # singkat, lalu pipeline segera memakai ranking lokal yang sudah dihitung.
+    deadline = time.monotonic() + float(c.get("chain_budget", 90))
+    for model in chain_for(task, c):
+        left = deadline - time.monotonic()
+        if left < 5:
+            errors.append("batas waktu total habis")
+            break
+        try:
+            per_model = min(float(c.get("timeout", 60)), 45.0, left)
+            text = chat(model, system, user, {**c, "timeout": per_model},
+                        max_tokens=max_tokens, json_mode=json_mode)
+            return (_json(text) if parse_json else text), model
+        except LLMError as e:
+            errors.append(f"{model}: {str(e)[:120]}")
+    raise LLMError("Semua model gagal → " + " | ".join(errors[-4:]))
+
+
 def _json(text: str):
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
     m = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
@@ -246,16 +303,18 @@ SYS_EDITOR = (
 def pick_moments(cands: list[dict], count: int, language: str | None) -> list[dict]:
     """cands: [{id, start, end, text}] → [{id, score, title, reason, hashtags}] urut terbaik."""
     c = cfg()
-    lines = [f'#{x["id"]} [{x["start"]:.0f}s–{x["end"]:.0f}s, {x["end"] - x["start"]:.0f}dtk]: {x["text"][:900]}' for x in cands]
+    lines = [f'#{x["id"]} [{x["start"]:.0f}s–{x["end"]:.0f}s, {x["end"] - x["start"]:.0f}dtk]: {x["text"][:2200]}' for x in cands]
     user = (
         f"Bahasa video: {language or 'tidak diketahui'}. Pilih {count} kandidat TERBAIK yang tidak saling tumpang tindih "
         f"dari daftar berikut.\n\n" + "\n\n".join(lines) +
         "\n\nUntuk tiap pilihan buat judul akurat maksimal 8 kata. Beri confidence dan seluruh dimensi 0-100.\n"
+        "PENTING: bedakan kualitas dengan tegas. Skor total dan tiap dimensi harus bervariasi nyata antar klip "
+        "(klip terbaik 85-98, klip biasa 55-70, klip lemah di bawah 50). Dilarang memberi skor hampir sama untuk semua klip.\n"
         'Format: {"clips":[{"id":1,"score":80,"confidence":0.8,"title":"...","reason":"...",'
         '"breakdown":{"hook":0,"novelty":0,"emotional_shift":0,"clarity":0,"payoff":0,"quotability":0,'
         '"visual_action":0,"information_density":0,"clean_ending":0},"hashtags":["#topik"]}]}'
     )
-    out = _json(chat(c["model_moments"], SYS_EDITOR, user, c, json_mode=True))
+    out, _ = chat_chain("moments", SYS_EDITOR, user, c, json_mode=True)
     clips = out.get("clips", out) if isinstance(out, dict) else out
     res = []
     for x in clips if isinstance(clips, list) else []:
@@ -275,21 +334,14 @@ def pick_moments(cands: list[dict], count: int, language: str | None) -> list[di
 
 def make_title(text: str, language: str | None, style: str = "penasaran") -> list[str]:
     c = cfg()
-    model = c["model_titles"] or c["model_moments"]
     user = (f"Transkrip klip:\n{text[:2500]}\n\nBuat 3 alternatif judul pembuka akurat ({style}), maksimal 8 kata, "
             f"bahasa sama dengan transkrip ({language or 'auto'}). Format: {{\"titles\":[\"...\"]}}")
-    out = _json(chat(model, SYS_EDITOR, user, c, max_tokens=1500))
+    out, _ = chat_chain("titles", SYS_EDITOR, user, c, max_tokens=1500)
     titles = out.get("titles", []) if isinstance(out, dict) else out
     return [str(t).strip()[:80] for t in titles if str(t).strip()][:3]
 
 
-def make_post(text: str, title: str, language: str | None) -> dict:
-    c = cfg()
-    model = c["model_titles"] or c["model_moments"]
-    user = (f"Judul klip: {title}\nTranskrip:\n{text[:2500]}\n\nTulis caption value-first: pembuka manfaat, konteks singkat, "
-             f"CTA natural. Buat 4-7 hashtag terkelompok niche/topic/format tanpa spam, bahasa {language or 'sama dengan transkrip'}. "
-             'Format: {"caption":"...","hashtags":["#..."],"groups":{"niche":[],"topic":[],"format":[]}}')
-    out = _json(chat(model, SYS_EDITOR, user, c, max_tokens=1500))
-    return {"caption": str(out.get("caption", ""))[:1200],
-            "hashtags": [str(h) for h in out.get("hashtags", []) if str(h).startswith("#")][:7],
-            "hashtag_groups": out.get("groups", {})}
+def make_post(text: str, title: str, language: str | None, profile: str = "general") -> dict:
+    """Paket posting siap pakai per platform (lihat postgen). Tetap kompatibel: caption + hashtags di level atas."""
+    from . import postgen
+    return postgen.generate(text, title, profile, language, use_llm=True)

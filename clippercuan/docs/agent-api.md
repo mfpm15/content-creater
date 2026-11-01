@@ -31,6 +31,7 @@ Untuk server cloud tambahkan `"env": {"CLIPPER_URL": "https://…", "CLIPPER_TOK
 | `add_clip(project_id, start, end, title)` / `delete_clip(project_id, clip_id)` | Klip manual / hapus klip |
 | `restyle_project(project_id, settings)` | Render ulang semua klip dengan gaya baru |
 | `export_project(project_id, folder)` | Ekspor MP4 + SRT + `caption-posting.txt` ke folder, atau ZIP |
+| `check_delivery(project_id, clip_id, platform)` | Ukur klip hasil render terhadap aturan `tiktok` / `shorts` / `reels` / `all`: rasio 9:16, durasi, audio, loudness. Hasil: `ok` + daftar `issues` (`error` / `warn`) |
 | `list_templates()` / `system_check()` | Template gaya / kesiapan sistem |
 
 Contoh perintah ke agent:
@@ -55,6 +56,7 @@ GET  /api/projects/{id}/summary    → status, progress, clips[].video_path / sr
 PATCH /api/projects/{id}/clips/{cid}  {"changes": {"title": "…"}, "rerender": true}
 POST /api/projects/{id}/rerender   {"settings": {"layout": "blur"}}
 POST /api/projects/{id}/export     {"folder": "D:/Konten"}
+GET  /api/projects/{id}/clips/{cid}/delivery?platform=all|tiktok|shorts|reels   → cek hasil per platform
 GET  /api/templates   ·   GET /api/system   ·   POST /api/automation/inbox/scan
 ```
 Server hanya mendengarkan `127.0.0.1` (tidak terbuka ke jaringan).
@@ -70,7 +72,7 @@ Atur di menu **AI Agent & otomatisasi**:
    "folder": "…/projects/20261026-…", "clips": [{"id": "clip_01", "score": 97, "title": "…",
    "video_path": "…/clip_01.mp4", "srt_path": "…/clip_01.srt", "caption": "…", "hashtags": ["#…"]}]}
   ```
-- **Folder inbox** — taruh file video di `~/ClipperCuan/inbox` → diproses otomatis dengan template pilihan,
+- **Folder inbox** — taruh file video di `<folder repo>/.data/ClipperCuan/inbox` (atau `$CLIPPER_HOME/inbox`) → diproses otomatis dengan template pilihan,
   file asli dipindah ke `inbox/diproses`.
 - **Ekspor otomatis** — hasil setiap proyek disalin ke folder pilihan (`YYYY-MM-DD Judul/01 - Judul.mp4`, `.srt`, `caption-posting.txt`).
 

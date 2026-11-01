@@ -3,9 +3,16 @@ node_modules/
 .venv/
 venv/
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
 dist/
 dist-electron/
+build/
 release/
 .runtime/
 .pnpm-store/
@@ -20,20 +27,41 @@ config.toml
 
 # logs / generated
 *.log
+*.tmp
+*.temp
+*.bak
 storage/
 output/
 outputs/
+exports/
+renders/
 projects/
 uploads/
 tmp/
+cache/
 .hyperframes/
 .thumbnails/
 *.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.m4v
 *.mp3
+*.m4a
+*.aac
 *.wav
+*.flac
 
-# local visual audit artifacts
+# data lokal Clipper Cuan (proyek, model, settings berisi API key, temp)
+.data/
+
+# local visual audit artifacts, temporary reports, and distribution archives
 .ui-audit/
+creator-control-center-*.zip
+_package-staging/
+creator-dashboard/cleanup-manifest.json
+creator-dashboard/*-test-output.txt
 
 # huge macOS fonts (>50MB)
 creator-dashboard/apps/moneyprinterturbo/resource/fonts/STHeiti*.ttc

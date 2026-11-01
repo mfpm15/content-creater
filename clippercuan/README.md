@@ -20,7 +20,7 @@ Lihat [docs/cloud.md](docs/cloud.md): `docker build` + `docker run` dengan `CLIP
 4. Tempel link / pilih file → atur gaya → **Mulai generate klip**.
 
 FFmpeg sudah ikut terpasang otomatis. Model transkripsi Whisper diunduh sekali saat pertama dipakai (small ±480 MB).
-Hasil tersimpan di folder `~/ClipperCuan/projects/` (tombol **Buka folder** di aplikasi).
+Hasil tersimpan di `<folder repo>/.data/ClipperCuan/projects/` (tombol **Buka folder** di aplikasi). Seluruh data (proyek, model, pengaturan, log, temp, cache) ada di `.data/` dan tidak menyentuh drive C:. Untuk memindahkan ke lokasi lain, set env `CLIPPER_HOME`.
 
 ## Fitur
 | Fitur | Keterangan |

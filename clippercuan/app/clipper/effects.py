@@ -127,7 +127,7 @@ def safe_zones(profile: str, layout: str, caption_y_pct: float = 74) -> list[dic
     elif profile in {"podcast", "interview"}:
         zones += [{"kind": "face", "rect": [.18, .08, .64, .5]}]
     if layout == "split":
-        zones.append({"kind": "facecam", "rect": [0, 0, 1, .38]})
+        zones.append({"kind": "facecam", "rect": [0, .68, 1, .32]})   # facecam di bagian bawah
     return zones
 
 

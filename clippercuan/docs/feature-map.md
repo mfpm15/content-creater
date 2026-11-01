@@ -26,4 +26,7 @@ yang disamakan adalah **fitur dan alur kerja**, bukan merek, logo, aset, atau te
 Resep gaya viral per niche · mode hemat disk (tanpa simpan video penuh) · sinyal visual untuk skor · Viral readiness transparan
 per dimensi · AI router opsional (9Router) · subtitle YouTube/API cloud · potong jeda hening · emoji otomatis · progress bar & CTA ·
 musik + ducking · pembicara aktif · paket posting (caption + hashtag) · ZIP + SRT · batch link · template gaya · MCP/CLI/REST/webhook/inbox ·
-server cloud dengan password · cookies browser untuk YouTube. Usulan berikutnya: [usulan-fitur.md](usulan-fitur.md).
+server cloud dengan password · cookies browser untuk YouTube · cek hasil per platform (rasio, durasi, audio, loudness; REST + MCP `check_delivery`) ·
+framing per-shot (`shot_framing`, default aktif): potongan kamera termasuk crossfade terdeteksi, tiap shot diputuskan `single` (crop mengikuti wajah) / `multi` (dua panel bertumpuk) / `broll` (frame utuh + latar blur) ·
+video panel/meja banyak orang tidak lagi dibaca gaming + facecam (`visual_composition.multi_person`) · crop manual (`crop_manual`) tidak ditimpa render ulang.
+Usulan berikutnya: [usulan-fitur.md](usulan-fitur.md). Analisis 8 repo referensi: [plan-referensi-2026-10.md](plan-referensi-2026-10.md).

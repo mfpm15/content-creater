@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 APP_NAME = "ClipperCuan"
@@ -11,12 +12,22 @@ PKG_DIR = Path(__file__).resolve().parent
 WEB_DIR = PKG_DIR / "web"
 FONTS_DIR = PKG_DIR / "fonts"
 
-DATA_DIR = Path(os.environ.get("CLIPPER_HOME", Path.home() / APP_NAME)).expanduser()
+# Data ikut folder repo (drive D), bukan profil pengguna di drive C. CLIPPER_HOME tetap bisa menimpa.
+# Build exe (frozen): folder data di samping exe.
+_BASE = Path(sys.executable).parent if getattr(sys, "frozen", False) else PKG_DIR.parents[2]
+DATA_DIR = Path(os.environ.get("CLIPPER_HOME") or (_BASE / ".data" / APP_NAME)).expanduser()
 PROJECTS_DIR = DATA_DIR / "projects"
 MODELS_DIR = DATA_DIR / "models"
 UPLOADS_DIR = DATA_DIR / "uploads"
-for d in (PROJECTS_DIR, MODELS_DIR, UPLOADS_DIR):
+TMP_DIR = DATA_DIR / "tmp"
+for d in (PROJECTS_DIR, MODELS_DIR, UPLOADS_DIR, TMP_DIR):
     d.mkdir(parents=True, exist_ok=True)
+# File sementara (frame, potongan klip, ffmpeg, yt-dlp) juga di drive yang sama, bukan %TEMP% di C.
+tempfile.tempdir = os.environ["TMP"] = os.environ["TEMP"] = str(TMP_DIR)
+# Cache pihak ketiga (yt-dlp, Hugging Face) juga ikut data Clipper, bukan ~/.cache di drive C.
+CACHE_DIR = DATA_DIR / "cache"
+for _k in ("XDG_CACHE_HOME", "HF_HOME"):
+    os.environ.setdefault(_k, str(CACHE_DIR / _k.lower()))
 
 
 def _find_ffmpeg() -> str:
@@ -53,17 +64,19 @@ DEFAULTS: dict = {
     "model": "small",            # tiny | base | small | medium | large-v3
     "transcriber": "auto",       # auto | youtube | api | local  (auto: YouTube → API cloud → Whisper lokal)
     "clip_count": "auto",        # jumlah render otomatis; "auto" = ±1 per 3 menit video, 3–10 (≥30 menit = 10)
-    "duration_preset": "auto",  # auto | 15-25 | 25-40 | 40-60 | custom
-    "min_sec": 15,
-    "max_sec": 60,
+    "duration_preset": "auto",  # auto (min. 1 menit) | 60-90 | 90-120 | 15-25 | 25-40 | 40-60 | custom
+    "min_sec": 60,
+    "max_sec": 90,
     "layout": "portrait",        # portrait | square | blur | split | landscape
     "smart_crop": True,          # ikuti wajah
+    "shot_framing": True,        # portrait dari video 16:9: framing diputuskan per shot (satu wajah / dua wajah / B-roll)
     "cut_silence": False,        # potong jeda hening (jump cut)
     "silence_gap": 0.55,         # detik jeda minimum yang dipotong
     "split": {                   # area dalam pecahan (0..1) dari frame sumber
         "face": [0.70, 0.62, 0.30, 0.38],   # x, y, w, h  (default: facecam pojok kanan bawah)
         "game": [0.0, 0.0, 1.0, 1.0],
-        "face_ratio": 0.4,       # porsi tinggi frame output untuk facecam (atas)
+        "game_focus": 1.0,       # pecahan lebar gameplay yang ditampilkan (crop tengah aksi); 1.0 = seluruh area gameplay
+        "face_ratio": 0.32,      # porsi tinggi frame output untuk facecam (BAWAH); gameplay mengisi bagian atas
     },
     "caption": {
         "enabled": True,

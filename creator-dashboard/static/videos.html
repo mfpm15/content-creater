@@ -28,6 +28,52 @@
       height: 100%;
       object-fit: contain;
     }
+    .workflow-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 0 0 18px;
+    }
+    .workflow-step {
+      padding: 9px 6px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+    }
+    .workflow-step.active {
+      border-color: var(--accent);
+      background: rgba(99,102,241,.12);
+      color: #fff;
+    }
+    .review-panel {
+      display: none;
+      margin: 14px 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(15,23,42,.7);
+    }
+    .review-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+      max-height: 420px;
+      overflow: auto;
+    }
+    .review-card { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .review-card h4 { margin: 0 0 10px; color: #fff; }
+    .review-card p { margin: 5px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .review-card strong { color: #c4b5fd; }
+    .scene-editor { display:grid; gap:9px; }
+    .scene-editor label { margin:0; font-size:10px; color:var(--muted); }
+    .scene-editor input,.scene-editor textarea,.scene-editor select { width:100%; margin-top:4px; padding:8px 9px; border:1px solid var(--line); border-radius:7px; background:var(--panel-2); color:var(--text); font:inherit; font-size:11px; }
+    .scene-editor textarea { min-height:68px; resize:vertical; line-height:1.4; }
+    .scene-editor .editor-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .review-actions { display: flex; gap: 10px; flex-wrap:wrap; }
+    .danger-button { border:1px solid rgba(248,113,113,.55); background:rgba(127,29,29,.22); color:#fecaca; border-radius:8px; padding:9px 12px; cursor:pointer; }
     .progress-track {
       width: 100%;
       height: 6px;
@@ -68,34 +114,45 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <a class="brand" href="/" aria-label="Creator Control Center">
         <span class="brand-mark">C</span>
         <span><strong>Creator</strong><small>Control Center</small></span>
       </a>
+      <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Ciutkan sidebar" aria-expanded="true">☰</button>
       <nav aria-label="Navigasi utama">
-        <a class="nav-link" href="/"><span>▦</span> Semua Tools</a>
-        <a class="nav-link active" href="/videos.html"><span>🎬</span> Video Studio</a>
-        <a class="nav-link" href="/articles.html"><span>✎</span> Article Drafter</a>
+        <small class="nav-group">HOME</small>
+        <a class="nav-link" href="/" title="Overview" data-tip="Overview"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><b>Overview</b></a>
+        <small class="nav-group">CREATE</small>
+        <a class="nav-link active" href="/videos.html" title="Video Studio" data-tip="Video Studio" aria-current="page"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><b>Video Studio</b></a>
+        <a class="nav-link" href="/articles.html" title="Article Drafter" data-tip="Article Drafter"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><b>Article Drafter</b></a>
+        <small class="nav-group">REPURPOSE</small>
+        <a class="nav-link" href="http://127.0.0.1:8765" title="Buka Clipper Cuan (tab baru)" data-tip="Clipper Cuan" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg><b>Clipper Cuan</b></a>
+        <small class="nav-group">TOOLS</small>
+        <a class="nav-link" href="/#tools" title="Tool Catalog" data-tip="Tool Catalog"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><b>Tool Catalog</b></a>
       </nav>
-      <div class="sidebar-note">
-        <span class="pulse"></span>
-        <div><strong>Opuscar Production</strong><small>9Router Direction + Edge TTS + FFmpeg</small></div>
-      </div>
+      <a class="sidebar-note" id="sideClipper" href="http://127.0.0.1:8765" target="_blank" rel="noopener" title="Status Clipper Cuan"><span class="pulse" id="sideDot"></span><div><strong id="sideClipperTitle">Clipper Cuan</strong><small id="sideClipperText">Memeriksa…</small></div></a>
     </aside>
 
     <main>
       <header class="topbar">
         <div>
-          <p class="eyebrow">OPUSCAR VIDEO STUDIO</p>
-          <h1>Produksi Video Opuscar Dinamis</h1>
+          <p class="eyebrow">ANIMATION PRODUCTION STUDIO</p>
+          <h1>Workflow Produksi Animasi Web</h1>
         </div>
       </header>
 
       <section class="section-block drafter-grid">
         <form id="videoForm" class="panel" autocomplete="off">
-          <h2 id="formEngineTitle">1. Sutradarai Film Opuscar</h2>
-          <div id="engineNotice" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Opuscar Production Pipeline</strong><br>Scene plan mengikuti topik, narasi, timecode, visual, teks layar, sound cue, durasi, rasio, dan model. Timecode eksplisit dipertahankan; input bebas dibagi proporsional.</div>
+          <h2 id="formEngineTitle">1. Buat Brief Animasi</h2>
+          <div class="workflow-steps" aria-label="Tahapan produksi">
+            <div class="workflow-step active" data-workflow-step="brief">Brief</div>
+            <div class="workflow-step" data-workflow-step="research">Web Research</div>
+            <div class="workflow-step" data-workflow-step="scene_plan">Scene Plan</div>
+            <div class="workflow-step" data-workflow-step="storyboard">Storyboard</div>
+            <div class="workflow-step" data-workflow-step="render">Render</div>
+          </div>
+          <div id="engineNotice" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Workflow Berbasis Sumber</strong><br>Brief diriset melalui Google Search grounding sebelum Scene Plan dibuat. Workflow berhenti jika sumber valid atau kredensial pencarian tidak tersedia.</div>
           <label>Topik / Judul Video <span class="req">wajib</span>
             <input name="topic" id="topicInput" maxlength="200" required placeholder="Contoh: 3 Tips Sukses Mengatur Waktu, Peluncuran Kopi Organik, AI Video Engine" />
           </label>
@@ -105,8 +162,8 @@
           </label>
 
           <div class="row2">
-            <label>Gaya Visual
-              <select name="style" id="styleSelect"></select>
+            <label>Render Adapter
+              <select name="engine" id="engineSelect"></select>
             </label>
             <label>Format Rasio Layar
               <select name="aspect" id="aspectSelect"></select>
@@ -117,34 +174,46 @@
             <label>Durasi Video (Detik)
               <select name="duration" id="durationSelect"></select>
             </label>
-            <label>Model Pengarah Visual (9Router)
+            <label>Model Motion Planner (9Router)
               <select name="model" id="modelSelect"></select>
             </label>
           </div>
 
+          <select name="style" id="styleSelect" hidden></select>
           <button id="generateBtn" class="primary-button" type="submit" style="width: 100%; margin-top: 18px; padding: 14px; font-size: 14px;">
-            ⚡ Generate Video Sekarang (MP4)
+            Buat Scene Plan
           </button>
           <div id="formStatus" class="form-status"></div>
         </form>
 
         <section class="panel">
-          <h2>2. Hasil Video & Pratinjau</h2>
+          <h2>2. Review & Hasil</h2>
           <div id="statusContainer" style="display: none; margin-bottom: 16px;">
             <p id="statusStep" style="font-weight: bold; margin: 0; color: var(--accent);">Menyiapkan render...</p>
             <div class="progress-track"><div id="progressBar" class="progress-fill"></div></div>
           </div>
+
+          <section id="reviewPanel" class="review-panel" aria-live="polite">
+            <h3 id="reviewTitle">Review</h3>
+            <p id="reviewDescription" style="color:var(--muted);font-size:13px"></p>
+            <div id="reviewGrid" class="review-grid"></div>
+            <div class="review-actions">
+              <button id="savePlanBtn" class="secondary-button" type="button">Simpan Perubahan</button>
+              <button id="approveBtn" class="primary-button" type="button">Setujui</button>
+              <button id="reviseBtn" class="secondary-button" type="button" style="display:none">Kembali ke Scene Plan</button>
+            </div>
+          </section>
 
           <div id="videoContainer" class="video-preview-box">
             <p style="color: var(--muted); font-size: 13px;">Belum ada video yang dipilih atau digenerate.</p>
           </div>
 
           <div id="videoActions" style="display: none; gap: 10px; margin-top: 14px;">
-            <a id="downloadBtn" class="primary-button" href="#" download style="flex: 1; text-align: center;">⬇ Unduh Video MP4</a>
-            <a id="inspectHtmlBtn" class="secondary-button" href="#" target="_blank" style="flex: 1; text-align: center;">🔍 Buka Source HTML</a>
+            <a id="downloadBtn" class="primary-button" href="#" download style="flex: 1; text-align: center;">Unduh Hasil</a>
+            <a id="inspectHtmlBtn" class="secondary-button" href="#" target="_blank" rel="noopener" style="flex: 1; text-align: center;">Buka Preview Web</a>
           </div>
 
-          <h3 style="margin-top: 28px;">Daftar Video yang Pernah Dibuat</h3>
+          <h3 style="margin-top: 28px;">Riwayat Animasi</h3>
           <div id="historyList">
             <p class="empty">Memuat daftar video...</p>
           </div>
@@ -153,6 +222,7 @@
     </main>
   </div>
 
+  <script src="/shell.js" defer></script>
   <script src="/videos.js"></script>
 </body>
 </html>

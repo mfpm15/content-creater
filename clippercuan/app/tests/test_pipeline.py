@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pytest  # noqa: E402
 
 from clipper import candidates, highlights, project, transcribe  # noqa: E402
-from clipper.config import FFMPEG  # noqa: E402
+from clipper.config import DEFAULTS, FFMPEG, deep_merge  # noqa: E402
 from clipper.server import _local_request_ok  # noqa: E402
 
 SENTENCES = ["Kenapa uang kamu selalu habis di tengah bulan?", "Ternyata rahasia nya ada di kebiasaan kecil.",
@@ -146,8 +146,6 @@ def test_recipe_is_base_and_user_settings_win():
 
 def test_caption_styles_box_toggle_keyword_glow_and_duo_title():
     from clipper import captions
-    from clipper.config import DEFAULTS, deep_merge
-
     words = [{"w": w, "s": i * .4, "e": i * .4 + .35} for i, w in enumerate("kenapa bisnis bisa bangkrut".split())]
     cfg = deep_merge(DEFAULTS, {"caption": {"style": "keyword", "box": True, "effect": "glow", "y_pct": 60,
                                              "highlight": "#FFC933", "accent_mode": "font",
@@ -194,11 +192,14 @@ def test_detect_facecam_small_corner_face_vs_podcast():
     from clipper import facetrack
 
     class Fake:
+        """Koordinat wajah ditulis untuk frame 640 px; skalakan mengikuti ukuran frame yang dipakai detektor."""
+
         def __init__(self, faces):
             self.faces = faces
 
         def __call__(self, g):
-            return self.faces
+            k = g.shape[1] / 640
+            return [(int(x * k), int(y * k), int(w * k), int(h * k), m) for x, y, w, h, m in self.faces]
 
     frames = [np.zeros((360, 640), np.uint8)] * 6
     orig = facetrack._Detector
@@ -214,6 +215,153 @@ def test_detect_facecam_small_corner_face_vs_podcast():
         assert facetrack.detect_facecam(frames)["rect"] is None
     finally:
         facetrack._Detector = orig
+
+
+def test_detect_facecam_prefers_stable_corner_cluster_over_moving_game_faces():
+    import numpy as np
+
+    from clipper import facetrack
+
+    class Seq:
+        def __init__(self, per_frame):
+            self.per_frame, self.i = per_frame, 0
+
+        def __call__(self, g):
+            k = g.shape[1] / 640
+            faces = self.per_frame[self.i % len(self.per_frame)]
+            self.i += 1
+            return [(int(x * k), int(y * k), int(w * k), int(h * k), m) for x, y, w, h, m in faces]
+
+    frames = [np.zeros((360, 640), np.uint8)] * 9
+    orig = facetrack._Detector
+    try:  # streamer di kiri bawah (stabil) + wajah karakter game yang berpindah-pindah di tengah
+        per = [[(70, 270, 50, 52, None), (200 + 30 * k, 90 + 20 * k, 30, 30, None)] for k in range(9)]
+        facetrack._Detector = lambda w, h: Seq(per)
+        cam = facetrack.detect_facecam(frames)
+        x, y, w, h = cam["rect"]
+        assert x < .2 and y > .5 and w < .45                  # area facecam = pojok kiri bawah, bukan wajah karakter
+    finally:
+        facetrack._Detector = orig
+
+
+def test_small_faces_away_from_corners_are_not_a_facecam():
+    import numpy as np
+
+    from clipper import facetrack
+
+    class Two:   # podcast dua orang dari kamera lebar: dua wajah kecil di area tengah
+        def __call__(self, g):
+            k = g.shape[1] / 640
+            return [(int(x * k), int(y * k), int(w * k), int(h * k), None) for x, y, w, h in ((200, 120, 60, 66), (380, 120, 60, 66))]
+
+    frames = [np.zeros((360, 640), np.uint8)] * 8
+    orig = facetrack._Detector
+    try:
+        facetrack._Detector = lambda w, h: Two()
+        cam = facetrack.detect_facecam(frames)
+        assert cam["rect"] is None and not cam["big_face"]
+    finally:
+        facetrack._Detector = orig
+
+
+def test_adaptive_split_uses_profile_specific_composition(monkeypatch):
+    rect = [0.0, 0.64, 0.27, 0.35]
+    faces = [
+        {"rect": [0.05, 0.05, 0.42, 0.78], "center": [.26, .3], "hits": 9, "confidence": .8},
+        {"rect": [0.53, 0.05, 0.42, 0.78], "center": [.74, .3], "hits": 8, "confidence": .72},
+    ]
+    state = {"user_settings": {}, "facecam": {"rect": rect},
+             "visual_composition": {"faces": faces, "confidence": .8}}
+    monkeypatch.setattr(project, "load", lambda pid: state)
+    monkeypatch.setattr(project, "update", lambda pid, **kw: None)
+    base = deep_merge(DEFAULTS, {"recipe": "auto", "content_profile": "auto"})
+    podcast = project._apply_auto_recipe("x", deep_merge(DEFAULTS, base), "podcast", {"confidence": .9})
+    assert podcast["layout"] == "split"
+    assert podcast["split"]["strategy"] == "dual-speaker"
+    assert podcast["split"]["game"] == faces[0]["rect"] and podcast["split"]["face"] == faces[1]["rect"]
+    # Presenter kecil (produk/layar mendominasi frame) → konteks di atas, presenter di bawah.
+    small = {"rect": [0.62, 0.45, 0.3, 0.42], "center": [.77, .6], "hits": 9, "confidence": .8}
+    state["visual_composition"] = {"faces": [small], "confidence": .8}
+    review = project._apply_auto_recipe("x", deep_merge(DEFAULTS, base), "review", {"confidence": .9})
+    assert review["layout"] == "split" and review["split"]["strategy"] == "context-presenter"
+    # Presenter mengisi frame (wawancara WIRED: tinggi wilayah 0,75) → split akan menduplikasi orang yang sama; pakai crop wajah.
+    big = {"rect": [0.3583, 0.0204, 0.3354, 0.7463], "center": [.526, .319], "hits": 10, "confidence": .833}
+    state["visual_composition"] = {"faces": [big], "confidence": .833}
+    for profile in ("review", "educational", "general"):
+        full = project._apply_auto_recipe("x", deep_merge(DEFAULTS, base), profile, {"confidence": .9})
+        assert full["layout"] == "portrait" and not full["split_decision"]["enabled"], profile
+    state["visual_composition"] = {"faces": faces, "confidence": .8}
+    for profile in ("gaming", "mobile_legends"):
+        gaming = project._apply_auto_recipe("x", deep_merge(DEFAULTS, base), profile, {"confidence": .9})
+        assert gaming["layout"] == "split" and gaming["split"]["face"] == rect
+        assert gaming["split"]["game"][0] >= .27 - 1e-6
+
+
+def test_adaptive_split_falls_back_when_composition_is_weak(monkeypatch):
+    state = {"user_settings": {}, "facecam": {"rect": None},
+             "visual_composition": {"faces": [], "confidence": .1}}
+    monkeypatch.setattr(project, "load", lambda pid: state)
+    monkeypatch.setattr(project, "update", lambda pid, **kw: None)
+    base = deep_merge(DEFAULTS, {"recipe": "auto", "content_profile": "auto"})
+    gaming = project._apply_auto_recipe("x", deep_merge(DEFAULTS, base), "gaming", {"confidence": .9})
+    assert gaming["layout"] == "blur" and not gaming["split_decision"]["enabled"]
+    podcast = project._apply_auto_recipe("x", deep_merge(DEFAULTS, base), "podcast", {"confidence": .9})
+    assert podcast["layout"] == "portrait" and not podcast["split_decision"]["enabled"]
+
+
+def test_split_areas_work_for_facecam_in_every_corner():
+    from clipper import facetrack
+
+    corners = {"kiri-atas": [0, 0, .27, .35], "kanan-atas": [.73, 0, .27, .35],
+               "kiri-bawah": [0, .65, .27, .35], "kanan-bawah": [.73, .65, .27, .35]}
+    for name, face in corners.items():
+        a = facetrack.split_areas(face)
+        gx, _, gw, gh = a["game"]
+        assert a["face"] == face and gh == 1.0, name
+        if name.startswith("kiri"):
+            assert gx >= .27 - 1e-6 and abs(gx + gw - 1.0) < 1e-6, name       # kolom kiri (facecam) dibuang
+        else:
+            assert gx == 0.0 and gx + gw <= .73 + 1e-6, name                   # kolom kanan (facecam) dibuang
+    wide = facetrack.split_areas([0.0, 0.7, 0.9, 0.3])                         # facecam melebar (bar bawah): gameplay utuh
+    assert wide["game"] == [0.0, 0.0, 1.0, 1.0]
+
+
+def test_detect_facecam_in_each_corner_from_stable_small_face():
+    import numpy as np
+
+    from clipper import facetrack
+
+    class Fixed:
+        def __init__(self, face):
+            self.face = face
+
+        def __call__(self, g):
+            k = g.shape[1] / 640
+            x, y, w, h = self.face
+            return [(int(x * k), int(y * k), int(w * k), int(h * k), None)]
+
+    frames = [np.zeros((360, 640), np.uint8)] * 8
+    orig = facetrack._Detector
+    try:
+        for name, (fx, fy) in {"kiri-atas": (40, 20), "kanan-atas": (550, 20), "kiri-bawah": (40, 280), "kanan-bawah": (550, 280)}.items():
+            facetrack._Detector = lambda w, h, f=(fx, fy, 50, 55): Fixed(f)
+            x, y, w, h = facetrack.detect_facecam(frames)["rect"]
+            cx, cy = (fx + 25) / 640, (fy + 27) / 360
+            assert x <= cx <= x + w and y <= cy <= y + h, name
+            assert (x < .5) == (fx < 320) and (y < .5) == (fy < 180), name       # sudut yang benar
+    finally:
+        facetrack._Detector = orig
+
+
+def test_split_layout_puts_gameplay_on_top_and_facecam_below():
+    from clipper import render
+    from clipper.media import Probe
+
+    cfg = {"split": {"face": [0, .64, .27, .36], "game": [0, 0, 1, 1], "face_ratio": .32}, "quality": {"sharpen": False}}
+    graph = render.framing_filter("split", Probe(60, 1920, 1080, 30, True), cfg, None)
+    assert graph.index("[top][bot]vstack") > 0
+    assert "[a]crop=" in graph and "[bot]" in graph          # facecam → bot (bawah)
+    assert "[gfg]" in graph and "[gbg][gfg]overlay" in graph  # gameplay utuh di atas dengan latar blur
 
 
 @pytest.mark.skipif(not (shutil.which(FFMPEG) or Path(FFMPEG).exists()), reason="ffmpeg tidak tersedia")

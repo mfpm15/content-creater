@@ -73,6 +73,15 @@ function renderArticle(article) {
   }
   document.querySelector('#resultPath').textContent =
     `${article.wordCount.toLocaleString('id-ID')} kata | ${article.referencesCount} rujukan | Folder: ${article.path}`;
+  const report = document.querySelector('#writingReport');
+  report.hidden = !article.writing;
+  if (article.writing) {
+    const notes = article.writing.findings.map(f => el('li', {}, f.msg));
+    report.replaceChildren(
+      el('strong', {}, `Gaya tulisan: ${article.writing.score}/100`),
+      el('span', {}, ' (heuristik pola, bukan hasil detektor AI)'),
+      ...(notes.length ? [el('ul', {}, ...notes)] : [el('span', {}, ' | tidak ada pola yang perlu dirapikan')]));
+  }
   document.querySelector('#mdPreview').textContent = article.markdown;
 
   document.querySelector('#downloads').replaceChildren(...article.files.map(name =>

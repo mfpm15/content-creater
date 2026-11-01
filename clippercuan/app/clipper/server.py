@@ -4,12 +4,16 @@ from __future__ import annotations
 import base64
 import hmac
 import json
+import logging
 import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import uuid
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import BinaryIO
 
@@ -24,9 +28,62 @@ from . import __version__, asr, automation, effects, llm, media, profiles, proje
 from .captions import FONT_PRESETS
 from .config import DATA_DIR, DEFAULTS, FONTS_DIR, UPLOADS_DIR, WEB_DIR
 
+def _configure_file_logging() -> logging.Logger:
+    """Simpan log aplikasi dan Uvicorn ke berkas berputar di direktori data Clipper."""
+    log_dir = DATA_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    handler = RotatingFileHandler(
+        log_dir / "clipper.log", maxBytes=2_000_000, backupCount=5, encoding="utf-8"
+    )
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logger = logging.getLogger("clipper")
+    if not any(isinstance(item, RotatingFileHandler) for item in logger.handlers):
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logging.getLogger("uvicorn.error").addHandler(handler)
+    return logger
+
+
+_log = _configure_file_logging()
+_MODEL_CHECK: dict = {"checked_at": None, "available": [], "missing": [], "error": None}
+
+
+def _check_model_catalog() -> dict:
+    """Bandingkan model pada rantai fallback dengan katalog 9Router tanpa menjalankan inferensi."""
+    global _MODEL_CHECK
+    configured = list(dict.fromkeys(llm.chain_for("posts") + llm.chain_for("moments")))
+    try:
+        available = llm.list_models(llm.cfg())
+        available_set = set(available)
+        _MODEL_CHECK = {
+            "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "available": [model for model in configured if model in available_set],
+            "missing": [model for model in configured if model not in available_set],
+            "catalog_size": len(available),
+            "error": None,
+        }
+        _log.info("9Router model check: %s tersedia, %s hilang", len(_MODEL_CHECK["available"]), len(_MODEL_CHECK["missing"]))
+    except Exception as exc:  # noqa: BLE001
+        _MODEL_CHECK = {
+            "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "available": [], "missing": configured, "error": str(exc)[:300],
+        }
+        _log.warning("9Router model check gagal: %s", exc)
+    return _MODEL_CHECK
+
+
+def _model_monitor() -> None:
+    interval = max(300, int(os.environ.get("CLIPPER_MODEL_CHECK_INTERVAL", "1800")))
+    while True:
+        _check_model_catalog()
+        time.sleep(interval)
+
+
 @asynccontextmanager
 async def lifespan(_app):
     project.start_worker()
+    threading.Thread(target=_model_monitor, name="clipper-model-monitor", daemon=True).start()
+    _log.info("ClipperCuan dimulai; data=%s", DATA_DIR)
     yield
 
 
@@ -323,6 +380,70 @@ def project_words(pid: str, start: float = 0, end: float = 1e9):
     return {"words": [{"w": w["w"], "s": w["s"], "e": w["e"]} for w in words if start - 0.05 <= w["s"] <= end + 0.05]}
 
 
+def _clip_words_full(pid: str, cid: str):
+    """(proyek, klip, kata relatif klip lengkap dengan probabilitas) atau 404."""
+    from . import wordtools
+
+    p = _get(pid)
+    clip = next((c for c in p.get("clips", []) if c.get("id") == cid), None)
+    if not clip:
+        raise HTTPException(404, "Klip tidak ditemukan")
+    if "start" not in clip or "end" not in clip:
+        raise HTTPException(409, "Data klip lama belum memiliki waktu mulai/akhir. Buat ulang kandidat atau render klip ini.")
+    f = project.pdir(pid) / "transcript.json"
+    tw = json.loads(f.read_text("utf-8")).get("words", []) if f.exists() else []
+    return p, clip, wordtools.clip_words_with_p(tw, clip)
+
+
+@app.get("/api/projects/{pid}/clips/{cid}/quality")
+def clip_quality(pid: str, cid: str, low: float = 0.55):
+    """Saran kualitas transkrip: filler, kata berulang, kata low-confidence + pratinjau potong jeda."""
+    from . import wordtools
+
+    p, clip, words = _clip_words_full(pid, cid)
+    cfg = {**DEFAULTS, **p.get("settings", {}), **(clip.get("overrides") or {})}
+    dur = float(clip["end"]) - float(clip["start"])
+    return {"quality": wordtools.analyze(words, max(0.05, min(0.95, low))),
+            "silence": wordtools.silence_preview(words, dur, float(cfg.get("silence_gap", 0.55))),
+            "cut_silence": bool(cfg.get("cut_silence"))}
+
+
+@app.get("/api/projects/{pid}/clips/{cid}/subtitles")
+def clip_subtitles(pid: str, cid: str, format: str = "srt", word_timing: bool = False, per_line: int = 5, download: bool = True):
+    """Ekspor subtitle klip: srt | vtt | sbv | ass | txt. Waktu mengikuti video hasil (jeda terpotong bila aktif)."""
+    from . import wordtools
+
+    p, clip, words = _clip_words_full(pid, cid)
+    cfg = {**DEFAULTS, **p.get("settings", {}), **(clip.get("overrides") or {})}
+    words = wordtools.timeline_words(words, float(clip["end"]) - float(clip["start"]), cfg)
+    if not words:
+        raise HTTPException(404, "Klip ini belum punya kata transkrip")
+    try:
+        body = wordtools.export_subtitles(words, format, max(1, min(12, per_line)), word_timing=word_timing)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    headers = {"Content-Disposition": f'attachment; filename="{cid}.{format.lower()}"'} if download else {}
+    return Response(body, media_type=wordtools.FORMATS[format.lower()] + "; charset=utf-8", headers=headers)
+
+
+@app.get("/api/projects/{pid}/clips/{cid}/delivery")
+def clip_delivery(pid: str, cid: str, platform: str = "all"):
+    """Ukur file klip hasil render terhadap aturan platform: rasio, durasi, audio, loudness."""
+    from . import delivery
+
+    p = _get(pid)
+    clip = next((c for c in p.get("clips", []) if c.get("id") == cid), None)
+    if not clip:
+        raise HTTPException(404, "Klip tidak ditemukan")
+    f = project.pdir(pid) / clip["file"] if clip.get("file") else None
+    if not f or clip.get("status") != "done" or not f.is_file():
+        raise HTTPException(409, "Klip belum selesai dirender")
+    try:
+        return delivery.check_all(f) if platform == "all" else delivery.check(f, platform)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/api/clips")
 def all_clips(limit: int = 200):
     """Galeri semua klip yang sudah dirender, lintas proyek (terbaru dulu)."""
@@ -448,6 +569,15 @@ def frame(pid: str, t: float = 0.0):
     return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "max-age=3600"})
 
 
+@app.post("/api/projects/{pid}/detect-facecam")
+def detect_facecam_api(pid: str):
+    _get(pid)
+    try:
+        return project.redetect_facecam(pid)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
 @app.get("/api/projects/{pid}/source")
 def source_video(pid: str):
     p = _get(pid)
@@ -476,9 +606,9 @@ def production_board():
                                              "selected_count": sum(bool(x.get("selected")) for x in candidates_list),
                                              "ready_count": sum(x.get("status") == "done" for x in candidates_list),
                                              "output_duration": round(sum(float(x.get("duration", 0)) for x in candidates_list if x.get("status") == "done"), 1)})
-    return {"groups": groups, "metrics": {"projects": len(projects),
-            "candidates": sum(len(v) for v in [project.load(x["id"]).get("candidates", []) for x in projects]),
-            "ready": sum(len(x) for x in groups.get("ready", []))}}
+    return {"groups": groups, "metrics": {"projects": sum(len(v) for v in groups.values()),
+            "candidates": sum(x["candidate_count"] for v in groups.values() for x in v),
+            "ready": len(groups.get("ready", []))}}
 
 
 @app.get("/files/{pid}/{name}")
@@ -685,6 +815,20 @@ def asr_test(body: Settings):
         raise HTTPException(502, str(e)[:300])
 
 
+@app.get("/api/llm/catalog")
+def llm_catalog():
+    """Daftar model Gemini + GPT-5.6 Think Deeper dan rantai fallback aktif."""
+    return {**llm.model_catalog(), "chain_posts": llm.chain_for("posts"), "chain_moments": llm.chain_for("moments")}
+
+
+@app.get("/api/llm/check")
+def llm_check(refresh: bool = False):
+    """Status pemeriksaan berkala model 9Router; refresh=true memeriksa langsung."""
+    if refresh or not _MODEL_CHECK.get("checked_at"):
+        return _check_model_catalog()
+    return _MODEL_CHECK
+
+
 @app.post("/api/llm/models")
 def llm_models(body: Settings):
     """Tes koneksi + ambil daftar model memakai nilai form (belum disimpan)."""
@@ -706,7 +850,7 @@ def clip_ai(pid: str, cid: str, kind: str = "titles"):
     text = clip.get("text") or " ".join(w["w"] for w in clip.get("words") or [])
     try:
         if kind == "post":
-            return llm.make_post(text, clip.get("title", ""), p.get("language"))
+            return llm.make_post(text, clip.get("title", ""), p.get("language"), p.get("content_profile") or "general")
         return {"titles": llm.make_title(text, p.get("language"))}
     except llm.LLMError as e:
         raise HTTPException(502, str(e))

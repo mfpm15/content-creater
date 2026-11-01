@@ -19,9 +19,16 @@ def _free_port(preferred: int) -> int:
 
 
 def serve(port: int, open_browser: bool, host: str = "127.0.0.1", strict_port: bool = False) -> None:
+    import asyncio
     import os
 
     import uvicorn
+
+    # Proactor Windows dapat mencetak traceback ConnectionResetError ketika browser
+    # menutup koneksi HTTP lebih dahulu. Selector menangani kondisi normal ini
+    # tanpa callback transport yang bising.
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     if host not in ("127.0.0.1", "localhost") and not os.environ.get("CLIPPER_TOKEN"):
         sys.exit("Menjalankan di jaringan/cloud wajib memakai password: set variabel CLIPPER_TOKEN dulu.")
@@ -31,7 +38,9 @@ def serve(port: int, open_browser: bool, host: str = "127.0.0.1", strict_port: b
     print(f"\n  ClipperCuan berjalan di {url}\n  Biarkan jendela ini terbuka. Tutup untuk keluar.\n")
     if open_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
-    uvicorn.run("clipper.server:app", host=host, port=port, log_level="warning")
+    # loop="none" mencegah Uvicorn mengganti Selector policy di atas kembali
+    # menjadi Proactor, yang mencetak traceback saat klien memutus koneksi.
+    uvicorn.run("clipper.server:app", host=host, port=port, log_level="warning", loop="none")
 
 
 def cli(args) -> None:

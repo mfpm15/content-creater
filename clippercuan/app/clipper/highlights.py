@@ -38,7 +38,8 @@ EMO_WORDS = {
 }
 _TOKEN = re.compile(r"[\w']+", re.UNICODE)
 FILLERS = {"um", "uh", "eh", "anu", "hmm", "kayak", "literally", "basically"}
-DURATION_PRESETS = {"15-25": (15.0, 25.0), "25-40": (25.0, 40.0), "40-60": (40.0, 60.0)}
+DURATION_PRESETS = {"15-25": (15.0, 25.0), "25-40": (25.0, 40.0), "40-60": (40.0, 60.0),
+                    "60-90": (60.0, 90.0), "90-120": (90.0, 120.0)}
 
 
 def _tokens(text: str) -> list[str]:
@@ -70,11 +71,12 @@ def duration_range(preset: str, tr: dict | None = None) -> tuple[float, float, s
     span = (segs[-1]["e"] - segs[0]["s"]) if segs else 0
     pace = len(words) / max(span, 1)
     avg_idea = span / max(len(segs), 1)
+    # Auto selalu minimal 1 menit: Reels/Shorts yang layak tayang butuh konteks + payoff, bukan potongan 20 detik.
     if pace >= 2.8 and avg_idea <= 5:
-        return 15.0, 25.0, "Ujaran padat dan ide cepat mencapai payoff"
+        return 60.0, 80.0, "Ujaran padat; 1 menit cukup untuk ide + payoff"
     if pace >= 1.8 or avg_idea <= 8:
-        return 25.0, 40.0, "Ide butuh konteks sedang sebelum payoff"
-    return 40.0, 60.0, "Ujaran lebih tenang; rentang panjang menjaga ide tetap utuh"
+        return 60.0, 90.0, "Ide butuh konteks sedang; minimal 1 menit agar layak Reels/Shorts"
+    return 75.0, 120.0, "Ujaran lebih tenang; rentang panjang menjaga ide tetap utuh"
 
 
 def _is_punctuated(segs: list[dict]) -> bool:
@@ -253,8 +255,11 @@ def find_moments(tr: dict, energy: np.ndarray, duration: float, count: int = 6,
     if not tr["segments"]:
         return _fallback(duration, count, min_sec, max_sec)
     chosen = non_overlapping(score_candidates(tr, energy, min_sec, max_sec, hop, visual), count)
-    top = max(c["score"] for c in chosen) or 1
-    out = [to_moment(c, tr["segments"], duration, round(60 + 39 * c["score"] / top)) for c in chosen]
+    if not chosen:
+        return _fallback(duration, count, min_sec, max_sec)
+    # Pertahankan skor editorial absolut. Normalisasi lama mengangkat kandidat lemah
+    # menjadi 60–99 hanya karena kandidat tersebut terbaik di video yang sama.
+    out = [to_moment(c, tr["segments"], duration, int(c.get("readiness", 0))) for c in chosen]
     out.sort(key=lambda m: m["score"], reverse=True)
     return out
 

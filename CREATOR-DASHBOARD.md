@@ -14,6 +14,10 @@ Dashboard lokal ini menjadi pintu masuk untuk lima repository yang sekarang ters
 
 Dashboard berjalan hanya di `127.0.0.1:3210`. Dashboard tidak mengirimkan API key atau file media ke service lain. Provider yang dikonfigurasi di masing-masing tool tetap dapat mengirim data ke penyedia AI sesuai pengaturannya.
 
+## Memindahkan atau membagikan proyek
+
+Jangan menyalin seluruh folder kerja secara langsung karena folder ini dapat berisi API key lokal, data proyek, media, virtual environment, dan dependency berukuran beberapa GB. Gunakan `package-release.ps1` untuk membuat ZIP source code yang bersih. Panduan instalasi komputer penerima, daftar pengecualian, validasi secret, dan prosedur backup data tersedia di `DISTRIBUTION.md`.
+
 ## Quick start
 
 ### 1. Setup dependensi

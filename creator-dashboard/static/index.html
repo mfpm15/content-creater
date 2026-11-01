@@ -4,29 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Dashboard lokal untuk mengelola seluruh tool produksi konten AI." />
+  <meta name="theme-color" content="#090b18" />
   <title>Creator Control Center</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=ui-polish-2" />
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-      <a class="brand" href="#top" aria-label="Creator Control Center">
+      <a class="brand" href="/" aria-label="Creator Control Center">
         <span class="brand-mark">C</span>
         <span><strong>Creator</strong><small>Control Center</small></span>
       </a>
       <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Ciutkan sidebar" aria-expanded="true">☰</button>
       <nav aria-label="Navigasi utama">
-        <small class="nav-group">HOME</small><a class="nav-link active" href="#top" title="Overview"><span>⌂</span><b>Overview</b></a>
-        <small class="nav-group">CREATE</small><a class="nav-link" href="/videos.html" title="Video Studio"><span>▶</span><b>Video Studio</b></a><a class="nav-link" href="/articles.html" title="Article"><span>✎</span><b>Article</b></a>
-        <small class="nav-group">REPURPOSE</small><a class="nav-link accent-link" href="http://127.0.0.1:8765" target="_blank" rel="noopener" title="Clipper Cuan"><span>✂</span><b>Clipper Cuan</b></a>
-        <small class="nav-group">AUDIO</small><a class="nav-link" href="#tools" title="Audio tools"><span>◉</span><b>Audio</b></a>
-        <small class="nav-group">UTILITIES</small><a class="nav-link" href="#tools" title="Semua tools"><span>▦</span><b>Tool Catalog</b></a>
-        <small class="nav-group">SYSTEM</small><a class="nav-link" href="#system" title="Status Sistem"><span>●</span><b>Status Sistem</b></a>
+        <small class="nav-group">HOME</small>
+        <a class="nav-link active" href="/" title="Overview" data-tip="Overview" aria-current="page"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><b>Overview</b></a>
+        <small class="nav-group">CREATE</small>
+        <a class="nav-link" href="/videos.html" title="Video Studio" data-tip="Video Studio"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><b>Video Studio</b></a>
+        <a class="nav-link" href="/articles.html" title="Article Drafter" data-tip="Article Drafter"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><b>Article Drafter</b></a>
+        <a class="nav-link" href="/youtube-analytics.html" title="YouTube Analytics" data-tip="YouTube Analytics"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/></svg><b>YouTube Analytics</b></a>
+        <small class="nav-group">REPURPOSE</small>
+        <a class="nav-link" href="http://127.0.0.1:8765" title="Buka Clipper Cuan (tab baru)" data-tip="Clipper Cuan" target="_blank" rel="noopener"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg><b>Clipper Cuan</b></a>
+        <small class="nav-group">TOOLS</small>
+        <a class="nav-link" href="#tools" title="Tool Catalog" data-tip="Tool Catalog"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><b>Tool Catalog</b></a>
+        <a class="nav-link" href="#tool-podcastfy" title="Audio" data-tip="Audio" data-goto-tool="podcastfy"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/></svg><b>Audio</b></a>
+        <small class="nav-group">SYSTEM</small>
+        <a class="nav-link" href="#production" title="Production Queue" data-tip="Production Queue"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg><b>Production Queue</b></a>
+        <a class="nav-link" href="#system" title="Status Sistem" data-tip="Status Sistem"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><b>Status Sistem</b></a>
       </nav>
-      <div class="sidebar-note">
-        <span class="pulse"></span>
-        <div><strong>Local-first</strong><small>Semua service hanya di 127.0.0.1</small></div>
-      </div>
+      <a class="sidebar-note" id="sideClipper" href="http://127.0.0.1:8765" target="_blank" rel="noopener" title="Status Clipper Cuan"><span class="pulse" id="sideDot"></span><div><strong id="sideClipperTitle">Clipper Cuan</strong><small id="sideClipperText">Memeriksa…</small></div></a>
     </aside>
 
     <main id="top">
@@ -36,7 +42,7 @@
           <h1>Selamat datang, Faiz</h1>
         </div>
         <div class="topbar-actions">
-          <button id="refreshButton" class="icon-button" type="button" title="Refresh status">↻</button>
+          <button id="refreshButton" class="icon-button" type="button" title="Refresh status" aria-label="Refresh status">↻</button>
           <div class="avatar">FP</div>
         </div>
       </header>
@@ -45,8 +51,8 @@
       <section class="hero">
         <div class="hero-copy">
           <span class="hero-label">AI CONTENT OPERATING SYSTEM</span>
-          <h2>Satu pintu untuk seluruh<br /><em>creator tool</em> Anda.</h2>
-          <p>Jalankan, pantau, dan buka setiap aplikasi produksi konten tanpa berpindah folder atau menghafal perintah terminal.</p>
+          <h2>Satu control plane untuk<br /><em>seluruh produksi konten.</em></h2>
+          <p>Mulai dari naskah, produksi animasi atau video, repurpose, hingga analitik. Engine yang saling tumpang tindih dipakai sebagai adapter internal, bukan workflow terpisah yang membingungkan.</p>
           <div class="hero-actions">
             <button id="startRecommended" class="primary-button" type="button">Buka Clipper Cuan</button>
             <a class="secondary-button" href="#workflow">Lihat workflow</a>
@@ -64,11 +70,15 @@
       <section id="tools" class="section-block">
         <div class="section-heading">
           <div><p class="eyebrow">TOOLBOX</p><h2>Creator tools</h2></div>
-          <div class="filter-row" role="group" aria-label="Filter tool">
-            <button class="filter active" data-filter="all" type="button">Semua</button>
-            <button class="filter" data-filter="web" type="button">Web</button>
-            <button class="filter" data-filter="desktop" type="button">Desktop</button>
-            <button class="filter" data-filter="cli" type="button">CLI</button>
+          <div class="tool-controls">
+            <input id="toolSearch" class="tool-search" type="search" placeholder="Cari tool…  ( / )" aria-label="Cari tool" autocomplete="off" />
+            <div class="filter-row" role="group" aria-label="Filter tool">
+              <button class="filter active" data-filter="all" type="button">Semua</button>
+              <button class="filter" data-filter="web" type="button">Web</button>
+              <button class="filter" data-filter="desktop" type="button">Desktop</button>
+              <button class="filter" data-filter="api" type="button">API</button>
+              <button class="filter" data-filter="cli" type="button">CLI</button>
+            </div>
           </div>
         </div>
         <div id="toolGrid" class="tool-grid" aria-live="polite"></div>
@@ -80,22 +90,22 @@
       </section>
 
       <section id="workflow" class="section-block workflow-section">
-        <div class="section-heading"><div><p class="eyebrow">RECOMMENDED FLOW</p><h2>Dari ide sampai publikasi</h2></div></div>
+        <div class="section-heading"><div><p class="eyebrow">RECOMMENDED FLOW</p><h2>Empat menu inti, engine bekerja di belakang</h2></div></div>
         <div class="workflow-grid">
-          <article><span>01</span><strong>Riset & Script</strong><p>Gunakan OpenCreator untuk merancang topik, sudut pandang, dan naskah.</p></article>
-          <article><span>02</span><strong>Produksi Video</strong><p>MoneyPrinterTurbo menyatukan footage, narration, subtitle, dan BGM.</p></article>
-          <article><span>03</span><strong>Repurpose</strong><p>Clipper Cuan memilih momen utuh, memberi Viral Readiness transparan, caption terbaca, dan metadata siap salin.</p></article>
-          <article><span>04</span><strong>Finishing</strong><p>Short Video Factory menangani template, efek, dan pemeriksaan akhir.</p></article>
+          <article><span>01</span><strong>Riset & Naskah</strong><p>Article Drafter untuk output cepat; OpenCreator hanya saat membutuhkan workspace riset dan agent yang lebih lengkap.</p></article>
+          <article><span>02</span><strong>Produksi Konten</strong><p>Video Studio menjadi pintu utama. Opuscar, GSAP, HyperFrames, Lottie, dan kelak Three.js bekerja sebagai Render Adapter.</p></article>
+          <article><span>03</span><strong>Repurpose</strong><p>Clipper Cuan menjadi satu-satunya menu pemotongan long-form ke short-form; pipeline shorts lama tetap sebagai komponen internal.</p></article>
+          <article><span>04</span><strong>Ukur & Perbaiki</strong><p>YouTube Analytics memeriksa hook, packaging, dan retention sebelum iterasi konten berikutnya.</p></article>
         </div>
       </section>
 
       <section id="system" class="section-block system-section">
         <div class="section-heading"><div><p class="eyebrow">SYSTEM</p><h2>Ringkasan layanan</h2></div></div>
         <div class="metric-grid">
-          <article><small>Tool terdaftar</small><strong id="totalTools">0</strong></article>
+          <article><small>Menu utama</small><strong id="totalTools">0</strong></article>
           <article><small>Service siap</small><strong id="readyTools">0</strong></article>
           <article><small>Sedang dimulai</small><strong id="startingTools">0</strong></article>
-          <article><small>CLI pipeline</small><strong id="cliTools">0</strong></article>
+          <article><small>Engine internal</small><strong id="cliTools">0</strong></article>
         </div>
       </section>
     </main>
@@ -104,12 +114,13 @@
   <div id="logModal" class="modal" hidden>
     <div class="modal-backdrop" data-close-modal></div>
     <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="logTitle">
-      <header><div><p class="eyebrow">PROCESS LOG</p><h2 id="logTitle">Log</h2></div><button class="icon-button" data-close-modal type="button">×</button></header>
+      <header><div><p class="eyebrow">PROCESS LOG</p><h2 id="logTitle">Log</h2></div><button class="icon-button" data-close-modal type="button" aria-label="Tutup">×</button></header>
       <pre id="logOutput">Belum ada log.</pre>
     </section>
   </div>
 
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/shell.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

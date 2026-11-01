@@ -128,6 +128,12 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "| 1 |  |" in md and "lebih" not in md
     assert "Daftar Isi" not in md  # 300 kata: tidak perlu daftar isi
 
+    # laporan gaya tulisan: ada untuk bahasa Indonesia, tidak ada untuk bahasa lain, dan tidak mengubah teks
+    assert article["writing"] and 0 <= article["writing"]["score"] <= 100
+    assert "not_detector" in article["writing"]["method"]
+    english = ad.generate({"points": "points", "words": 300, "language": "Inggris"})
+    assert english["writing"] is None, "pola linter khusus Indonesia; bahasa lain tidak dinilai"
+
     directory = ad.ARTICLES_DIR / slug
 
     def check_docx() -> str:

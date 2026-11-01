@@ -110,6 +110,31 @@ def test_fallback_without_speech():
     assert len(ms) == 3 and all(m["end"] - m["start"] >= 20 for m in ms)
 
 
+def test_tracking_result_exports_evidence_and_confidence(monkeypatch, tmp_path):
+    from clipper import facetrack
+
+    frames = np.zeros((8, 90, 160), dtype=np.uint8)
+    info = [{"faces": [(0.25, 0.12, 9.0)], "motion": None} for _ in range(8)]
+    monkeypatch.setattr(facetrack, "_frames", lambda *args: frames)
+    monkeypatch.setattr(facetrack, "analyse", lambda value: info)
+    result = facetrack.tracking_result(tmp_path / "source.mp4", 0, 2, 1280, 720)
+    assert result["source"] == "face"
+    assert result["face_samples"] == 8
+    assert result["target_samples"] == 8
+    assert result["confidence"] >= 0.9
+    assert result["keys"][0][1] < 0.3
+
+
+def test_tracking_result_has_safe_center_fallback(monkeypatch, tmp_path):
+    from clipper import facetrack
+
+    monkeypatch.setattr(facetrack, "_frames", lambda *args: np.zeros((0, 90, 160), dtype=np.uint8))
+    result = facetrack.tracking_result(tmp_path / "missing.mp4", 0, 2, 1280, 720)
+    assert result["source"] == "center-fallback"
+    assert result["confidence"] == 0.0
+    assert result["keys"] == [[0.0, 0.5]]
+
+
 def test_active_speaker_switch_and_motion_fallback():
     from clipper import facetrack
 
@@ -194,8 +219,10 @@ def test_duration_auto_and_presets_keep_sentence_ranges():
     fast = {"segments": [{"s": 0, "e": 4, "text": "Hook utuh."}, {"s": 4, "e": 8, "text": "Payoff utuh."}],
             "words": _words("satu dua tiga empat lima enam tujuh delapan sembilan sepuluh sebelas dua belas tiga belas empat belas lima belas enam belas tujuh belas delapan belas sembilan belas dua puluh", 0, .3)}
     mn, mx, reason = highlights.duration_range("auto", fast)
-    assert (mn, mx) == (15, 25) and reason
+    assert mn >= 60 and mx > mn and reason          # Auto selalu minimal 1 menit (Reels/Shorts)
     assert highlights.duration_range("25-40", fast)[:2] == (25, 40)
+    assert highlights.duration_range("60-90", fast)[:2] == (60, 90)
+    assert highlights.duration_range("90-120", fast)[:2] == (90, 120)
 
 
 def test_readiness_penalties_and_metadata_quality():

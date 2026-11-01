@@ -29,11 +29,16 @@ def tokens(text: str) -> set[str]:
     return {x.lower() for x in TOKEN.findall(text) if len(x) > 2}
 
 
+def _count(text: str, term: str) -> int:
+    """Hitung `term` sebagai kata utuh: 'worth' tidak boleh cocok di 'worthless', 'turtle' tidak di 'turtleneck'."""
+    return len(re.findall(rf"(?<!\w){re.escape(term)}(?!\w)", text))
+
+
 def classify_profile(transcript: dict, metadata: dict | None = None, activity: dict | None = None) -> dict:
     text = " ".join([str((metadata or {}).get("title", ""))] + [s.get("text", "") for s in transcript.get("segments", [])]).lower()
     activity = activity or {}
-    scores = {name: sum(text.count(term) for term in data["terms"]) for name, data in PROFILES.items()}
-    evidence = [term for data in PROFILES.values() for term in data["terms"] if term in text]
+    scores = {name: sum(_count(text, term) for term in data["terms"]) for name, data in PROFILES.items()}
+    evidence = [term for data in PROFILES.values() for term in data["terms"] if _count(text, term)]
     if activity.get("gameplay"):
         scores["gaming"] += 2; scores["mobile_legends"] += 3; evidence.append("gameplay visual")
     if activity.get("product_demo"):
@@ -63,6 +68,28 @@ def similarity(a: dict, b: dict) -> float:
     ta, tb = tokens(a.get("transcript_excerpt", a.get("text", ""))), tokens(b.get("transcript_excerpt", b.get("text", "")))
     lexical = len(ta & tb) / max(1, len(ta | tb))
     return max(lexical, overlap(a, b))
+
+
+def score_tier(score: float) -> str:
+    """Label manusiawi untuk skor relatif dalam satu video."""
+    return "Sangat kuat" if score >= 88 else "Kuat" if score >= 75 else "Cukup" if score >= 62 else "Lemah"
+
+
+def spread_scores(items: list[dict], min_span: float = 24) -> None:
+    """Skor mentah sering menumpuk (mis. 73-79) karena banyak dimensi bernilai default.
+    Bila rentangnya sempit, regangkan secara relatif agar perbedaan antar kandidat terlihat.
+    Skor asli disimpan di `score_raw`; urutan peringkat tidak berubah (transformasi monoton)."""
+    live = [x for x in items if not x.get("manual")]
+    scores = [float(x["score"]) for x in live]
+    if len(scores) < 4:
+        return
+    lo, hi = min(scores), max(scores)
+    if hi - lo >= min_span or hi - lo < 1:
+        return
+    floor, ceil = max(35.0, lo - 12), min(98.0, hi + 12)
+    for x in live:
+        x["score_raw"] = x["score"]
+        x["score"] = round(floor + (float(x["score"]) - lo) / (hi - lo) * (ceil - floor))
 
 
 def weighted_score(breakdown: dict, profile_name: str) -> int:
@@ -99,6 +126,9 @@ def normalize(raw: dict, index: int, profile_name: str, source_duration: float) 
     breakdown = {k: max(0, min(100, round(float(v)))) for k, v in breakdown.items()}
     digest = hashlib.sha1(f"{start:.2f}:{end:.2f}:{text}".encode()).hexdigest()[:12]
     score = weighted_score(breakdown, profile_name)
+    source = raw.get("source_score")   # skor dari LLM / pemeringkat lokal; dulu dibuang sehingga semua kandidat nyaris sama
+    if source is not None:
+        score = round(0.5 * float(source) + 0.5 * score)
     warnings = list(dict.fromkeys(raw.get("warnings", [])))
     if breakdown["rights_context_risk"] >= 50:
         warnings.append("Periksa hak sumber dan konteks sebelum publikasi")
@@ -152,10 +182,12 @@ def rerank(items: list[dict], profile_name: str, diversity: float = 0.3, max_ove
     for item in selected:   # klip yang isinya hampir sama dengan klip di atasnya diturunkan ke bawah
         (dupes if not item["pinned"] and any(similarity(item, u) >= 0.6 for u in unique) else unique).append(item)
     selected = unique + dupes
-    n_hot = max(1, round(len(selected) * 0.4))
+    spread_scores(selected)
+    cap = max(2, round(len(selected) * 0.4))
     for rank, item in enumerate(selected, 1):
         item["rank"] = rank
-        item["hot"] = rank <= n_hot and item["score"] >= 60   # 🔥 = 40% teratas dengan skor layak
+        item["tier"] = score_tier(item["score"])
+        item["hot"] = item["score"] >= 80 and rank <= cap   # 🔥 = skor tinggi DAN termasuk 40% teratas
     return selected
 
 
@@ -175,6 +207,21 @@ def snap_boundary(start: float, end: float, segments: list[dict], tolerance: flo
     snap = lambda value, choices: min(choices, key=lambda x: (abs(x - value), x)) if choices and min(abs(x-value) for x in choices) <= tolerance else value
     fixed_start, fixed_end = snap(start, starts), snap(end, ends)
     return (round(max(0, fixed_start), 2), round(max(fixed_start + 1, fixed_end), 2))
+
+
+def snap_chapters(moments: list[dict], chapters: list[dict], mn: float, mx: float, tolerance: float = 3.0) -> None:
+    """Rapikan batas klip ke batas chapter sumber bila dekat dan durasi tetap dalam [mn, mx]; beri label chapter."""
+    for m in moments:
+        s, e = float(m["start"]), float(m["end"])
+        ns = next((c["s"] for c in chapters if abs(c["s"] - s) <= tolerance), s)
+        ne = next((c["e"] for c in chapters if abs(c["e"] - e) <= tolerance), e)
+        if (ns, ne) != (s, e) and mn <= ne - ns <= mx:
+            m["start"], m["end"] = round(ns, 2), round(ne, 2)
+            m["chapter_snapped"] = True
+        mid = (float(m["start"]) + float(m["end"])) / 2
+        hit = next((c for c in chapters if c["s"] <= mid < c["e"]), None)
+        if hit and hit["title"]:
+            m["chapter"] = hit["title"]
 
 
 def chunk_ranges(duration: float, size: float = 900, overlap_seconds: float = 30) -> list[tuple[float, float]]:

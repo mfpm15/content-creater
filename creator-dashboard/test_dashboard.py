@@ -93,6 +93,21 @@ def main() -> int:
         assert "text/css" in content_type
         assert b".tool-grid" in css
 
+        status, analytics_html, content_type = fetch("/youtube-analytics.html")
+        assert status == 200 and "text/html" in content_type
+        assert b"Retention Analyzer" in analytics_html and b"Hook Workshop" in analytics_html
+
+        request = urllib.request.Request(
+            BASE_URL + "/api/analytics/hook",
+            data=json.dumps({"hook": "Kenapa 3 detik pertama menentukan video ini?"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            analytics_payload = json.loads(response.read().decode("utf-8"))
+        assert analytics_payload["score"] >= 60
+        assert analytics_payload["method"] == "editorial_heuristic_not_prediction"
+
         print("Dashboard smoke test passed")
         print(f"Tools discovered: {len(tools)}")
         print("Static assets: index.html, app.js, styles.css OK")

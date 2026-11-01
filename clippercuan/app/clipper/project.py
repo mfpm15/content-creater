@@ -49,7 +49,7 @@ def load(pid: str) -> dict:
 _RENDER_FIELDS = ("status", "file", "thumb", "srt", "ass", "words", "crop_keys", "overrides", "post", "title", "start", "end",
                   "duration", "version", "error", "cut_saved", "emojis", "caption_cues", "caption_layers",
                   "caption_provenance", "caption_render", "template_id", "template_name", "effective_caption_height_pct",
-                  "sidecar_autoload_safe", "crop_confidence", "render_warnings", "manual")
+                  "sidecar_autoload_safe", "crop_confidence", "tracking", "render_warnings", "manual")
 
 
 def _unify_clips(p: dict) -> None:
@@ -165,6 +165,7 @@ def _pipeline(pid: str) -> None:
         _progress(pid, 0.0, 0.18)(0.1, "Membaca info video (mode hemat)…")
         meta = download.resolve_streams(p["source"], max_h=download.source_height(cfg, True))
         title = meta["title"]
+        download.write_chapters(work, meta.get("chapters"))
         src = None
         pr = media.Probe(meta["duration"], meta["width"], meta["height"], meta["fps"], True)
         update(pid, title=title, media={"file": None, "remote": True, "duration": pr.duration, "width": pr.width,
@@ -249,18 +250,26 @@ def _pipeline(pid: str) -> None:
             engine = model
         except Exception as e:  # noqa: BLE001 — selalu ada cadangan lokal
             print(f"[llm] gagal, pakai skor lokal: {e}")
-            update(pid, llm_warning=f"AI tidak tersedia ({str(e)[:200]}). Dipakai skor lokal.")
+            update(pid, llm_warning="AI sedang lambat. Kandidat tetap dibuat dengan analisis lokal; jalankan ulang ranking AI bila diperlukan.",
+                   llm_error_detail=str(e)[:500])
     if not moments:
         moments = highlights.find_moments(tr, energy, pr.duration, count, mn, mx, visual=visual)
+    chapters_file = work / "chapters.json"
+    if chapters_file.exists():
+        try:
+            candidates.snap_chapters(moments, json.loads(chapters_file.read_text("utf-8")), mn, mx)
+        except (OSError, ValueError, KeyError) as e:  # noqa: BLE001 — chapter hanya bonus, jangan gagalkan pipeline
+            print(f"[chapters] dilewati: {e}")
     update(pid, engine=engine)
     lang = tr.get("language")
     prepared = []
     for i, m in enumerate(moments):
-        post = highlights.post_kit(m.get("text", ""), m["title"], lang)
+        from . import postgen
+        post = postgen.local(m.get("text", ""), m["title"], profile_name, lang)
         m.setdefault("duration_reason", duration_reason)
         if m.get("hashtags"):
             post["hashtags"] = m["hashtags"]
-        prepared.append({**m, "id": m.get("id", f"candidate_{i + 1:02d}"), "post": post,
+        prepared.append({**m, "id": m.get("id", f"candidate_{i + 1:02d}"), "post": post, "source_score": m.get("score"),
                          "status": "draft_candidate", "words": None, "crop_keys": None})
     ranked = candidates.rerank(prepared, profile_name, float(cfg.get("diversity", .3)), float(cfg.get("max_overlap", .35)))[:count]
     manifest = candidates.manifest(ranked, profile_name, p["source"])
@@ -272,6 +281,24 @@ def _pipeline(pid: str) -> None:
         picks = auto_picks(ranked, target, float(cfg.get("min_score", 45)))
         select_candidates(pid, [x["id"] for x in picks])
         batch_render(pid)
+
+
+def redetect_facecam(pid: str) -> dict:
+    """Deteksi ulang facecam dari frame proyek lalu simpan area split. Dipakai Studio saat memilih format Split."""
+    p = load(pid)
+    if not p.get("media"):
+        raise ValueError("Video belum siap")
+    from . import facetrack
+
+    work = pdir(pid)
+    src = None if p["media"].get("remote") else work / p["media"]["file"]
+    pr = media.Probe(p["media"]["duration"], p["media"]["width"], p["media"]["height"], p["media"].get("fps") or 30, True)
+    cam = facetrack.detect_facecam(_sample_frames(p, pr, src, n=12))
+    cfg = dict(p["settings"])
+    if cam.get("rect"):
+        cfg["split"] = {**(cfg.get("split") or {}), **facetrack.split_areas(cam["rect"]), "auto": True}
+    update(pid, facecam=cam, settings=cfg)
+    return {"facecam": cam, "split": cfg.get("split")}
 
 
 def clip_target(cfg: dict, duration: float) -> int:
@@ -313,22 +340,30 @@ def _sample_frames(p: dict, pr: media.Probe, src: Path | None, n: int = 8) -> li
 
 
 def _activity(p: dict, pr: media.Probe, src: Path | None, tr: dict, cfg: dict) -> dict:
-    """Sinyal non-teks untuk klasifikasi profil: gameplay (tanpa wajah besar + ujaran jarang/istilah game) & facecam."""
+    """Sinyal visual bersama untuk klasifikasi dan keputusan split adaptif."""
     from . import facetrack
 
     need = (cfg.get("content_profile", "auto") in ("auto", "mobile_legends") or cfg.get("recipe") == "auto"
             or (cfg.get("split") or {}).get("auto"))
     if not need or not pr.duration:
         return {}
-    cam = facetrack.detect_facecam(_sample_frames(p, pr, src))
+    frames = _sample_frames(p, pr, src, n=12)
+    cam = facetrack.detect_facecam(frames)
+    composition = facetrack.detect_composition(frames)
     coverage = caption_workspace.quality_report(tr, pr.duration)["coverage"] if tr.get("words") else 0.0
-    gameplay = not cam["big_face"] and (cam["rect"] is not None or coverage < 0.35)
-    update(p["id"], facecam=cam)
-    return {"gameplay": gameplay, "facecam": cam["rect"], "speech_coverage": coverage}
+    # Dua wajah sebanding di satu frame = orang di panggung/meja panel, bukan facecam streamer. Tanpa ini, wajah kecil di
+    # sudut dibaca "facecam" dan video panel diklasifikasi gaming (kasus nyata: panel Huang & Musk jadi 'mobile_legends').
+    people = facetrack.multi_person_frames(frames)
+    if people >= 0.25 and cam.get("rect") is not None:
+        cam = {**cam, "rect": None, "rejected": "multi-person-scene"}
+    gameplay = not cam["big_face"] and (cam["rect"] is not None or (coverage < 0.35 and people < 0.25))
+    update(p["id"], facecam=cam, visual_composition={**composition, "multi_person": round(people, 3)})
+    return {"gameplay": gameplay, "facecam": cam["rect"], "speech_coverage": coverage,
+            "stable_faces": len(composition.get("faces", [])), "composition_confidence": composition.get("confidence", 0)}
 
 
 def _apply_auto_recipe(pid: str, cfg: dict, profile_name: str, classified: dict) -> dict:
-    """Resep "auto": pilih resep sesuai konten. Untuk gaming, split bila facecam terdeteksi, selain itu blur."""
+    """Resep Auto memilih gaya dan split adaptif hanya bila bukti visual cukup kuat."""
     from .recipes import FALLBACK, RECIPES, default_for
 
     if cfg.get("recipe") == "auto" and not cfg.get("recipe_applied"):   # Ulangi tidak menimpa gaya yang sudah diedit
@@ -345,13 +380,24 @@ def _apply_auto_recipe(pid: str, cfg: dict, profile_name: str, classified: dict)
         cfg["recipe"], cfg["recipe_applied"] = "auto", rid
     p = load(pid)
     cam = p.get("facecam") or {}
-    if cfg.get("layout") == "split" and (cfg.get("split") or {}).get("auto"):
-        if cam.get("rect"):
-            cfg["split"] = {**cfg["split"], "face": cam["rect"], "game": [0.0, 0.0, 1.0, 1.0]}
-        else:  # gameplay tanpa facecam: gameplay utuh di tengah, caption di bawahnya (tidak menutup HUD)
-            cfg["layout"] = "blur"
+    composition = p.get("visual_composition") or {}
+    user = p.get("user_settings") or {}
+    manual_layout = user.get("layout_mode") == "manual" or (user.get("layout") not in (None, "", "portrait") and "layout_mode" not in user)
+    auto_style = user.get("recipe") in (None, "", "auto") or bool(cfg.get("recipe_applied"))
+    from . import facetrack
+
+    decision = facetrack.adaptive_split(profile_name, composition, cam)
+    if not manual_layout and auto_style and decision.get("enabled"):
+        cfg["layout"] = "split"
+        cfg["split"] = {**(cfg.get("split") or {}), **{k: v for k, v in decision.items() if k != "enabled"}, "auto": True}
+        cfg["layout_reason"] = decision["reason"]
+    elif cfg.get("layout") == "split" and (cfg.get("split") or {}).get("auto"):
+        fallback = decision.get("fallback", "portrait")
+        cfg["layout"] = fallback
+        if fallback == "blur":
             cfg["caption"] = {**cfg["caption"], "y_pct": 76}
-            cfg["layout_reason"] = "Facecam tidak terdeteksi: format Blur agar HUD & minimap tetap utuh"
+        cfg["layout_reason"] = decision["reason"]
+    cfg["split_decision"] = decision
     update(pid, settings=cfg)
     return cfg
 
@@ -373,9 +419,9 @@ def _transcript(pid: str, source: str, cfg: dict, work: Path, get_wav, duration:
         try:
             tr = asr.youtube_captions(source, cfg["language"])
             if not tr:
-                notes.append("Video tidak punya subtitle YouTube")
+                notes.append("Subtitle YouTube tidak tersedia")
         except Exception as e:  # noqa: BLE001
-            notes.append(f"Subtitle YouTube gagal ({str(e)[:120]})")
+            notes.append(f"Subtitle YouTube tidak dapat dibaca ({str(e)[:120]})")
     acfg = llm.load_settings()["asr"]
     use_api = mode == "api" or (mode == "auto" and bool(acfg.get("api_key")))
     if tr is None and use_api:
@@ -385,10 +431,11 @@ def _transcript(pid: str, source: str, cfg: dict, work: Path, get_wav, duration:
             notes.append(f"Transkripsi cloud gagal ({str(e)[:160]})")
             tr = None
     if tr is None:
+        cb(0.08, "Subtitle tidak tersedia; menyiapkan Whisper lokal…")
         tr = transcribe.transcribe(get_wav(), cfg["model"], cfg["language"], cfg["translate_en"], cb, duration)
         tr["source"] = "whisper-lokal"
     if notes:
-        update(pid, asr_warning=" · ".join(notes) + f". Dipakai: {tr['source']}.")
+        update(pid, asr_warning=" · ".join(notes) + f". Transkripsi dilanjutkan dengan {tr['source']}.")
     tr["_key"] = key
     tr["quality_report"] = caption_workspace.quality_report(tr, duration)
     if not tr.get("render_allowed", True):
@@ -479,7 +526,7 @@ def _set_clip(pid: str, cid: str, **fields) -> dict:
 
 
 # ---------------------------------------------------------------- edit klip
-EDITABLE = {"title", "start", "end", "words", "crop_keys", "overrides", "post", "selected"}
+EDITABLE = {"title", "start", "end", "words", "crop_keys", "crop_manual", "overrides", "post", "selected"}
 
 
 def edit_clip(pid: str, cid: str, changes: dict, rerender: bool = True) -> dict:

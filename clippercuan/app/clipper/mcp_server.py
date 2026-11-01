@@ -222,6 +222,13 @@ def export_project(project_id: str, folder: str = "") -> dict:
 
 
 @mcp.tool()
+def check_delivery(project_id: str, clip_id: str, platform: str = "all") -> dict:
+    """Ukur klip hasil render terhadap aturan platform (tiktok | shorts | reels | all): rasio 9:16, durasi, audio, loudness."""
+    _ensure_server()
+    return _call("GET", f"/api/projects/{project_id}/clips/{clip_id}/delivery?platform={urllib.parse.quote(platform)}", timeout=180)
+
+
+@mcp.tool()
 def list_templates() -> dict:
     """Template gaya yang tersimpan (nama → pengaturan)."""
     _ensure_server()

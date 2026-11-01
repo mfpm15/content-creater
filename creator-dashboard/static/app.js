@@ -1,4 +1,8 @@
-const state = { tools: [], filter: 'all', logToolId: null };
+const state = { tools: [], filter: 'all', query: '', logToolId: null };
+
+function visibleTools() {
+  return state.tools.filter(tool => !tool.hidden);
+}
 const iconMap = { sparkles: '✦', layers: '▦', clapperboard: '▶', mic: '◉', scissors: '✂', film: '🎬', palette: '🎨', code: '⚡' };
 const statusLabels = { ready: 'Siap', starting: 'Memulai', stopped: 'Berhenti', cli: 'CLI' };
 
@@ -29,7 +33,9 @@ function escapeHtml(value = '') {
 }
 
 function render() {
-  const visible = state.tools.filter(tool => state.filter === 'all' || tool.type === state.filter);
+  const query = state.query.trim().toLowerCase();
+  const visible = visibleTools().filter(tool => (state.filter === 'all' || tool.type === state.filter)
+    && (!query || [tool.name, tool.category, tool.description, ...(tool.capabilities || [])].join(' ').toLowerCase().includes(query)));
   grid.innerHTML = visible.map((tool, index) => {
     const canStart = tool.type !== 'cli' && tool.status === 'stopped';
     const canStop = tool.managedRunning;
@@ -50,7 +56,7 @@ function render() {
       ? '<a class="launch" href="/videos.html">Buat dengan Opuscar</a>'
       : '';
     return `
-      <article class="tool-card${featured}" style="--card-glow:${glow}">
+      <article class="tool-card${featured}" id="tool-${escapeHtml(tool.id)}" style="--card-glow:${glow}">
         <div class="card-top">
           <div class="tool-icon">${iconMap[tool.icon] || '◆'}</div>
           <span class="status ${tool.status}"><span class="status-dot"></span>${statusLabels[tool.status] || tool.status}</span>
@@ -67,18 +73,19 @@ function render() {
           ${tool.type !== 'cli' ? `<button type="button" data-logs="${tool.id}">Log</button>` : ''}
         </div>
       </article>`;
-  }).join('') || '<p>Tidak ada tool untuk filter ini.</p>';
+  }).join('') || '<p class="empty-note">Tidak ada tool yang cocok dengan filter atau pencarian ini.</p>';
 
-  document.querySelector('#totalTools').textContent = state.tools.length;
-  document.querySelector('#readyTools').textContent = state.tools.filter(tool => tool.status === 'ready').length;
-  document.querySelector('#startingTools').textContent = state.tools.filter(tool => tool.status === 'starting').length;
-  document.querySelector('#cliTools').textContent = state.tools.filter(tool => tool.type === 'cli').length;
+  const surfaced = visibleTools();
+  document.querySelector('#totalTools').textContent = surfaced.length;
+  document.querySelector('#readyTools').textContent = surfaced.filter(tool => tool.status === 'ready').length;
+  document.querySelector('#startingTools').textContent = surfaced.filter(tool => tool.status === 'starting').length;
+  document.querySelector('#cliTools').textContent = state.tools.filter(tool => tool.hidden).length;
 }
 
 async function refreshProductionQueue() {
   const box = document.querySelector('#productionQueue'); if (!box) return;
   try {
-    const response = await fetch('http://127.0.0.1:8765/api/production', { cache: 'no-store' });
+    const response = await fetch('/api/clipper/production', { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json(), labels = { draft_candidate: 'Draft Candidate', selected: 'Selected', rendering: 'Rendering', ready: 'Ready', published_archived: 'Published / Archived' };
     box.innerHTML = Object.entries(labels).map(([key, label]) => { const items = data.groups?.[key] || []; return `<article><header><strong>${label}</strong><span>${items.length}</span></header>${items.slice(0, 4).map(x => `<a href="http://127.0.0.1:8765/#/p/${escapeHtml(x.id)}" target="_blank" rel="noopener"><b>${escapeHtml(x.title || x.id)}</b><small>${x.candidate_count || 0} kandidat · ${x.ready_count || 0} siap</small></a>`).join('') || '<p>Kosong</p>'}</article>`; }).join('');
@@ -87,7 +94,7 @@ async function refreshProductionQueue() {
 
 async function refreshClipperHealth() {
   const el = document.querySelector('#clipperHealth'); if (!el) return;
-  try { const r = await fetch('http://127.0.0.1:8765/api/health', { cache: 'no-store' }); const h = await r.json(); el.textContent = h.ok ? `Siap · ${h.llm?.enabled ? '9Router' : 'fallback lokal'}` : 'Perlu perhatian'; }
+  try { const r = await fetch('/api/clipper/health', { cache: 'no-store' }); const h = await r.json(); el.textContent = h.ok ? `Siap · ${h.llm?.enabled ? '9Router' : 'fallback lokal'}` : 'Perlu perhatian'; }
   catch { el.textContent = 'Belum berjalan'; }
 }
 
@@ -155,8 +162,8 @@ document.addEventListener('click', async event => {
   if (element.dataset.stop) await act(element.dataset.stop, 'stop');
   if (element.dataset.logs) await openLogs(element.dataset.logs);
   if (element.dataset.copy) {
-    await navigator.clipboard.writeText(element.dataset.copy);
-    showToast('Command disalin ke clipboard.');
+    try { await navigator.clipboard.writeText(element.dataset.copy); showToast('Command disalin ke clipboard.'); }
+    catch { showToast('Clipboard diblokir browser. Salin manual dari kartu tool.'); }
   }
   if (element.matches('[data-close-modal]')) { modal.hidden = true; state.logToolId = null; }
 });
@@ -170,7 +177,22 @@ document.querySelectorAll('.filter').forEach(button => {
   });
 });
 
-document.querySelector('#sidebarToggle').addEventListener('click', event => { const collapsed = document.body.classList.toggle('sidebar-collapsed'); event.currentTarget.setAttribute('aria-expanded', String(!collapsed)); event.currentTarget.setAttribute('aria-label', collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'); });
+document.querySelector('#toolSearch').addEventListener('input', event => { state.query = event.target.value; render(); });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !modal.hidden) { modal.hidden = true; state.logToolId = null; }
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
+  if (event.key === '/' && !typing) { event.preventDefault(); document.querySelector('#toolSearch').focus(); }
+});
+document.querySelectorAll('[data-goto-tool]').forEach(link => link.addEventListener('click', event => {
+  event.preventDefault();
+  state.filter = 'all'; state.query = ''; document.querySelector('#toolSearch').value = '';
+  document.querySelectorAll('.filter').forEach(item => item.classList.toggle('active', item.dataset.filter === 'all'));
+  render();
+  const card = document.getElementById(`tool-${link.dataset.gotoTool}`);
+  if (!card) return showToast('Tool tidak ditemukan di katalog.');
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('flash'); setTimeout(() => card.classList.remove('flash'), 1800);
+}));
 refreshButton.addEventListener('click', () => { refresh(); refreshProductionQueue(); });
 startRecommended.addEventListener('click', async () => { const tool = state.tools.find(item => item.id === 'clippercuan'); if (tool?.status === 'ready') window.open(tool.url, '_blank', 'noopener'); else await act('clippercuan', 'start'); });
 setInterval(() => refresh(true), 5000);

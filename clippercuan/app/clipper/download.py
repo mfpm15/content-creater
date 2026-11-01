@@ -86,7 +86,21 @@ def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = l
     files = [f for f in files if f.suffix not in (".part", ".ytdl")]
     if not files:
         raise RuntimeError("Unduhan selesai tetapi file video tidak ditemukan.")
+    write_chapters(out_dir, info.get("chapters"))
     return files[0], info.get("title") or "Video"
+
+
+def write_chapters(out_dir: Path, chapters) -> None:
+    """Simpan chapter dari sumber (batas topik bersih) ke chapters.json; kosong bila sumber tak punya."""
+    import json
+
+    rows = [{"s": float(c["start_time"]), "e": float(c["end_time"]), "title": str(c.get("title") or "")}
+            for c in chapters or [] if c.get("start_time") is not None and c.get("end_time") is not None]
+    f = Path(out_dir) / "chapters.json"
+    if rows:
+        f.write_text(json.dumps(rows, ensure_ascii=False), "utf-8")
+    else:
+        f.unlink(missing_ok=True)
 
 
 # ------------------------------------------------------------------ mode hemat disk (lite)
@@ -132,7 +146,7 @@ def resolve_streams(source: str, max_age: float = 1800, max_h: int = 2160) -> di
     if audio is None and video.get("acodec") in (None, "none"):
         audio = None
     pick = lambda f: {"url": f["url"], "headers": f.get("http_headers") or info.get("http_headers") or {}}  # noqa: E731
-    data = {"title": info.get("title") or "Video", "duration": float(info.get("duration") or 0),
+    data = {"title": info.get("title") or "Video", "duration": float(info.get("duration") or 0), "chapters": info.get("chapters"),
             "width": int(video.get("width") or info.get("width") or 1920), "height": int(video.get("height") or info.get("height") or 1080),
             "fps": float(video.get("fps") or info.get("fps") or 30), "video": pick(video), "audio": pick(audio) if audio else None}
     _STREAMS[key] = (time.time(), data)

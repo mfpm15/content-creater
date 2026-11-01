@@ -19,6 +19,7 @@ from urllib.parse import unquote, urlparse
 
 import article_drafter
 import video_drafter
+import youtube_analytics
 
 ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent.resolve()
@@ -266,7 +267,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self'")
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass  # Browser menutup koneksi saat pindah halaman atau refresh; bukan error server.
 
     def _route_parts(self) -> list[str]:
         return [part for part in urlparse(self.path).path.split("/") if part]
@@ -376,6 +380,19 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 if raw is None:
                     return
                 self._json(HTTPStatus.ACCEPTED, video_drafter.start_job(json.loads(raw or b"{}")))
+            elif len(parts) == 5 and parts[2] == "jobs" and parts[4] == "approve":
+                raw = self._read_body(10_000)
+                if raw is None:
+                    return
+                stage = str(json.loads(raw or b"{}").get("stage") or "")
+                self._json(HTTPStatus.ACCEPTED, video_drafter.approve_job(unquote(parts[3]), stage))
+            elif len(parts) == 5 and parts[2] == "jobs" and parts[4] == "revise":
+                self._json(HTTPStatus.OK, video_drafter.revise_job(unquote(parts[3])))
+            elif len(parts) == 5 and parts[2] == "jobs" and parts[4] == "edit":
+                raw = self._read_body(500_000)
+                if raw is None:
+                    return
+                self._json(HTTPStatus.OK, video_drafter.update_job_plan(unquote(parts[3]), json.loads(raw or b"{}")))
             else:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
         except json.JSONDecodeError:
@@ -385,6 +402,36 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         except Exception as exc:
             self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
+    def _analytics_post(self, parts: list[str]) -> None:
+        try:
+            raw = self._read_body(youtube_analytics.MAX_CSV_BYTES + youtube_analytics.MAX_TRANSCRIPT_CHARS + 100_000)
+            if raw is None:
+                return
+            payload = json.loads(raw or b"{}")
+            if parts == ["api", "analytics", "retention"]:
+                csv_text = str(payload.get("csv") or "")
+                result = youtube_analytics.analyze_retention(
+                    csv_text.encode("utf-8"),
+                    str(payload.get("transcript") or ""),
+                    float(payload["duration"]) if payload.get("duration") not in (None, "") else None,
+                )
+            elif parts == ["api", "analytics", "package"]:
+                result = youtube_analytics.lint_package(
+                    str(payload.get("title") or ""),
+                    str(payload.get("thumbnail") or ""),
+                    str(payload.get("transcript") or ""),
+                )
+            elif parts == ["api", "analytics", "hook"]:
+                result = youtube_analytics.review_hook(str(payload.get("hook") or ""))
+            else:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
+                return
+            self._json(HTTPStatus.OK, result)
+        except json.JSONDecodeError:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "Body bukan JSON valid"})
+        except (TypeError, ValueError) as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
     def do_HEAD(self) -> None:
         parts = self._route_parts()
         if parts[:2] in (["api", "videos"], ["api", "articles"]):
@@ -392,8 +439,23 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         super().do_HEAD()
 
+    def _clipper_proxy(self, path: str) -> None:
+        # ponytail: GET-only, fixed upstream; cukup untuk health/production. Tambah rute bila perlu.
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:8765{path}", timeout=2) as r:
+                body = json.loads(r.read().decode("utf-8"))
+            self._json(HTTPStatus.OK, body)
+        except Exception as exc:
+            self._json(HTTPStatus.BAD_GATEWAY, {"ok": False, "error": str(exc)})
+
     def do_GET(self) -> None:
         parts = self._route_parts()
+        if parts == ["api", "clipper", "health"]:
+            self._clipper_proxy("/api/health")
+            return
+        if parts == ["api", "clipper", "production"]:
+            self._clipper_proxy("/api/production")
+            return
         if parts[:2] == ["api", "videos"]:
             self._videos_get(parts)
             return
@@ -416,6 +478,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parts = self._route_parts()
+        if parts[:2] == ["api", "analytics"]:
+            self._analytics_post(parts)
+            return
         if parts[:2] == ["api", "videos"]:
             self._videos_post(parts)
             return
@@ -443,6 +508,17 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             "message": message,
             "tool": public_tool(TOOLS_BY_ID[tool_id]),
         })
+
+
+    def do_DELETE(self) -> None:
+        parts = self._route_parts()
+        if len(parts) == 3 and parts[:2] == ["api", "videos"]:
+            try:
+                self._json(HTTPStatus.OK, video_drafter.delete_video(unquote(parts[2])))
+            except (FileNotFoundError, ValueError) as exc:
+                self._json(HTTPStatus.NOT_FOUND if isinstance(exc, FileNotFoundError) else HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        self._json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
 
 
 class ReusableThreadingHTTPServer(ThreadingHTTPServer):

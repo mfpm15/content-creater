@@ -123,19 +123,61 @@ def _protected_tokens(text: str) -> set[str]:
     return protected
 
 
+# Singkatan yang titiknya BUKAN akhir kalimat ("Dr. Chen", "vs. Android", "Bpk. Budi").
+_ABBREVIATIONS = {"dr", "drs", "ir", "mr", "mrs", "ms", "prof", "vs", "jr", "sr", "st", "bpk", "hj", "no", "dll", "dsb", "dkk", "yth"}
+_INITIAL_RE = re.compile(r"^(?:[A-Za-z]\.)+$")      # "J." / "U.S." / "J.R.R."
+_SENTENCE_END = (".", "?", "!", "…", ":", ";")
+
+
+def _ends_sentence(word: str, nxt: str | None) -> bool:
+    """Akhir kalimat sungguhan. Singkatan ("Dr.", "vs.") dan inisial ("J.") bukan akhir kalimat."""
+    if not word.endswith(_SENTENCE_END):
+        return False
+    if word[-1] != ".":
+        return True
+    return not (word.rstrip(".").casefold() in _ABBREVIATIONS or _INITIAL_RE.match(word))
+
+
+def _clause_split(current: list[dict]) -> int | None:
+    """Indeks kata koma terakhir (bukan kata terakhir) tempat pemecahan paksa lebih natural; None bila tak ada."""
+    for k in range(len(current) - 2, 0, -1):
+        if str(current[k].get("w", "")).endswith(","):
+            return k
+    return None
+
+
 def segment(words: list[dict], max_words: int = 7, max_chars: int = 34, pause: float = .55) -> list[list[dict]]:
-    chunks, current = [], []
+    chunks, current, forced = [], [], set()
     protected = _protected_tokens(" ".join(str(w.get("w", "")) for w in words))
     for index, word in enumerate(words):
         current.append(word)
         text = " ".join(str(item.get("w", "")) for item in current)
+        nxt = str(words[index + 1].get("w", "")) if index + 1 < len(words) else None
         next_gap = float(words[index + 1].get("s", 0)) - float(word.get("e", 0)) if index + 1 < len(words) else 99
-        punctuation = str(word.get("w", "")).endswith((".", "?", "!", "…", ":", ";"))
+        punctuation = _ends_sentence(str(word.get("w", "")), nxt)
         limit = len(current) >= max_words or len(text) >= max_chars
         protected_tail = any(text.casefold().endswith(entity) for entity in protected)
-        if punctuation or next_gap > pause or (limit and not protected_tail):
+        if punctuation or next_gap > pause:
             chunks.append(current); current = []
+        elif limit and not protected_tail:
+            k = _clause_split(current)
+            if k is not None:                      # pecah di koma terdekat: "we packed the car," / "locked the door…"
+                chunks.append(current[:k + 1]); forced.add(len(chunks) - 1)
+                current = current[k + 1:]
+            else:
+                chunks.append(current); forced.add(len(chunks) - 1); current = []
     if current: chunks.append(current)
+    # kata yatim: hanya diperbaiki bila batas sebelumnya adalah pemecahan paksa (bukan akhir kalimat / jeda nyata)
+    i = 1
+    while i < len(chunks):
+        if len(chunks[i]) == 1 and (i - 1) in forced:
+            prev = chunks[i - 1]
+            if len(prev) < max_words and len(" ".join(str(w.get("w", "")) for w in prev + chunks[i])) <= max_chars + 6:
+                prev.extend(chunks.pop(i)); forced = {f if f < i else f - 1 for f in forced if f != i}
+                continue
+            if len(prev) > 2 and not str(prev[-1].get("w", "")).endswith(","):
+                chunks[i].insert(0, prev.pop())     # "This is where / you start."
+        i += 1
     if len(chunks) > 1 and len(chunks[-1]) == 1 and len(chunks[-2]) < max_words:
         chunks[-2].extend(chunks.pop())
     return chunks
