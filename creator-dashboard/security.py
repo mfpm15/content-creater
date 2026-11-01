@@ -3,6 +3,7 @@ import os
 import re
 import json
 import base64
+import html
 from urllib.parse import quote, unquote
 
 
@@ -58,7 +59,7 @@ def redact(value: str) -> str:
     text = str(value)
     for name, secret in os.environ.items():
         if any(tag in name.upper() for tag in ("API_KEY", "TOKEN", "PASSWORD", "SECRET")) and len(secret) >= 4:
-            for value in {secret,quote(secret,safe=''),json.dumps(secret)[1:-1]}:
+            for value in {secret,quote(secret,safe=''),json.dumps(secret)[1:-1],html.escape(secret),html.escape(secret,quote=False)}:
                 text = text.replace(value, "[REDACTED]")
     text = re.sub(r"(?i)(Bearer\s+)[^\s\"']+", r"\1[REDACTED]", text)
     def basic(match):

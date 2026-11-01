@@ -1,4 +1,5 @@
 import hashlib
+import html
 import http.client
 import io
 import json
@@ -25,13 +26,15 @@ class ProductionBundleTests(unittest.TestCase):
         secret='synthetic"\\api-key'
         original=json.dumps({'note':secret,'api_key':'unknown-private-value'})
         (self.root/'research.json').write_text(original)
+        (self.root/'index.html').write_text('<p>'+html.escape(secret)+'</p>')
         (self.root/'metadata.json').write_text('{"path":"private-directory"}')
         (self.root/'.env').write_text('private')
         (self.root/'review.json').write_text('{"status":"needs_attention"}')
         with patch.dict(os.environ,{'VIDEO_LLM_API_KEY':secret}),bundle.build(self.root) as path:
             with zipfile.ZipFile(path) as archive:
                 names=set(archive.namelist())
-                self.assertEqual(names,{'lottie.json','research.json','review.json','README.txt','manifest.json'})
+                self.assertEqual(names,{'lottie.json','index.html','research.json','review.json','README.txt','manifest.json'})
+                self.assertNotIn(html.escape(secret),archive.read('index.html').decode())
                 data=json.loads(archive.read('research.json'))
                 self.assertNotIn(secret,data['note']);self.assertEqual(data['api_key'],'[REDACTED]')
                 manifest=json.loads(archive.read('manifest.json'))
