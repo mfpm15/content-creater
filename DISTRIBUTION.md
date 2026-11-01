@@ -98,3 +98,5 @@ Folder `.data` sengaja tidak masuk paket. Untuk memindahkan proyek video milik s
 Launcher memakai `creator-dashboard/.venv/Scripts/python.exe` bila tersedia. Tutup Word bila file DOCX sedang terkunci saat rebuild/revisi; aplikasi mengembalikan pesan konflik dan memulihkan sumber sebelumnya. Pada Windows proteksi file mengikuti ACL folder pengguna, bukan izin POSIX 0600. Simpan checkout dan credential di folder pribadi yang tidak dibagikan.
 
 Target produk adalah Windows 10/11 x64. Cloud Linux telah menguji kode inti, pencarian path Windows melalui fixture, dan isi ZIP; `.bat`/PowerShell serta driver/GPU/TTS perlu smoke test native pada laptop Windows sebelum menyebut rilis sepenuhnya tervalidasi.
+
+Installer dan launcher inti sudah lulus [CI Windows native](https://github.com/mfpm15/content-creater/actions/runs/41300095514), termasuk path berspasi dan smoke HTTP. Pengujian langsung di laptop, driver/GPU, TTS daring, serta wrapper packaging PowerShell tetap terpisah dari hasil CI inti tersebut.
