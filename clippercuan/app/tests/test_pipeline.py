@@ -36,6 +36,31 @@ def fake_transcript(repeat: int = 2) -> dict:
     return {"language": "id", "words": words, "segments": segs}
 
 
+def test_full_download_has_timeout_retry_and_visible_initial_progress():
+    from pathlib import Path
+    from clipper import download
+    source = Path(download.__file__).read_text("utf-8")
+    assert '"socket_timeout": 20' in source
+    assert '"concurrent_fragment_downloads": 3' in source
+    assert "Membaca metadata dan menyiapkan unduhan video penuh" in source
+    assert "Mengunduh video penuh" in source
+
+
+def test_source_identity_uses_platform_creator_and_safe_local_filename():
+    from clipper import download
+    remote = download.source_identity("https://www.youtube.com/watch?v=abc", {"extractor_key": "YouTube", "channel": "Kanal Resmi"})
+    assert remote["label"] == "Sumber: YouTube · Kanal Resmi"
+    local = download.source_identity(r"C:\video\episode-12.mp4")
+    assert local["label"] == "Sumber: episode-12"
+    assert len(remote["label"]) <= 80
+
+
+def test_candidates_keep_plain_language_summary():
+    item = candidates.normalize({"start": 0, "end": 20, "text": "A clear explanation.",
+                                 "title": "Clear title", "summary": "This explains the central point."}, 1, "podcast", 30)
+    assert item["summary"] == "This explains the central point."
+
+
 def test_context_dependency_and_title_options_regex():
     bd = highlights._candidate_breakdown("Dan itu bagus", "Dan itu bagus", "ok.", 2.5, .5, .9)
     assert bd["clarity"] < 100 and bd["penalties"]["context_dependency"] > 0
@@ -177,13 +202,20 @@ def test_studio_endpoints_recipes_settings_words_clips():
 
 
 def test_auto_clip_target_and_quality_gate():
-    assert project.clip_target({"clip_count": "auto"}, 3600) == 10          # video 1 jam = 10 klip
+    assert project.clip_target({"clip_count": "auto"}, 3600) == 10          # jumlah kandidat target boleh tetap 10
     assert project.clip_target({"clip_count": 0}, 300) == 3                 # minimal 3
-    assert project.clip_target({"clip_count": "auto"}, 6 * 3600) == 10      # maksimal 10
+    assert project.clip_target({"clip_count": "auto"}, 6 * 3600) == 10      # maksimal 10 kandidat target
     assert project.clip_target({"clip_count": 5}, 3600) == 5
     ranked = [{"id": "a", "score": 80}, {"id": "b", "score": 30}, {"id": "c", "score": 60, "banned": True}, {"id": "d", "score": 50}]
     assert [x["id"] for x in project.auto_picks(ranked, 8)] == ["a", "d"]
     assert [x["id"] for x in project.auto_picks([{"id": "z", "score": 10}], 3)] == ["z"]   # tetap ada 1 klip
+
+
+def test_auto_render_is_capped_to_top_five_ranked_candidates():
+    ranked = [{"id": f"candidate_{i:02d}", "rank": i, "score": 90 - i} for i in range(1, 11)]
+    picked = project.auto_picks(ranked, target=10)
+    assert [x["rank"] for x in picked] == [1, 2, 3, 4, 5]
+    assert all(x not in picked for x in ranked[5:])
 
 
 def test_detect_facecam_small_corner_face_vs_podcast():

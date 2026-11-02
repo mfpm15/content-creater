@@ -38,9 +38,26 @@
         <form id="draftForm" class="panel" autocomplete="off">
           <h2>1. Isi informasi draft</h2>
           <label>Judul kerja <input name="title" maxlength="200" placeholder="Boleh kasar, AI boleh usulkan judul akhir" /></label>
-          <label>Jenis artikel (menentukan struktur)
-            <select name="article_type" id="typeSelect"></select>
-          </label>
+          <div class="row2">
+            <label>Jenis artikel (menentukan struktur)
+              <select name="article_type" id="typeSelect">
+                <option value="analisis" selected>Analisis mendalam / white paper (standar internasional)</option>
+                <option value="imrad">Ilmiah IMRaD (untuk riset dan data milikmu)</option>
+                <option value="laporan">Laporan / studi kasus</option>
+                <option value="populer">Artikel populer / feature (blog, majalah)</option>
+                <option value="tutorial">Tutorial / panduan langkah demi langkah</option>
+              </select>
+            </label>
+            <label>Model penulis (9Router)
+              <select name="model" id="articleModelSelect">
+                <option value="ag/gemini-3.8-flash-high" selected>Gemini 3.8 Flash High · utama</option>
+                <option value="ag/gemini-3.8-flash-medium">Gemini 3.8 Flash Medium · cepat</option>
+                <option value="ms/GPT-5.6-Think-Deeper">GPT-5.6 Think Deeper · penalaran</option>
+                <option value="cc/claude-opus-5-5">Claude Opus 5.5 · tambahan</option>
+                <option value="cc/claude-sonnet-5-5">Claude Sonnet 5.5 · tambahan</option>
+              </select>
+            </label>
+          </div>
           <div class="row2">
             <label>Audiens <input name="audience" maxlength="200" placeholder="Misal: pemula keamanan siber" /></label>
             <label>Panjang (kata) <input name="words" id="wordsInput" type="number" min="200" max="30000" value="1200" /></label>
@@ -71,7 +88,10 @@
             </label>
           </div>
           <label>Gaya visual
-            <select name="image_style" id="styleSelect"></select>
+            <select name="image_style" id="styleSelect">
+              <option value="__random__">Acak (setiap gambar beda gaya)</option>
+              <option value="infografis bersih, flat, palet biru-ungu">Infografis bersih, flat, palet biru-ungu</option>
+            </select>
           </label>
           <label>Permintaan gambar (satu per baris)
             <textarea name="image_requests" rows="3" placeholder="Misal: diagram alur login dengan 2FA&#10;Perbandingan serangan phishing vs smishing"></textarea>

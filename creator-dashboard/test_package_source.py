@@ -41,8 +41,10 @@ class SourcePackageTests(unittest.TestCase):
     def test_rejects_secret_content_versions_and_does_not_follow_links(self):
         with tempfile.TemporaryDirectory() as tmp,tempfile.TemporaryDirectory() as other:
             root=Path(tmp);outside=Path(other)/'private.txt';outside.write_text('private')
-            (root/'linked.txt').symlink_to(outside)
-            (root/'linked-dir').symlink_to(Path(other),target_is_directory=True)
+            try:
+                (root/'linked.txt').symlink_to(outside)
+                (root/'linked-dir').symlink_to(Path(other),target_is_directory=True)
+            except (OSError,NotImplementedError) as error:self.skipTest(f'Symlink unavailable: {error}')
             (root/'safe.py').write_text('source')
             result=package_source.package(root,'safe')
             with zipfile.ZipFile(result['archive']) as archive:self.assertEqual(len(archive.namelist()),1)

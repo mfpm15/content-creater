@@ -62,7 +62,7 @@ calls = {"section": 0, "fail_section": None}
 lock = threading.Lock()
 
 
-def fake_chat(messages):
+def fake_chat(messages, model=None):
     system, user = messages[0]["content"], messages[-1]["content"]
     if system.startswith("TAHAP: OUTLINE"):
         return "```json\n" + json.dumps(OUTLINE) + "\n```"
@@ -96,6 +96,11 @@ with tempfile.TemporaryDirectory() as tmp:
     assert big["words"] == 15000, "15.000 kata harus diterima"
     assert big["image_count"] == ad.MAX_IMAGES and big["article_type"] == ad.DEFAULT_TYPE and big["language"] == "Indonesia"
     assert ad.clean_input({"points": "x", "words": 999999})["words"] == ad.MAX_WORDS
+    selected = ad.clean_input({"points": "x", "model": "ms/GPT-5.6-Think-Deeper"})
+    assert selected["model"] == "ms/GPT-5.6-Think-Deeper"
+    assert ad.clean_input({"points": "x", "model": "model-tidak-diizinkan"})["model"] == ad.LLM_MODEL
+    opts = ad.options()
+    assert opts["defaultModel"] in {item["id"] for item in opts["models"]}
 
     # gaya acak: tiap gambar dapat gaya dari preset, dan tidak semuanya sama
     images = [{"id": str(i)} for i in range(5)]
@@ -210,7 +215,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert any(item["slug"] == status["slug"] and item["complete"] for item in ad.list_articles())
 
     # galat LLM terus-menerus -> job berstatus error dan pesan terbaca
-    def broken(messages):
+    def broken(messages, model=None):
         raise ad.LLMError("LLM tidak terjangkau (simulasi)")
 
     ad._chat = broken
@@ -223,7 +228,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert status["status"] == "error" and "tidak terjangkau" in status["error"], status
 
     # LLM mengembalikan sampah -> LLMError
-    ad._chat = lambda messages: "bukan json"
+    ad._chat = lambda messages, model=None: "bukan json"
     try:
         ad.make_outline(ad.clean_input({"points": "x"}))
         raise SystemExit("sampah LLM lolos")

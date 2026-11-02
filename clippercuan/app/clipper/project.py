@@ -169,11 +169,13 @@ def _pipeline(pid: str) -> None:
         _progress(pid, 0.0, 0.18)(0.1, "Membaca info video (mode hemat)…")
         meta = download.resolve_streams(p["source"], max_h=download.source_height(cfg, True))
         title = meta["title"]
+        source_attribution = meta.get("source_identity") or download.source_identity(p["source"])
         download.write_chapters(work, meta.get("chapters"))
         src = None
         pr = media.Probe(meta["duration"], meta["width"], meta["height"], meta["fps"], True)
-        update(pid, title=title, media={"file": None, "remote": True, "duration": pr.duration, "width": pr.width,
-                                        "height": pr.height, "fps": pr.fps})
+        update(pid, title=title, source_attribution=source_attribution,
+               media={"file": None, "remote": True, "duration": pr.duration, "width": pr.width,
+                      "height": pr.height, "fps": pr.fps})
 
         def get_wav() -> Path:  # audio hanya diunduh bila subtitle YouTube tidak tersedia/tidak dipakai
             if not wav.exists():
@@ -197,9 +199,13 @@ def _pipeline(pid: str) -> None:
     else:
         src, title = download.fetch(p["source"], work, _progress(pid, 0.0, 0.18), max_h=download.source_height(cfg, False))
         pr = media.probe(src)
+        info_path = work / "source-info.json"
+        source_attribution = (json.loads(info_path.read_text("utf-8")) if info_path.exists()
+                              else download.source_identity(p["source"]))
         # file lokal milik pengguna direferensikan dengan path absolut (tidak disalin)
-        update(pid, title=title, media={"file": src.name if src.parent == work else str(src), "duration": pr.duration,
-                                        "width": pr.width, "height": pr.height, "fps": pr.fps})
+        update(pid, title=title, source_attribution=source_attribution,
+               media={"file": src.name if src.parent == work else str(src), "duration": pr.duration,
+                      "width": pr.width, "height": pr.height, "fps": pr.fps})
         if pr.has_audio:
             _progress(pid, 0.18, 0.2)(0, "Mengekstrak audio…")
             media.extract_audio(src, wav)
@@ -283,7 +289,12 @@ def _pipeline(pid: str) -> None:
         m.setdefault("duration_reason", duration_reason)
         if m.get("hashtags"):
             post["hashtags"] = m["hashtags"]
-        prepared.append({**m, "id": m.get("id", f"candidate_{i + 1:02d}"), "post": post, "source_score": m.get("score"),
+        summary = str(m.get("summary") or "").strip()
+        if not summary:
+            sentences = [s.strip() for s in __import__("re").split(r"(?<=[.!?])\s+", m.get("text", "")) if s.strip()]
+            summary = " ".join(sentences[:2])[:320]
+        prepared.append({**m, "id": m.get("id", f"candidate_{i + 1:02d}"), "post": post,
+                         "summary": summary, "source_score": m.get("score"),
                          "status": "draft_candidate", "words": None, "crop_keys": None})
     ranked = candidates.rerank(prepared, profile_name, float(cfg.get("diversity", .3)), float(cfg.get("max_overlap", .35)))[:count]
     manifest = candidates.manifest(ranked, profile_name, p["source"])
@@ -324,9 +335,9 @@ def clip_target(cfg: dict, duration: float) -> int:
 
 
 def auto_picks(ranked: list[dict], target: int, min_score: float = 45) -> list[dict]:
-    """Klip terbaik untuk render otomatis: urut ranking, lewati yang skornya terlalu lemah (minimal 1 klip)."""
+    """Render otomatis maksimal Top 5; kandidat lain tetap draft dan dapat dipilih pengguna."""
     good = [x for x in ranked if not x.get("banned") and (x.get("pinned") or float(x.get("score", 0)) >= min_score)]
-    return (good or ranked[:1])[:target]
+    return (good or ranked[:1])[:min(max(1, target), 5)]
 
 
 def _sample_frames(p: dict, pr: media.Probe, src: Path | None, n: int = 8) -> list:
@@ -531,6 +542,10 @@ def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.P
         words = resolve_caption_track(pid)
     clip = next(c for c in p["clips"] if c["id"] == cid)
     cfg = deep_merge(p["settings"], clip.get("overrides"))
+    attribution = p.get("source_attribution") or download.source_identity(p.get("source", ""))
+    cfg["source_attribution"] = {**cfg.get("source_attribution", {}), "enabled": True,
+                                 "text": attribution.get("label", ""),
+                                 "position": cfg.get("source_attribution", {}).get("position", "tr")}
     _set_clip(pid, cid, status="rendering")
     seg = None
     try:

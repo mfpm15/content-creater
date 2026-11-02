@@ -131,6 +131,15 @@ DEFAULTS: dict = {
         "sharpen": True,         # penajaman ringan bila sumber harus diperbesar
     },
     "composition": {"subtle_punch_in": True, "max_zoom": 1.035, "scene_aware": True},
+    # Atribusi sumber berbeda dari watermark merek pengguna. Label ini selalu
+    # disertakan pada klip agar asal materi tetap terlihat.
+    "source_attribution": {
+        "enabled": True,
+        "text": "",
+        "position": "tr",        # tl | tr
+        "opacity": 0.82,
+        "size": 30,
+    },
     "watermark": {
         "enabled": False,
         "text": "@namakamu",

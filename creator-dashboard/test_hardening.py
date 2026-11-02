@@ -30,7 +30,8 @@ class HardeningTest(unittest.TestCase):
                 saved = json.loads((directory / (key + '.json')).read_text())
                 self.assertNotIn('example-secret-123', saved['error'])
                 self.assertEqual(video_job_store.recover_jobs(directory)[key]['status'], 'interrupted')
-                self.assertEqual((directory / (key + '.json')).stat().st_mode & 0o777, 0o600)
+                if os.name != 'nt':
+                    self.assertEqual((directory / (key + '.json')).stat().st_mode & 0o777, 0o600)
 
     def test_provider_credentials_require_tls_and_no_url_userinfo(self):
         import urllib.request

@@ -302,6 +302,13 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header('Referrer-Policy','no-referrer')
+        # Dashboard adalah aplikasi lokal yang sering diperbarui. Jangan biarkan browser
+        # memakai HTML/JS lama setelah server direstart karena dapat membuat UI dan API
+        # berbeda versi, misalnya dropdown model kosong walau API sudah mengirim model.
+        if not self.path.startswith('/api/'):
+            self.send_header('Cache-Control','no-store, max-age=0')
+            self.send_header('Pragma','no-cache')
+            self.send_header('Expires','0')
         super().end_headers()
 
     def send_head(self):

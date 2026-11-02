@@ -159,11 +159,30 @@ class VideoDrafterTest(unittest.TestCase):
 
     def test_start_job_selects_adapter_and_keeps_valid_duration(self):
         with patch.object(video_drafter.threading, "Thread"):
-            result = video_drafter.start_job({"topic": "Tes", "engine": "lottie", "duration": 30})
+            result = video_drafter.start_job({"topic": "Tes", "engine": "lottie", "duration": 30, "model": "cc/claude-sonnet-5-5"})
         job = video_drafter.job_status(result["jobId"])
         self.assertEqual(job["engine"], "lottie")
         self.assertEqual(job["duration"], 30)
+        self.assertEqual(job["model"], "cc/claude-sonnet-5-5")
+        self.assertEqual(job["researchMode"], "planner")
         self.assertEqual(job["status"], "queued")
+
+    def test_title_only_planner_uses_selected_model_and_detailed_prompt(self):
+        captured = {}
+        def fake_call(prompt, model=""):
+            captured["prompt"] = prompt
+            captured["model"] = model
+            return '{"creativeDirection":{"logline":"Transformasi"},"scenes":[{"start":0,"end":15,"narration":"Sebuah perubahan dimulai.","onScreenText":"MULAI BERUBAH","visual":"Satu objek berubah bentuk lalu membuka dunia baru.","type":"story","shotPurpose":"hook","camera":"macro push-in","lighting":"high contrast","transition":"shape match","continuity":"bentuk diteruskan"}]}'
+        with patch.object(video_drafter.threading, "Thread"):
+            result = video_drafter.start_job({"topic": "Masa depan kerja", "duration": 15, "model": "ms/GPT-5.6-Think-Deeper", "researchMode": "planner"})
+        with patch.object(video_drafter, "_call_9router", side_effect=fake_call):
+            video_drafter._run_job(result["jobId"])
+        job = video_drafter.job_status(result["jobId"])
+        self.assertEqual(captured["model"], "ms/GPT-5.6-Think-Deeper")
+        self.assertIn("creative director", captured["prompt"])
+        self.assertIn("foreground, midground, background", captured["prompt"])
+        self.assertEqual(job["status"], "awaiting_scene_plan")
+        self.assertEqual(job["scenePlan"]["creativeDirection"]["logline"], "Transformasi")
 
     def test_workflow_requires_ordered_approvals(self):
         plan = video_drafter.normalize_scene_plan({}, "Tes", "Adegan pembuka.", 15)

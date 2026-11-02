@@ -15,18 +15,37 @@ def test_local_package_has_all_platforms_per_profile():
             assert d["ready"].startswith(d["caption"][:20])
 
 
+def test_english_post_is_fully_english_without_indonesian_template_fragments():
+    r = postgen.local("More than 72 billion dollars of the loss is an accounting illusion.",
+                      "Anthropic's Accounting Illusion", "podcast", "en")
+    ready = r["platforms"]["tiktok"]["ready"]
+    assert "A thought-provoking take:" in ready
+    assert "What do you think?" in ready
+    assert "Pendapat ini" not in ready and "Setuju" not in ready and "#podcastindonesia" not in ready
+
+
+def test_indonesian_post_is_fully_indonesian_without_english_cta():
+    r = postgen.local("Kerugian itu sebagian besar hanya ilusi akuntansi.",
+                      "Ilusi Akuntansi Anthropic", "podcast", "id")
+    ready = r["platforms"]["tiktok"]["ready"]
+    assert "Pendapat ini bikin mikir:" in ready
+    assert "Setuju atau nggak?" in ready
+    assert "What do you think?" not in ready
+
+
 def test_profiles_get_distinct_niche_tags():
     ml = postgen.local("Lord", "Lord", "mobile_legends", "id")["hashtags"]
     pod = postgen.local("cerita", "Cerita", "podcast", "id")["hashtags"]
     assert "#mlbb" in ml and "#podcast" in pod
 
 
-def test_chain_starts_with_task_model_and_includes_gpt_and_gemini():
+def test_chain_starts_with_gemini_38_high_for_all_editorial_tasks():
     c = {**llm.DEFAULT_LLM}
-    chain = llm.chain_for("posts", c)
-    assert chain[0] == llm.GPT_THINKER
-    assert any(m.startswith("ag/gemini") for m in chain)
-    assert len(chain) == len(set(chain))
+    for task in ("moments", "titles", "posts"):
+        chain = llm.chain_for(task, c)
+        assert chain[0] == "ag/gemini-3.8-flash-high"
+        assert all(m.startswith("ag/gemini") for m in chain)
+        assert len(chain) == len(set(chain))
 
 
 def test_chat_chain_falls_back_to_next_model():

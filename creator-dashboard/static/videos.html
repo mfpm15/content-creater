@@ -164,8 +164,12 @@
           </label>
 
           <label>Sumber rencana
-            <select id="researchMode" name="researchMode"><option value="web">Riset web + motion planner</option><option value="provided">Naskah sendiri — rencana lokal tanpa provider</option></select>
-            <small>Mode naskah sendiri tidak memeriksa fakta atau membuat audio. Adapter Lottie dapat diselesaikan secara lokal; MP4 tetap memerlukan runtime render dan TTS.</small>
+            <select id="researchMode" name="researchMode">
+              <option value="planner" selected>Judul → Motion Planner 9Router</option>
+              <option value="web">Riset web + Motion Planner 9Router</option>
+              <option value="provided">Naskah sendiri → Motion Planner 9Router</option>
+            </select>
+            <small>Mode Judul membuat konsep, alur narasi, Scene Plan, dan Storyboard melalui model yang dipilih. Mode Riset Web menambahkan sumber terverifikasi bila Google/Gemini Search tersedia. Mode Naskah Sendiri mempertahankan materi Anda lalu menyempurnakan arahan produksi. Semua hasil tetap melalui tahap review sebelum render.</small>
           </label>
           <label>Brand kit
             <select id="brandSelect"><option value="">Tampilan bawaan</option></select>
@@ -190,23 +194,44 @@
           </details>
           <div class="row2">
             <label>Render Adapter
-              <select name="engine" id="engineSelect"></select>
+              <select name="engine" id="engineSelect">
+                <option value="opuscar" selected>Opuscar / GSAP</option>
+                <option value="threejs">Three.js 3D</option>
+                <option value="lottie">Lottie</option>
+              </select>
             </label>
             <label>Format Rasio Layar
-              <select name="aspect" id="aspectSelect"></select>
+              <select name="aspect" id="aspectSelect">
+                <option value="9:16" selected>9:16 Vertikal</option>
+                <option value="16:9">16:9 Horizontal</option>
+                <option value="4:5">4:5 Portrait</option>
+                <option value="1:1">1:1 Persegi</option>
+              </select>
             </label>
           </div>
 
           <div class="row2">
             <label>Durasi Video (Detik)
-              <select name="duration" id="durationSelect"></select>
+              <select name="duration" id="durationSelect">
+                <option value="15">15 Detik</option>
+                <option value="30">30 Detik</option>
+                <option value="45">45 Detik</option>
+                <option value="60" selected>60 Detik</option>
+                <option value="90">90 Detik</option>
+              </select>
             </label>
-            <label>Model Motion Planner (9Router)
-              <select name="model" id="modelSelect"></select>
+            <label>Model Sutradara & Motion Planner (9Router)
+              <select name="model" id="modelSelect">
+                <option value="ms/GPT-5.6-Think-Deeper" selected>GPT-5.6 Think Deeper · utama</option>
+                <option value="ag/gemini-3.8-flash-high">Gemini 3.8 Flash High · utama</option>
+                <option value="ag/gemini-3.8-flash-medium">Gemini 3.8 Flash Medium · utama</option>
+                <option value="cc/claude-opus-5-5">Claude Opus 5.5 · tambahan</option>
+                <option value="cc/claude-sonnet-5-5">Claude Sonnet 5.5 · tambahan</option>
+              </select>
             </label>
           </div>
 
-          <select name="style" id="styleSelect" hidden></select>
+          <select name="style" id="styleSelect" hidden><option value="opuscar_cinematic" selected>Opuscar Cinematic</option></select>
           <button id="generateBtn" class="primary-button" type="submit" style="width: 100%; margin-top: 18px; padding: 14px; font-size: 14px;">
             Buat Scene Plan
           </button>

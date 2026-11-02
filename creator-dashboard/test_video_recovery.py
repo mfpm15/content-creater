@@ -66,13 +66,14 @@ class VideoRecoveryTest(unittest.TestCase):
         path = self.directory / (self.key + '.json')
         saved = json.loads(path.read_text())
         self.assertNotIn(secret, saved['error'])
-        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        if os.name != 'nt':self.assertEqual(path.stat().st_mode & 0o777, 0o600)
         self.assertFalse(list(self.directory.glob('*.tmp')))
 
     def test_skip_symlink_checkpoint_and_invalid_revision(self):
         outside = self.directory / 'outside'
         outside.write_text(json.dumps(self.job))
-        (self.directory / (self.key + '.json')).symlink_to(outside)
+        try:(self.directory / (self.key + '.json')).symlink_to(outside)
+        except (OSError,NotImplementedError) as error:self.skipTest(f'Symlink unavailable: {error}')
         self.assertEqual(store.recover_jobs(self.directory), {})
         (self.directory / (self.key + '.json')).unlink()
         self.job['revision'] = 'bad'
@@ -82,7 +83,8 @@ class VideoRecoveryTest(unittest.TestCase):
     def test_symlinks_are_rejected_without_posix_nofollow(self):
         outside=self.directory/'outside'
         outside.write_text(json.dumps(self.job))
-        (self.directory/(self.key+'.json')).symlink_to(outside)
+        try:(self.directory/(self.key+'.json')).symlink_to(outside)
+        except (OSError,NotImplementedError) as error:self.skipTest(f'Symlink unavailable: {error}')
         with patch.object(store.os,'O_NOFOLLOW',0,create=True):
             self.assertEqual(store.recover_jobs(self.directory),{})
 

@@ -113,9 +113,13 @@ function paintOverlay(phone, cfg, words, t, title) {
   tt.style.fontSize = Math.round((cfg.title.size || 70) * k) + 'px';
   const tEnd = cfg.title.duration ? +cfg.title.duration : 1e9;
   tt.innerHTML = t <= tEnd ? titleHTML(cfg.title, cap, title) : '';
-  const wm = cfg.watermark, m = $('.cc-wm', phone);
-  m.hidden = !(wm.enabled && wm.text && !wm.image); m.textContent = wm.text || '';
-  m.dataset.pos = wm.position || 'br'; m.style.opacity = wm.opacity ?? .8;
+  const sourceMark = cfg.source_attribution || {}, wm = cfg.watermark, m = $('.cc-wm', phone);
+  const brandText = wm.enabled && wm.text && !wm.image ? wm.text : '';
+  const sourceText = sourceMark.enabled !== false ? sourceMark.text || '' : '';
+  m.hidden = !(sourceText || brandText);
+  m.textContent = sourceText || brandText;
+  m.dataset.pos = sourceText ? (sourceMark.position || 'tr') : (wm.position || 'br');
+  m.style.opacity = sourceText ? (sourceMark.opacity ?? .82) : (wm.opacity ?? .8);
   const pb = cfg.progress_bar || {}, bar = $('.cc-pb', phone);
   bar.hidden = !pb.enabled; bar.style.background = pb.color; bar.dataset.pos = pb.position || 'bottom';
 }

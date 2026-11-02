@@ -75,7 +75,7 @@ def get_available_models() -> list[dict]:
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
     research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": True, "ready": research_ready,"modes":["web","provided"]}}
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": True, "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
@@ -289,17 +289,42 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
 
 
 def build_scene_prompt(topic: str, script: str, duration: int, aspect: str) -> str:
-    return f"""Bertindak sebagai sutradara film Opuscar dan storyboard artist senior. Susun film sebagai progres visual yang dramatis, bukan kumpulan slide atau template berulang. Pertahankan seluruh fakta, angka, narasi, urutan, ejaan, dan timecode pengguna. Field visual adalah instruksi produksi dan tidak boleh disalin menjadi label layar. Jangan menciptakan metrik, persentase, kategori, atau klaim baru. Jangan memakai radar, HUD, grafik, neon, atau objek teknologi kecuali makna scene memang memerlukannya.
+    input_material = script.strip() or "Tidak ada naskah. Kembangkan treatment orisinal hanya dari judul, tanpa membuat data, kutipan, nama lembaga, hasil riset, atau klaim faktual spesifik yang tidak diberikan."
+    return f"""Bertindak sebagai creative director, sutradara motion design, penulis narasi, editor, sound designer, dan storyboard artist senior. Hasil harus langsung dapat dipakai tim produksi, bukan outline generik dan bukan kumpulan slide.
 
-Untuk setiap scene tentukan tujuan shot, subjek konkret, aksi yang terlihat, setting, metafora bila relevan, foreground, midground, background, titik fokus, negative space, ukuran shot, sudut dan gerak camera yang termotivasi, lighting, palet, typography singkat, gerak objek, transition native, sound cue, serta continuity dengan shot sebelum dan sesudahnya. Variasikan wide, medium, close-up, detail, overhead, tracking, orbit, locked, push-in, dan pull-back sesuai kebutuhan. Pastikan judul serta subtitle memiliki safe area dan ilustrasi tidak mendominasi frame. Subject hanya nama objek singkat yang benar-benar perlu dilabeli; kosongkan jika tidak perlu.
+TUJUAN FILM
+- Bangun satu ide utama yang jelas, hook yang terbaca dalam 1-2 detik, eskalasi informasi, turning point, dan payoff/CTA yang memperoleh ruang bernapas.
+- Gunakan perubahan visual bermakna setiap 2-5 detik sesuai kepadatan narasi, tetapi hindari potongan acak. Setiap shot wajib meneruskan bentuk, arah gerak, warna, objek, atau gagasan dari shot sebelumnya.
+- Buat narasi ringkas, natural, mudah diucapkan, dan sesuai durasi. Jangan memenuhi seluruh durasi dengan suara; sisakan jeda untuk penekanan visual.
+- Jika hanya ada judul, kembangkan treatment edukatif atau konseptual yang aman. Jangan mengarang statistik, tanggal, kutipan, hasil riset, merek, atau klaim absolut.
+- Jika pengguna memberi naskah, fakta, angka, ejaan, urutan, negasi, dan timecode wajib dipertahankan.
 
-Topik: {topic}
-Durasi: {duration}
+ARAH VISUAL
+- Film harus menunjukkan objek konkret dan aksi yang dapat dianimasikan. Hindari kata abstrak tanpa representasi visual.
+- Variasikan establishing, wide, medium, close-up, macro/detail, overhead, tracking, orbit, locked, push-in, pull-back, dan reveal berdasarkan fungsi dramatik, bukan sekadar variasi.
+- Untuk setiap shot, rancang foreground, midground, background, focal point, depth, negative space, protected title area, dan subtitle-safe area.
+- Gerak kamera harus termotivasi oleh informasi: reveal, follow, compare, inspect, transition, atau payoff. Hindari gerakan kamera dekoratif.
+- Gunakan metafora visual hanya bila memperjelas gagasan. Jangan memakai radar, HUD, neon, network node, grafik, atau objek teknologi kecuali benar-benar relevan.
+- Field visual adalah instruksi produksi dan tidak boleh disalin menjadi label layar. subject hanya nama objek pendek apabila objek memang perlu dilabeli.
+- Teks layar 2-6 kata, satu gagasan per kartu, kontras tinggi, tidak mengulang narasi secara utuh.
+
+PACING DAN EDITING
+- Tentukan start/end yang berurutan, tanpa overlap atau celah tak disengaja, sampai tepat {duration} detik.
+- Hook: pola visual kuat dan pertanyaan/konflik yang jelas. Build: informasi berkembang melalui sebab-akibat. Turn: perubahan perspektif. Payoff: kesimpulan visual yang memuaskan.
+- Tentukan transition yang berasal dari bentuk, arah, cahaya, kamera, atau aksi di dalam shot. Hindari transisi template tanpa hubungan.
+- Sound cue harus spesifik dan hemat: impact, riser, whoosh, click, ambience, tonal hit, atau silence. Jelaskan fungsi audio, bukan hanya nama efek.
+
+Topik/judul: {topic}
+Durasi total: {duration} detik
 Rasio: {aspect}
-Input user:
-{script}
+Materi pengguna:
+{input_material}
 
-Balas JSON valid dengan creativeDirection berisi logline, visualThesis, pacingArc, paletteLogic, continuitySystem; dan scenes berisi start, end, narration, onScreenText, soundCue, type, shotPurpose, visualFamily, subject, action, setting, visual, metaphor, composition, foreground, midground, background, camera, lighting, colorMood, typography, transition, continuity. Teks layar maksimal 2-6 kata. Tanpa timecode, bagi durasi menurut kepadatan narasi dan kebutuhan pacing. Hook harus cepat terbaca dan payoff harus mendapat ruang bernapas."""
+Balas satu objek JSON valid saja dengan:
+1. creativeDirection: logline, audiencePromise, narrativeArc, visualThesis, pacingArc, paletteLogic, typographySystem, motionLanguage, soundStrategy, continuitySystem, riskChecks.
+2. scenes: array berisi start, end, narration, onScreenText, soundCue, type, shotPurpose, visualFamily, subject, action, setting, visual, metaphor, composition, foreground, midground, background, camera, lighting, colorMood, typography, transition, continuity.
+
+Pastikan jumlah scene proporsional terhadap durasi, setiap scene berbeda fungsi dan visualnya, total timing tepat {duration} detik, serta seluruh keputusan cukup detail untuk divisualkan tanpa menebak maksud sutradara."""
 
 def _research_web(topic: str, script: str) -> dict:
     if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
@@ -964,8 +989,15 @@ def start_job(payload: dict) -> dict:
     if not topic: raise ValueError("Topik video wajib diisi")
     script=str(payload.get('script') or '').strip()
     if len(topic)>500 or len(script)>30000:raise ValueError('Topik maksimal 500 karakter; naskah maksimal 30.000 karakter')
-    research_mode=payload.get('researchMode','web')
-    if research_mode not in {'web','provided'}:raise ValueError('Mode riset tidak dikenal')
+    research_mode=payload.get('researchMode','planner')
+    if research_mode not in {'planner','web','provided'}:raise ValueError('Mode perencanaan tidak dikenal')
+    research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
+    # UI baru menonaktifkan Web Search ketika provider belum siap. Untuk klien lama,
+    # permintaan web yang membawa naskah dialihkan ke mode lokal. Permintaan tanpa
+    # naskah tetap diterima agar kontrak API lama tidak rusak; thread riset akan
+    # melaporkan kegagalan konfigurasi seperti sebelumnya.
+    if research_mode == 'web' and not research_ready:
+        research_mode = 'planner'
     if research_mode=='provided' and not script:raise ValueError('Mode naskah sendiri memerlukan naskah; periksa fakta sebelum menyetujui')
     aspect = str(payload.get("aspect") or "9:16"); aspect = aspect if aspect in ASPECT_RATIOS else "9:16"
     duration = int(payload.get("duration") or 60); duration = duration if duration in DURATIONS else 60
@@ -1082,14 +1114,29 @@ def _storyboard(plan: dict) -> list[dict]:
 def _run_job(job_id: str) -> None:
     job = job_status(job_id)
     try:
-        provided=job.get('researchMode')=='provided'
-        _update_job(job_id, {"status": "researching", "step": "Menyusun naskah pengguna untuk review" if provided else "Mencari sumber melalui Google Search", "progress": 10})
-        research = {'provider':'Naskah pengguna','mode':'provided','summary':'Naskah digunakan tanpa riset web atau verifikasi fakta otomatis. Periksa fakta dan sumber sebelum menyetujui.','sources':[],'sourceCount':0} if provided else _research_web(job["topic"], job["script"])
-        _update_job(job_id, {"research": research, "step": f"Riset selesai: {research['sourceCount']} sumber ditemukan", "progress": 20})
+        mode=job.get('researchMode','planner')
+        provided=mode=='provided'
+        web=mode=='web'
+        step = "Mencari sumber melalui Google Search" if web else "Menyusun creative direction dengan model terpilih"
+        _update_job(job_id, {"status": "researching", "step": step, "progress": 10})
+        if web:
+            research = _research_web(job["topic"], job["script"])
+        elif provided:
+            research = {'provider':'Naskah pengguna + 9Router','mode':'provided','summary':'Naskah dipertahankan lalu diterjemahkan menjadi arahan produksi oleh model terpilih. Fakta tidak diverifikasi otomatis.','sources':[],'sourceCount':0}
+        else:
+            research = {'provider':'Creative planning 9Router','mode':'planner','summary':'Treatment dikembangkan dari judul oleh model terpilih tanpa Web Search. Klaim faktual spesifik harus ditinjau sebelum persetujuan.','sources':[],'sourceCount':0}
+        _update_job(job_id, {"research": research, "step": "Konteks siap; menyusun Scene Plan sinematik", "progress": 20})
         explicit = parse_explicit_scenes(job["script"])
-        grounded_script = job["script"] + "\n\n" + _research_context(research)
-        data = {} if explicit or provided else _clean_json(_call_9router(build_scene_prompt(job["topic"], grounded_script, job["duration"], job["aspect"]), job["model"]))
+        planning_input = job["script"]
+        if web:
+            planning_input += "\n\n" + _research_context(research)
+        # Mode provided tetap merupakan jalur lokal deterministik. Ini penting untuk
+        # naskah bertimecode dan produksi offline: model tetap dapat dipilih di UI,
+        # tetapi hanya dipakai oleh mode planner/web yang memang meminta generasi AI.
+        data = {} if explicit or provided else _clean_json(_call_9router(build_scene_prompt(job["topic"], planning_input, job["duration"], job["aspect"]), job["model"]))
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
+        if isinstance(data.get('creativeDirection'), dict):
+            plan['creativeDirection'] = data['creativeDirection']
         if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])
         _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan})
     except Exception as exc:

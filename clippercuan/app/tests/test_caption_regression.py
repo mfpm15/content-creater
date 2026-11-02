@@ -30,6 +30,24 @@ def _events(ass: str) -> list[dict]:
     return result
 
 
+def test_source_attribution_is_separate_always_visible_top_watermark():
+    cfg = deep_merge(DEFAULTS, {"caption": {"enabled": False}, "title": {"enabled": False},
+                                "watermark": {"enabled": False},
+                                "source_attribution": {"enabled": True, "text": "Sumber: YouTube · Kanal Contoh", "position": "tr"}})
+    ass = captions.build_ass([], "", cfg, (1080, 1920), 8)
+    assert "Style: Source" in ass
+    assert "Sumber: YouTube · Kanal Contoh" in ass
+    assert r"\an9\pos(1040,86)" in ass
+    assert "Dialogue: 6," in ass
+
+
+def test_source_attribution_can_use_top_left_and_escapes_ass_markup():
+    cfg = deep_merge(DEFAULTS, {"source_attribution": {"enabled": True, "text": "Sumber: File {asli}", "position": "tl"}})
+    ass = captions.build_ass([], "", cfg, (1080, 1920), 3)
+    assert r"\an7\pos(40,86)" in ass
+    assert "{asli}" not in ass and "Sumber: File (asli)" in ass
+
+
 def test_filter_graph_has_one_subtitle_renderer():
     source = Path(render.__file__).read_text("utf-8")
     assert source.count("ass=filename=") == 1

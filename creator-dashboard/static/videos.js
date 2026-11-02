@@ -101,11 +101,20 @@ function setWorkflowStep(stage) {
 
 async function loadOptions() {
   try {
-    const res = await fetch('/api/videos/options');
+    const res = await fetch('/api/videos/options', { cache: 'no-store' });
     if (!res.ok) throw new Error('Gagal memuat opsi animasi');
     const data = await res.json();
     engineRuntime=Object.fromEntries(data.engines.map(engine=>[engine.id,engine.runtimeMissing||[]]));
     researchReady=!!data.research?.ready;
+    const researchSelect = document.getElementById('researchMode');
+    const webOption = researchSelect.querySelector('option[value="web"]');
+    if (webOption) {
+      webOption.disabled = !researchReady;
+      webOption.textContent = researchReady
+        ? 'Riset web + Motion Planner 9Router'
+        : 'Riset web tidak tersedia — gunakan Motion Planner 9Router';
+    }
+    if (!researchReady && researchSelect.value === 'web') researchSelect.value = 'planner';
     elements.engineSelect.innerHTML = data.engines.map(engine =>
       `<option value="${escapeHtml(engine.id)}" ${engine.id === data.defaultEngine ? 'selected' : ''} ${engine.disabled ? 'disabled' : ''}>${escapeHtml(engine.name)}${engine.disabled ? ' - segera' : ''}</option>`
     ).join('');
@@ -139,10 +148,22 @@ function updateEngineExperience() {
   } else {
     elements.engineNotice.innerHTML = `<strong style="color:#a855f7">Opuscar / GSAP Cinematic</strong><br>Motion graphics prosedural kaya ilustrasi dinamis (radar HUD, bar chart neon, network nodes, compare core) dengan continuous living motion tanpa dead frame (Output MP4).`;
   }
-  const provided=document.getElementById('researchMode').value==='provided';
-  elements.script.required=provided;elements.modelSelect.disabled=provided;
+  const researchSelect=document.getElementById('researchMode');
+  if (!researchReady && researchSelect.value === 'web') researchSelect.value='planner';
+  const mode=researchSelect.value;
+  const provided=mode==='provided';
+  elements.script.required=provided;
+  // Model selalu dapat dipilih. Pada mode planner/web model menghasilkan treatment;
+  // pada mode naskah lokal pilihan disimpan untuk perpindahan mode berikutnya.
+  elements.modelSelect.disabled=false;
+  elements.modelSelect.setAttribute('aria-disabled', 'false');
   const note=document.createElement('p');
-  note.textContent=(engineRuntime[eng]?.length?`Runtime belum siap: ${engineRuntime[eng].join(', ')}. `:'')+(provided?'Rencana lokal dari naskah; periksa fakta sebelum menyetujui.':researchReady?'Riset web dikonfigurasi; klaim tetap perlu diperiksa.':'Riset web belum siap. Konfigurasi provider atau pilih mode naskah sendiri.');
+  const planningNote = mode === 'web'
+    ? 'Riset web akan memberi konteks bersumber, lalu model terpilih menyusun arahan kreatif, Scene Plan, dan Storyboard.'
+    : provided
+      ? 'Model terpilih akan mempertahankan naskah Anda dan mengubahnya menjadi arahan produksi yang detail. Periksa fakta sebelum menyetujui.'
+      : 'Cukup masukkan judul. Model terpilih akan bertindak sebagai sutradara, penulis narasi, dan storyboard artist untuk membuat rencana video lengkap tanpa mengarang klaim faktual spesifik.';
+  note.textContent=(engineRuntime[eng]?.length?`Runtime belum siap: ${engineRuntime[eng].join(', ')}. `:'')+planningNote;
   elements.engineNotice.append(note);
 }
 
@@ -273,7 +294,7 @@ function renderReview(job) {
     activeReviewStage = 'scene_plan';
     setWorkflowStep('scene_plan');
     elements.reviewTitle.textContent = 'Review Research & Scene Plan';
-    elements.reviewDescription.textContent = 'Periksa sumber grounding, lalu periksa alur, timing, narasi, visual, dan motion direction sebelum membuat Storyboard.';
+    elements.reviewDescription.textContent = 'Periksa strategi kreatif, sumber bila tersedia, struktur hook hingga payoff, timing, narasi, visual, kamera, pencahayaan, transisi, audio, dan continuity sebelum membuat Storyboard.';
     elements.reviewGrid.innerHTML = researchMarkup(job.research) + (job.scenePlan?.scenes || []).map(sceneEditor).join('');
     elements.approveBtn.textContent = 'Setujui Scene Plan & Buat Storyboard';
     elements.reviseBtn.style.display = 'none';
@@ -281,7 +302,7 @@ function renderReview(job) {
     activeReviewStage = 'storyboard';
     setWorkflowStep('storyboard');
     elements.reviewTitle.textContent = 'Review Storyboard';
-    elements.reviewDescription.textContent = 'Periksa kartu visual. Setujui untuk memulai render, atau kembali ke Scene Plan.';
+    elements.reviewDescription.textContent = 'Periksa setiap kartu shot sebagai keputusan produksi: komposisi, kedalaman, aksi, kamera, lighting, tipografi, transisi, sound cue, dan kesinambungan. Setujui hanya jika seluruh film sudah koheren.';
     elements.reviewGrid.innerHTML = (job.scenePlan?.scenes || []).map(sceneEditor).join('');
     elements.approveBtn.textContent = 'Setujui Storyboard & Mulai Render';
     elements.reviseBtn.style.display = 'inline-flex';

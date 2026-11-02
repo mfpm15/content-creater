@@ -6,12 +6,30 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urlparse
 
 from .config import FFMPEG, UPLOADS_DIR
 
 
 def is_url(s: str) -> bool:
     return s.strip().lower().startswith(("http://", "https://"))
+
+
+def source_identity(source: str, info: dict | None = None) -> dict:
+    """Identitas publik ringkas untuk atribusi di video, tanpa menampilkan URL panjang."""
+    info = info or {}
+    if not is_url(source):
+        name = Path(source).stem.split("__", 1)[-1] or "file lokal"
+        return {"platform": "File lokal", "creator": "", "label": f"Sumber: {name}"[:80]}
+    host = (urlparse(source.strip()).hostname or "sumber video").lower().removeprefix("www.")
+    platform = str(info.get("extractor_key") or info.get("extractor") or "").strip()
+    if not platform:
+        platform = {"youtu.be": "YouTube", "youtube.com": "YouTube", "tiktok.com": "TikTok",
+                    "instagram.com": "Instagram", "facebook.com": "Facebook"}.get(host, host)
+    creator = str(info.get("channel") or info.get("uploader") or info.get("creator") or "").strip()
+    creator = " ".join(creator.split())[:48]
+    label = f"Sumber: {platform}" + (f" · {creator}" if creator else "")
+    return {"platform": platform[:32], "creator": creator, "label": label[:80], "host": host}
 
 
 def _youtube_js_opts() -> dict:
@@ -60,11 +78,17 @@ def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = l
 
     import yt_dlp
 
+    progress(0.01, "Membaca metadata dan menyiapkan unduhan video penuh…")
+
     def hook(d):
         if d.get("status") == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-            if total:
-                progress(d.get("downloaded_bytes", 0) / total, f"Mengunduh {d.get('_percent_str', '').strip()}")
+            downloaded = int(d.get("downloaded_bytes") or 0)
+            fraction = downloaded / total if total else 0.01
+            size = f"{downloaded / 1048576:.1f} MB"
+            progress(max(0.01, min(fraction, .99)), f"Mengunduh video penuh · {size} {d.get('_percent_str', '').strip()}".strip())
+        elif d.get("status") == "finished":
+            progress(0.99, "Unduhan selesai, menggabungkan video dan audio…")
 
     opts = {
         "outtmpl": str(out_dir / "source.%(ext)s"),
@@ -76,12 +100,19 @@ def fetch(source: str, out_dir: Path, progress: Callable[[float, str], None] = l
         "quiet": True,
         "no_warnings": True,
         "progress_hooks": [hook],
-        "retries": 5,
-        "fragment_retries": 5,
+        # Jangan biarkan koneksi CDN yang mati menggantungkan worker tanpa batas.
+        # File .part tetap dipakai yt-dlp untuk melanjutkan retry berikutnya.
+        "socket_timeout": 20,
+        "retries": 3,
+        "fragment_retries": 3,
+        "retry_sleep_functions": {"http": lambda n: min(2 ** n, 10), "fragment": lambda n: min(2 ** n, 10)},
+        "concurrent_fragment_downloads": 3,
     }
     opts.update(_youtube_js_opts())
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(source.strip(), download=True)
+    import json
+    (out_dir / "source-info.json").write_text(json.dumps(source_identity(source, info), ensure_ascii=False), "utf-8")
     files = sorted(out_dir.glob("source.*"), key=lambda p: p.stat().st_size, reverse=True)
     files = [f for f in files if f.suffix not in (".part", ".ytdl")]
     if not files:
@@ -127,7 +158,8 @@ _STREAMS: dict[str, tuple[float, dict]] = {}
 
 def _ydl_opts(**extra) -> dict:
     return {"quiet": True, "no_warnings": True, "noplaylist": True, "ffmpeg_location": FFMPEG,
-            "retries": 5, **_youtube_js_opts(), **extra}
+            "socket_timeout": 20, "retries": 3, "fragment_retries": 3,
+            **_youtube_js_opts(), **extra}
 
 
 def resolve_streams(source: str, max_age: float = 1800, max_h: int = 2160) -> dict:
@@ -148,7 +180,8 @@ def resolve_streams(source: str, max_age: float = 1800, max_h: int = 2160) -> di
     pick = lambda f: {"url": f["url"], "headers": f.get("http_headers") or info.get("http_headers") or {}}  # noqa: E731
     data = {"title": info.get("title") or "Video", "duration": float(info.get("duration") or 0), "chapters": info.get("chapters"),
             "width": int(video.get("width") or info.get("width") or 1920), "height": int(video.get("height") or info.get("height") or 1080),
-            "fps": float(video.get("fps") or info.get("fps") or 30), "video": pick(video), "audio": pick(audio) if audio else None}
+            "fps": float(video.get("fps") or info.get("fps") or 30), "video": pick(video), "audio": pick(audio) if audio else None,
+            "source_identity": source_identity(source, info)}
     _STREAMS[key] = (time.time(), data)
     return data
 

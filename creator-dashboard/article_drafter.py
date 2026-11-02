@@ -31,6 +31,14 @@ ARTICLES_DIR = ROOT / "output" / "articles"
 LLM_URL = os.getenv("ARTICLE_LLM_BASE_URL", os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:20128/v1").rstrip("/")
 LLM_MODEL = os.getenv("ARTICLE_LLM_MODEL", os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "ag/gemini-3.8-flash-high")
 LLM_KEY = os.getenv("ARTICLE_LLM_API_KEY", os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "9router-local")
+ARTICLE_MODELS = [
+    {"id": "ag/gemini-3.8-flash-high", "name": "Gemini 3.8 Flash High", "provider": "Gemini", "tier": "utama"},
+    {"id": "ag/gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash Medium", "provider": "Gemini", "tier": "cepat"},
+    {"id": "ms/GPT-5.6-Think-Deeper", "name": "GPT-5.6 Think Deeper", "provider": "GPT", "tier": "penalaran"},
+    {"id": "cc/claude-opus-5-5", "name": "Claude Opus 5.5", "provider": "Claude", "tier": "tambahan"},
+    {"id": "cc/claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "provider": "Claude", "tier": "tambahan"},
+]
+ARTICLE_MODEL_IDS = {item["id"] for item in ARTICLE_MODELS}
 LLM_TIMEOUT = int(os.getenv("ARTICLE_LLM_TIMEOUT", "300"))
 CONCURRENCY = max(1, min(6, int(os.getenv("ARTICLE_LLM_CONCURRENCY", "3"))))
 RETRY_BASE_SECONDS = float(os.getenv("ARTICLE_LLM_RETRY_SECONDS", "3"))
@@ -188,9 +196,10 @@ def _read_json(path: Path, default: object = None) -> object:
 
 # --------------------------------------------------------------------------- LLM
 
-def _chat(messages: list[dict]) -> str:
+def _chat(messages: list[dict], model: str | None = None) -> str:
     # stream=false wajib: 9Router default membalas SSE, bukan JSON
-    body = json.dumps({"model": LLM_MODEL, "messages": messages, "temperature": 0.6, "stream": False}).encode("utf-8")
+    selected_model = model if model in ARTICLE_MODEL_IDS else LLM_MODEL
+    body = json.dumps({"model": selected_model, "messages": messages, "temperature": 0.6, "stream": False}).encode("utf-8")
     request = urllib.request.Request(
         f"{LLM_URL}/chat/completions",
         data=body,
@@ -215,13 +224,13 @@ def _extract_json(text: str) -> dict:
     return json.loads(text[start:end + 1])
 
 
-def _ask_json(system: str, user: str, normalizer):
+def _ask_json(system: str, user: str, normalizer, model: str | None = None):
     """Tanya LLM, validasi lewat normalizer. Galat jaringan: ulang dengan jeda. JSON buruk: minta perbaiki."""
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     last = ""
     for attempt in range(3):
         try:
-            content = _chat(messages)
+            content = _chat(messages, model)
         except LLMError as exc:
             last = str(exc)
             if attempt == 2:
@@ -467,7 +476,7 @@ def build_section_prompt(inp: dict, outline: dict, refs: dict, index: int) -> st
 # ---------------------------------------------------------------------- tahapan
 
 def make_outline(inp: dict) -> dict:
-    return _ask_json(OUTLINE_SYSTEM, build_outline_prompt(inp), lambda raw: normalize_outline(raw, inp))
+    return _ask_json(OUTLINE_SYSTEM, build_outline_prompt(inp), lambda raw: normalize_outline(raw, inp), inp.get("model"))
 
 
 MONTHS = {
@@ -502,7 +511,7 @@ def make_references(inp: dict) -> dict:
         "", "SUMBER DARI PENGGUNA:", inp["sources"] or "(kosong)",
         "", "POIN DRAFT (hanya untuk konteks topik):", inp["points"][:3000],
     ])
-    return _ask_json(REFERENCES_SYSTEM, user, norm)
+    return _ask_json(REFERENCES_SYSTEM, user, norm, inp.get("model"))
 
 
 def write_section(inp: dict, outline: dict, refs: dict, index: int) -> dict:
@@ -518,7 +527,7 @@ def write_section(inp: dict, outline: dict, refs: dict, index: int) -> dict:
             raise ValueError("bagian kosong")
         return blocks
 
-    blocks = _ask_json(SECTION_SYSTEM, build_section_prompt(inp, outline, refs, index), norm)
+    blocks = _ask_json(SECTION_SYSTEM, build_section_prompt(inp, outline, refs, index), norm, inp.get("model"))
     expanded = False
     words = count_words(blocks)
     if section["words"] >= 300 and words < 0.7 * section["words"]:
@@ -532,7 +541,7 @@ def write_section(inp: dict, outline: dict, refs: dict, index: int) -> dict:
             "DAFTAR RUJUKAN:\n" + ("\n".join(f"[{i + 1}] {r}" for i, r in enumerate(refs["references"])) or "(kosong)")
         )
         try:
-            blocks = blocks + _ask_json(EXPAND_SYSTEM, user, norm)
+            blocks = blocks + _ask_json(EXPAND_SYSTEM, user, norm, inp.get("model"))
             expanded = True
         except LLMError:
             pass  # bagian asli tetap sah; lebih pendek dari target lebih baik daripada gagal
@@ -569,7 +578,7 @@ def make_image_prompts(inp: dict, outline: dict) -> list[dict]:
                 for im in chunk
             ],
         ])
-        found = _ask_json(IMAGE_SYSTEM, user, norm)
+        found = _ask_json(IMAGE_SYSTEM, user, norm, inp.get("model"))
         for im in chunk:
             result.append({**im, "alt": found[im["id"]]["alt"] or im["id"], "prompt": found[im["id"]]["prompt"]})
     return result
@@ -641,12 +650,14 @@ def clean_input(raw: object) -> dict:
     article_type = text("article_type", DEFAULT_TYPE)
     language = text("language", "Indonesia")
     style = text("image_style", STYLE_PRESETS[0])
+    requested_model = text("model", LLM_MODEL)
     inp = {
         "title": text("title"),
         "audience": text("audience"),
         "language": language if language in LABELS else "Indonesia",
         "tone": text("tone", "semi-formal"),
         "article_type": article_type if article_type in ARTICLE_TYPES else DEFAULT_TYPE,
+        "model": requested_model if requested_model in ARTICLE_MODEL_IDS else LLM_MODEL,
         "words": number("words", 1200, 200, MAX_WORDS),
         "points": text("points"),
         "sources": text("sources"),
@@ -809,9 +820,12 @@ def job_status(job_id: str) -> dict:
 
 
 def options() -> dict:
+    default_model = LLM_MODEL if LLM_MODEL in ARTICLE_MODEL_IDS else ARTICLE_MODELS[0]["id"]
     return {
         "types": [{"key": key, "label": value["label"]} for key, value in ARTICLE_TYPES.items()],
         "defaultType": DEFAULT_TYPE,
+        "models": ARTICLE_MODELS,
+        "defaultModel": default_model,
         "styles": STYLE_PRESETS,
         "randomStyle": RANDOM_STYLE,
         "limits": {"maxWords": MAX_WORDS, "maxImages": MAX_IMAGES},

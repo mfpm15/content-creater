@@ -78,7 +78,9 @@ class RequestSecurityTests(unittest.TestCase):
             for value in ['bytes=20-','bytes=0-1,3-4','bytes=-0']:
                 self.assertEqual(self.request('GET',route,{'Range':value})[0],416)
             outside=Path(tmp)/'outside.mp4';outside.write_bytes(b'private')
-            (folder/'video.mp4').unlink();(folder/'video.mp4').symlink_to(outside)
+            (folder/'video.mp4').unlink()
+            try:(folder/'video.mp4').symlink_to(outside)
+            except (OSError,NotImplementedError) as error:self.skipTest(f'Symlink unavailable: {error}')
             self.assertEqual(self.request('GET',route)[0],404)
 
     def test_static_files_cannot_escape_or_list_private_directories(self):
@@ -88,7 +90,9 @@ class RequestSecurityTests(unittest.TestCase):
             self.assertEqual(self.request('GET','/private/')[0],404)
             self.assertEqual(self.request('GET','/.env')[0],404)
             self.assertEqual(self.request('HEAD','/public.txt')[0],200)
-            (root/'escape.txt').symlink_to('/etc/hostname')
+            outside=root.parent/'outside.txt';outside.write_text('private')
+            try:(root/'escape.txt').symlink_to(outside)
+            except (OSError,NotImplementedError) as error:self.skipTest(f'Symlink unavailable: {error}')
             self.assertEqual(self.request('GET','/escape.txt')[0],404)
 
 

@@ -105,6 +105,7 @@ def chunk_words(words: list[dict], per_line: int, max_chars: int = 24) -> list[l
 def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], duration: float) -> str:
     W, H = size
     cap, ttl, wm = cfg["caption"], cfg["title"], cfg["watermark"]
+    source_mark = cfg.get("source_attribution") or {}
     if int(cfg.get("caption_layers", 1)) != 1:
         raise ValueError("Satu spoken-caption layer wajib aktif per render")
     if cap.get("role", "spoken-caption") != "spoken-caption":
@@ -131,6 +132,7 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
         f"Style: TitleClean,{font},{tfs},&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,{max(int(3 * scale), 2)},{int(4 * scale)},8,90,90,{int(H * 0.10)},1",
         f"Style: CTA,{font},{int(64 * scale)},&H00000000,&H00000000,{hl},&H64000000,0,0,0,0,100,100,0,0,3,{int(20 * scale)},0,5,80,80,0,1",
         f"Style: Mark,Arial Black,{int(wm['size'] * scale)},{_ass_color('#FFFFFF', wm['opacity'])},&H00FFFFFF,{_ass_color('#000000', wm['opacity'] * 0.6)},&H00000000,0,0,0,0,100,100,0,0,1,{max(int(2 * scale), 1)},0,2,40,40,40,1",
+        f"Style: Source,Arial,{int(float(source_mark.get('size', 30)) * scale)},{_ass_color('#FFFFFF', float(source_mark.get('opacity', .82)))},&H00FFFFFF,{_ass_color('#000000', .72)},&H50000000,0,0,0,0,100,100,0,0,3,{max(int(5 * scale), 2)},0,9,40,40,40,1",
     ]
     ev: list[str] = []
 
@@ -264,7 +266,16 @@ def build_ass(words: list[dict], title: str, cfg: dict, size: tuple[int, int], d
         add(5, c_start, duration, "CTA", r"{\an5\pos(" + f"{W // 2},{y}" + r")\fad(250,0)\fscx60\fscy60\t(0,220,\fscx108\fscy108)\t(220,350,\fscx100\fscy100)}"
             + _esc(cta["text"].strip()))
 
-    # ---- watermark teks
+    # ---- atribusi sumber: identitas editorial yang selalu terpisah dari watermark merek
+    source_text = str(source_mark.get("text") or "").strip()
+    if source_mark.get("enabled", True) and source_text:
+        source_pos = source_mark.get("position", "tr")
+        source_an = 7 if source_pos == "tl" else 9
+        source_x = int(40 * scale) if source_an == 7 else W - int(40 * scale)
+        source_y = int(H * .045)
+        add(6, 0, duration, "Source", r"{\an" + str(source_an) + r"\pos(" + f"{source_x},{source_y}" + r")\fad(160,0)}" + _esc(source_text[:80]))
+
+    # ---- watermark teks merek pengguna
     if wm["enabled"] and wm.get("text") and not wm.get("image"):
         an = {"tl": 7, "tr": 9, "bl": 1, "br": 3, "c": 5}.get(wm["position"], 3)
         mx, my = int(40 * scale), int(H * 0.05)

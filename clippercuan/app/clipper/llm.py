@@ -21,27 +21,28 @@ from .config import DATA_DIR
 
 SETTINGS_FILE = DATA_DIR / "settings.json"
 DEFAULT_LLM_BASE_URL = "http://localhost:20128/v1"
-DEFAULT_LLM_MODEL = "ag/gemini-3.8-flash-medium"
+# Satu model utama untuk seleksi momen, judul, ringkasan, dan paket posting.
+# Varian High dipilih untuk mengutamakan akurasi editorial dibanding sedikit penghematan latensi.
+DEFAULT_LLM_MODEL = "ag/gemini-3.8-flash-high"
 GPT_THINKER = "ms/GPT-5.6-Think-Deeper"
 # Semua model Gemini di 9Router, urut dari yang paling seimbang (cepat + akurat) ke cadangan.
 GEMINI_MODELS = [
-    "ag/gemini-3.8-flash-medium", "ag/gemini-3.8-flash-high", "ag/gemini-3.8-flash", "ag/gemini-3.8-flash-low",
+    "ag/gemini-3.8-flash-high", "ag/gemini-3.8-flash-medium", "ag/gemini-3.8-flash", "ag/gemini-3.8-flash-low",
     "ag/gemini-4-argon-medium", "ag/gemini-4-argon-high", "ag/gemini-4-argon-low",
     "ag/gemini-3.1-pro-high", "ag/gemini-3.1-pro-low", "ag/gemini-pro-agent",
     "ag/gemini-3.7-flash-medium", "ag/gemini-3.7-flash-high", "ag/gemini-3.7-flash-low",
     "ag/gemini-3.6-flash-medium", "ag/gemini-3.6-flash-high", "ag/gemini-3.6-flash-low",
 ]
-# Seleksi momen harus responsif. Gunakan varian Flash aktif terlebih dahulu dan jangan
-# menghabiskan anggaran pada model reasoning sebelum kandidat lokal tersedia.
-DEFAULT_FALLBACKS = ["ag/gemini-3.8-flash-medium", "ag/gemini-3.8-flash-low",
-                     "ag/gemini-3.8-flash-high", "ag/gemini-3.8-flash"]
+# Kualitas editorial didahulukan. Medium/standar tetap tersedia sebagai fallback bila High gagal.
+DEFAULT_FALLBACKS = ["ag/gemini-3.8-flash-high", "ag/gemini-3.8-flash-medium",
+                     "ag/gemini-3.8-flash", "ag/gemini-3.8-flash-low"]
 DEFAULT_LLM = {
     "enabled": False,
     "base_url": DEFAULT_LLM_BASE_URL,
     "api_key": "",
     "model_moments": DEFAULT_LLM_MODEL,
     "model_titles": DEFAULT_LLM_MODEL,
-    "model_posts": GPT_THINKER,          # caption posting: model penalaran untuk copy yang rapi
+    "model_posts": DEFAULT_LLM_MODEL,
     "fallback_models": DEFAULT_FALLBACKS,
     "temperature": 0.4,
     "timeout": 60,
@@ -310,10 +311,11 @@ def pick_moments(cands: list[dict], count: int, language: str | None) -> list[di
     user = (
         f"Bahasa video: {language or 'tidak diketahui'}. Pilih {count} kandidat TERBAIK yang tidak saling tumpang tindih "
         f"dari daftar berikut.\n\n" + "\n\n".join(lines) +
-        "\n\nUntuk tiap pilihan buat judul akurat maksimal 8 kata. Beri confidence dan seluruh dimensi 0-100.\n"
+        "\n\nUntuk tiap pilihan buat judul akurat maksimal 8 kata dan summary satu kalimat yang menjelaskan inti klip "
+        "dengan bahasa yang sama seperti video. Beri confidence dan seluruh dimensi 0-100.\n"
         "PENTING: bedakan kualitas dengan tegas. Skor total dan tiap dimensi harus bervariasi nyata antar klip "
         "(klip terbaik 85-98, klip biasa 55-70, klip lemah di bawah 50). Dilarang memberi skor hampir sama untuk semua klip.\n"
-        'Format: {"clips":[{"id":1,"score":80,"confidence":0.8,"title":"...","reason":"...",'
+        'Format: {"clips":[{"id":1,"score":80,"confidence":0.8,"title":"...","summary":"inti klip...","reason":"...",'
         '"breakdown":{"hook":0,"novelty":0,"emotional_shift":0,"clarity":0,"payoff":0,"quotability":0,'
         '"visual_action":0,"information_density":0,"clean_ending":0},"hashtags":["#topik"]}]}'
     )
@@ -326,7 +328,9 @@ def pick_moments(cands: list[dict], count: int, language: str | None) -> list[di
             breakdown = {k: max(0, min(100, int(v))) for k, v in (x.get("breakdown") or {}).items() if isinstance(v, (int, float))}
             res.append({"id": int(str(x["id"]).lstrip("#")), "score": score,
                         "confidence": max(0.0, min(1.0, float(x.get("confidence", .6)))),
-                        "title": str(x.get("title", "")).strip()[:80], "reason": str(x.get("reason", ""))[:240],
+                        "title": str(x.get("title", "")).strip()[:80],
+                        "summary": str(x.get("summary", "")).strip()[:320],
+                        "reason": str(x.get("reason", ""))[:240],
                         "breakdown": breakdown, "hashtags": [str(h) for h in x.get("hashtags", []) if str(h).startswith("#")][:8]})
         except (KeyError, ValueError, TypeError):
             continue

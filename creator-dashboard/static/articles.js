@@ -48,6 +48,14 @@ async function loadOptions() {
   const typeSelect = document.querySelector('#typeSelect');
   typeSelect.replaceChildren(...options.types.map(item => el('option', { value: item.key }, item.label)));
   typeSelect.value = options.defaultType;
+  const modelSelect = document.querySelector('#articleModelSelect');
+  const models = Array.isArray(options.models) && options.models.length ? options.models : [
+    { id: 'ag/gemini-3.8-flash-high', name: 'Gemini 3.8 Flash High', tier: 'utama' },
+  ];
+  modelSelect.replaceChildren(...models.map(model =>
+    el('option', { value: model.id }, `${model.name} · ${model.tier}`)));
+  modelSelect.value = models.some(model => model.id === options.defaultModel)
+    ? options.defaultModel : models[0].id;
   const styleSelect = document.querySelector('#styleSelect');
   styleSelect.replaceChildren(
     el('option', { value: options.randomStyle }, 'Acak (setiap gambar beda gaya)'),
@@ -197,7 +205,13 @@ form.addEventListener('submit', async event => {
   }
 });
 
-loadOptions().then(loadHistory).catch(error => toast(error.message));
+loadOptions().then(loadHistory).catch(error => {
+  const modelSelect = document.querySelector('#articleModelSelect');
+  if (modelSelect && !modelSelect.options.length) {
+    modelSelect.replaceChildren(el('option', { value: 'ag/gemini-3.8-flash-high' }, 'Gemini 3.8 Flash High · utama'));
+  }
+  toast(`Opsi gagal dimuat: ${error.message}. Muat ulang halaman.`);
+});
 
 function renderArticleTools(article) {
   const root=document.getElementById('articleTools');root.replaceChildren();

@@ -16,7 +16,7 @@ PLATFORMS = {
     "instagram_reels": {"label": "Instagram Reels", "max_chars": 2200, "tags": 6},
 }
 
-# Gaya per profil: nada, pola hook, CTA, hashtag dasar (niche/format).
+# Gaya Indonesia/Melayu. Template Inggris dipisahkan agar satu caption tidak pernah mencampur bahasa.
 STYLE = {
     "podcast": {"tone": "insight & cerita, kutip inti pendapat narasumber", "emoji": "🎙️",
                 "hook": "Pendapat ini bikin mikir: {t}",
@@ -47,11 +47,42 @@ STYLE = {
     "general": {"tone": "value-first, ringkas", "emoji": "✨", "hook": "{t}",
                 "cta": "Bagian mana yang paling relevan buatmu?", "tags": ["#fyp", "#viral"]},
 }
+STYLE_EN = {
+    "podcast": {"tone": "insight and story; quote the speaker's central point", "emoji": "🎙️",
+                "hook": "A thought-provoking take: {t}", "cta": "What do you think? Share your view in the comments.",
+                "tags": ["#podcast", "#insight", "#discussion"]},
+    "interview": {"tone": "complete question and answer with context", "emoji": "🎤",
+                  "hook": "A simple question with a deeper answer: {t}", "cta": "How would you answer it?",
+                  "tags": ["#interview", "#conversation", "#insight"]},
+    "review": {"tone": "honest verdict with tradeoffs and value", "emoji": "🔍", "hook": "The honest view: {t}",
+               "cta": "What should be reviewed next?", "tags": ["#review", "#verdict", "#recommendation"]},
+    "tech_review": {"tone": "specifications and demonstrations grounded in the transcript", "emoji": "📱",
+                     "hook": "Watch this before you buy: {t}", "cta": "Worth it or skip it? Share your take.",
+                     "tags": ["#techreview", "#technology", "#gadgets"]},
+    "gaming": {"tone": "energetic clutch, outplay, and reaction moments", "emoji": "🎮",
+               "hook": "This moment was unreal: {t}", "cta": "Would you make the same move?",
+               "tags": ["#gaming", "#gamer", "#gameplay"]},
+    "mobile_legends": {"tone": "MLBB terminology only when supported by the transcript", "emoji": "⚔️",
+                       "hook": "MLBB players need to see this: {t}", "cta": "What role do you play?",
+                       "tags": ["#mobilelegends", "#mlbb", "#gaming"]},
+    "educational": {"tone": "clear learning outcome and concise steps", "emoji": "💡",
+                    "hook": "Understand this in under a minute: {t}", "cta": "Save this for later.",
+                    "tags": ["#learning", "#education", "#tips"]},
+    "general": {"tone": "concise and value-first", "emoji": "✨", "hook": "{t}",
+                "cta": "Which part was most useful to you?", "tags": ["#shortvideo", "#insight"]},
+}
 FORMAT_TAG = {"tiktok": "#fyp", "youtube_shorts": "#shorts", "instagram_reels": "#reels"}
 
 
-def _style(profile: str | None) -> dict:
-    return STYLE.get(profile or "general", STYLE["general"])
+def _language_code(language: str | None) -> str:
+    """Normalisasi bahasa keluaran. Auto sudah diganti bahasa hasil deteksi sebelum fungsi ini dipanggil."""
+    value = str(language or "id").lower().split("-", 1)[0]
+    return "id" if value in {"id", "ms"} else "en" if value == "en" else value
+
+
+def _style(profile: str | None, language: str | None = "id") -> dict:
+    styles = STYLE_EN if _language_code(language) == "en" else STYLE
+    return styles.get(profile or "general", styles["general"])
 
 
 def _tag(word: str) -> str:
@@ -109,19 +140,19 @@ def _assemble(title: str, body: str, cta: str, tags: list[str], platform: str) -
 def local(text: str, title: str, profile: str = "general", language: str | None = None) -> dict:
     """Tanpa AI: template per profil + kata kunci transkrip."""
     from .highlights import STOP, _tokens, title_options
-    st = _style(profile)
+    st = _style(profile, language)
     toks = [t for t in _tokens(text or "") if len(t) > 3 and t not in STOP and not t.isdigit()]
     freq: dict[str, float] = {}
     for t in toks:
         freq[t] = freq.get(t, 0) + 1 + (.5 if len(t) > 6 else 0)
     topic = [_tag(k) for k, _ in sorted(freq.items(), key=lambda kv: -kv[1])[:3]]
     tags = _uniq(st["tags"][:2] + topic + st["tags"][2:])
-    head = (title or _first_sentence(text, 70) or "Momen penting").strip()
+    fallback_title = "Key moment" if _language_code(language) == "en" else "Momen penting"
+    head = (title or _first_sentence(text, 70) or fallback_title).strip()
     hook = f"{st['emoji']} " + st["hook"].format(t=head)
     quote = _first_sentence(text)
     body = hook + (f"\n\n\"{quote}\"" if quote and quote.lower() != head.lower() else "")
-    en = language not in (None, "id", "ms")
-    cta = "What do you think? Drop it in the comments." if en else st["cta"]
+    cta = st["cta"]
     return _package(head, {p: _assemble(head, body, cta, tags, p) for p in PLATFORMS},
                      tags, cta, title_options(text or head), profile, "lokal")
 
@@ -135,10 +166,13 @@ def _package(title, platforms, tags, cta, titles, profile, engine) -> dict:
 
 def _llm(text: str, title: str, profile: str, language: str | None) -> dict:
     from . import llm
-    st = _style(profile)
+    lang = _language_code(language)
+    st = _style(profile, lang)
+    language_name = {"en": "English only", "id": "Bahasa Indonesia saja"}.get(lang, f"bahasa {lang} saja")
     user = (
         f"Profil konten: {profile} (gaya: {st['tone']}).\nJudul klip: {title}\nTranskrip klip:\n{(text or '')[:3000]}\n\n"
-        f"Buat paket posting SIAP SALIN dalam bahasa {language or 'sama dengan transkrip'}. Aturan: klaim hanya dari transkrip; "
+        f"Buat paket posting SIAP SALIN dalam {language_name}. SELURUH hook, isi, CTA, dan hashtag harus satu bahasa; "
+        "jangan mencampur bahasa template dengan bahasa transkrip. Aturan: klaim hanya dari transkrip; "
         "hook 1 baris di awal; 1-3 kalimat isi; CTA natural (bukan 'like & follow'); emoji maksimal 2; hashtag relevan tanpa spam. "
         "TikTok: santai, 3-5 hashtag. YouTube Shorts: judul <=90 karakter + deskripsi 1-2 kalimat, 3 hashtag. "
         "Instagram Reels: caption sedikit lebih panjang dengan jeda baris, 4-6 hashtag.\n"
@@ -157,7 +191,7 @@ def _llm(text: str, title: str, profile: str, language: str | None) -> dict:
         if not d.get("caption"):
             raise llm.LLMError(f"Caption {p} kosong")
         all_tags += tags
-        a = _assemble(str(d.get("title") or head), str(d["caption"])[:1500], "", tags or _style(profile)["tags"], p)
+        a = _assemble(str(d.get("title") or head), str(d["caption"])[:1500], "", tags or _style(profile, lang)["tags"], p)
         if p == "youtube_shorts" and d.get("title"):
             a["title"] = str(d["title"])[:100]
         platforms[p] = a
