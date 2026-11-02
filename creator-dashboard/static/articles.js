@@ -218,8 +218,17 @@ function renderArticleTools(article) {
   const send=async(action,body)=>api(`/api/articles/${encodeURIComponent(article.slug)}/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const refresh=async()=>renderArticle(await api(`/api/articles/${encodeURIComponent(article.slug)}`));
   const report=article.evidence;
-  const evidencePanel=el('details',{},el('summary',{},`Bukti & klaim: ${report.unreviewed} paragraf perlu review`));
+  const evidencePanel=el('details',{},el('summary',{},`Bukti & klaim: ${report.unreviewed} paragraf perlu review · ${report.diagnostics?.claims_with_warnings || 0} peringatan angka/sitasi`));
   evidencePanel.append(el('p',{},'Kutipan dan sitasi tidak otomatis membuktikan fakta. Pemeriksaan di sini adalah catatan review pengguna, bukan fact-check otomatis.'));
+  if(report.diagnostics){
+    const diagnostics=report.diagnostics;
+    evidencePanel.append(el('p',{},`${diagnostics.claims_with_warnings} paragraf memiliki peringatan angka/sitasi. Angka dibandingkan secara literal dengan kutipan sumber tertaut; kesamaan angka tidak membuktikan makna, satuan, atau kebenaran.`));
+    if(diagnostics.uncited_references.length)evidencePanel.append(el('p',{},`Rujukan belum disitasi: ${diagnostics.uncited_references.join(', ')}`));
+    if(diagnostics.duplicate_reference_groups.length)evidencePanel.append(el('p',{},`Rujukan berulang: ${diagnostics.duplicate_reference_groups.map(group=>group.join(', ')).join('; ')}`));
+    const warnings=report.claims.filter(item=>item.review_warnings?.length);
+    for(const item of warnings.slice(0,100))evidencePanel.append(el('p',{},`Blok ${item.block+1}: ${item.review_warnings.join('. ')}. Klaim: ${item.text.slice(0,180)}`));
+    if(warnings.length>100)evidencePanel.append(el('p',{},`${warnings.length-100} peringatan lainnya tersedia dalam laporan API.`));
+  }
   const url=el('input',{placeholder:'URL HTTPS sumber'}),title=el('input',{placeholder:'Judul sumber'}),quote=el('textarea',{placeholder:'Kutipan bukti yang Anda periksa'}),date=el('input',{type:'date'}),add=el('button',{type:'button'},'Tambahkan sumber');
   add.onclick=async()=>{try{await send('evidence',{revision:report.revision,action:'source',url:url.value,title:title.value,excerpt:quote.value,published_at:date.value});await refresh()}catch(error){toast(error.message)}};
   const fetchSource=el('button',{type:'button'},'Ambil teks publik (host harus diizinkan)');

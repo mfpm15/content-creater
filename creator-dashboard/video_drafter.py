@@ -23,6 +23,7 @@ from runtime_config import resolve_python
 import creative_profile
 import continuous_motion
 import animation_clock
+import scene_render
 
 ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
@@ -287,7 +288,9 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
             end = float(duration) if index == len(scenes) - 1 else round(cursor + duration * weights[index] / sum(weights), 3)
             scene.update(start=cursor, end=end, duration=end - cursor)
             cursor = end
-    for scene,raw in zip(scenes,source):creative_profile.timing(scene,raw)
+    for scene,raw in zip(scenes,source):
+        creative_profile.timing(scene,raw)
+        if 'renderControls' in raw:scene['renderControls']=scene_render.validate(raw['renderControls'])
     result={"topic": topic, "duration": duration, "scenes": scenes}
     if data.get('brand') is not None:result['brand']=creative_profile.snapshot(data['brand'])
     if data.get('creativeDirection') is not None:
@@ -336,6 +339,7 @@ Materi pengguna:
 Balas satu objek JSON valid saja dengan:
 1. creativeDirection: logline, audiencePromise, narrativeArc, visualThesis, pacingArc, paletteLogic, typographySystem, motionLanguage, soundStrategy, continuitySystem, riskChecks.
 2. scenes: array berisi start, end, narration, onScreenText, soundCue, type, shotPurpose, visualFamily, subject, action, setting, visual, metaphor, composition, foreground, midground, background, camera, lighting, colorMood, typography, transition, continuity.
+Untuk engine opuscar/threejs saja, renderControls opsional mengendalikan gambar: camera (legacy/locked/push-in/pull-out/pan-left/pan-right/orbit), strength (angka 0–1), lighting (legacy/soft/dramatic), transition (legacy/fade/cut/slide). Kamera 2D hanya mengubah ilustrasi, bukan judul/subtitle. Arahan bebas tetap catatan produksi, bukan kode. Jangan menambahkan kontrol ini pada lottie/continuous.
 
 Pastikan jumlah scene proporsional terhadap durasi, setiap scene berbeda fungsi dan visualnya, total timing tepat {duration} detik, serta seluruh keputusan cukup detail untuk divisualkan tanpa menebak maksud sutradara."""
 
@@ -461,6 +465,7 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
     for index, scene in enumerate(plan["scenes"]):
         start, length = scene["start"], scene["duration"]
         kind = scene["type"]
+        controls=scene_render.validate(scene.get('renderControls',{}))
         family = scene.get("visualFamily") or _visual_family(" ".join((scene.get("visual", ""), scene.get("narration", ""))), kind, index)
         layout = ("full-bleed" if family in ("cityscape", "nature") else "split-stage" if family in ("comparison", "balance") else "focus-stage")
         sections.append(f'''<section class="scene clip type-{html.escape(kind)} family-{html.escape(family)} layout-{layout} transition-{html.escape(scene.get("transition", "shape-morph"))}" id="sc_{index}" data-family="{html.escape(family)}" data-start="{start}" data-duration="{length}">
@@ -469,18 +474,20 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
                 <div class="chapter-badge"><span class="badge-dot"></span> {index + 1:02d} / {len(plan["scenes"]):02d} · {html.escape(kind.upper())}</div>
                 <div class="content-stack">
                     <div class="copy-wrapper"><h2 class="hero-title">{html.escape(scene["onScreenText"])}</h2></div>
-                    <div class="visual-wrapper">{_visual_markup(scene, index)}</div>
+                    <div class="visual-wrapper" style="{scene_render.lighting_filter(scene)}">{_visual_markup(scene, index)}</div>
                 </div>
                 <div class="subtitle-capsule"><span class="sound-wave"><i></i><i></i><i></i></span><span>{html.escape(scene["narration"])}</span></div>
             </div>
         </section>''')
+        entrance=scene_render.entrance(scene,f'#sc_{index} .scene-inner') if controls['transition']!='legacy' else f'tl.fromTo("#sc_{index} .scene-inner", {{opacity:0,scale:1.08,filter:"blur(14px)"}}, {{opacity:1,scale:1,filter:"blur(0px)",duration:0.55,ease:"power3.out"}}, {start});'
+        drift=scene_render.camera_tween(scene,f'#sc_{index} .visual-canvas-box') if controls['camera']!='legacy' else f'tl.to("#sc_{index} .visual-canvas-box", {{y: {(-10 if family in ("nature","constellation") else 0)}, scale: {1.018 if family in ("device","portal","interface") else 1.0}, duration: Math.max(1.2, {length} * 0.48), yoyo:true, repeat:1, ease:"sine.inOut"}}, {start + 0.35});'
         animation.append(f'''
-        tl.fromTo("#sc_{index} .scene-inner", {{opacity:0,scale:1.08,filter:"blur(14px)"}}, {{opacity:1,scale:1,filter:"blur(0px)",duration:0.55,ease:"power3.out"}}, {start});
+        {entrance}
         tl.from("#sc_{index} .chapter-badge", {{x: -70, opacity: 0, duration: 0.5, ease: "back.out(1.4)"}}, {start + 0.03});
         tl.from("#sc_{index} .hero-title", {{y: -55, scale: 1.12, opacity: 0, duration: 0.62, ease: "power3.out"}}, {creative_profile.reveal(scene, .06)});
         tl.from("#sc_{index} .visual-wrapper", {{scale: 0.58, rotation: -7, opacity: 0, duration: 0.8, ease: "back.out(1.55)"}}, {creative_profile.reveal(scene, .12)});
         tl.from("#sc_{index} .subtitle-capsule", {{y: 45, opacity: 0, duration: 0.5, ease: "power3.out"}}, {start + 0.18});
-        tl.to("#sc_{index} .visual-canvas-box", {{y: {(-10 if family in ('nature','constellation') else 0)}, scale: {1.018 if family in ('device','portal','interface') else 1.0}, duration: Math.max(1.2, {length} * 0.48), yoyo:true, repeat:1, ease:"sine.inOut"}}, {start + 0.35});
+        {drift}
         tl.to("#sc_{index} .orbit-a", {{rotation:{180 if index % 2 == 0 else -150}, duration:{length}, ease:"none"}}, {start});
         tl.to("#sc_{index} .orbit-b", {{rotation:{-140 if index % 2 == 0 else 170}, duration:{length}, ease:"none"}}, {start});
         tl.from("#sc_{index} [data-family='{family}'] > *", {{opacity:0, y:{24 if index % 2 == 0 else -24}, stagger:0.07, duration:0.55, ease:"power2.out"}}, {start + 0.22});
@@ -517,7 +524,7 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
         elif family in ("constellation", "network"):
             animation.append(f'''tl.from("#sc_{index} .star, #sc_{index} .net-node", {{scale:0,stagger:.08,duration:.4,ease:"back.out(2)"}}, {start + .2});''')
         exit_start = max(start + 0.1, scene['end'] - 0.22)
-        animation.append(f'''
+        animation.append(scene_render.exit_tween(scene,f'#sc_{index} .scene-inner') if controls['transition']!='legacy' else f'''
         tl.to("#sc_{index} .scene-inner", {{opacity:0,scale:1.035,filter:"blur(8px)",duration:0.22,ease:"power2.in"}}, {exit_start});
         ''')
 
@@ -539,7 +546,7 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
 .copy-wrapper{{width:100%;text-align:left;padding-top:2px}}
 .hero-title{{max-width:920px;font-size:{min(68 if height > width else 50, round(width * .10))}px;line-height:1.04;margin:0;font-weight:950;background:linear-gradient(120deg,#fff 20%,#bae6fd 67%,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 12px 42px rgba(0,0,0,.86);letter-spacing:-.035em;text-wrap:balance}}
 .visual-wrapper{{min-height:0;width:100%;display:flex;align-items:center;justify-content:center;padding:6px 0 12px}}
-.visual-canvas-box{{width:100%;height:min(100%,760px);min-height:0;max-height:760px;border-radius:34px;background:linear-gradient(145deg,rgba(8,47,73,.64),rgba(3,7,18,.92));border:2px solid rgba(34,211,238,.5);box-shadow:0 24px 72px rgba(0,0,0,.58),inset 0 0 70px rgba(34,211,238,.1);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}}
+.visual-canvas-box{{transform:translate(0,0);width:100%;height:min(100%,760px);min-height:0;max-height:760px;border-radius:34px;background:linear-gradient(145deg,rgba(8,47,73,.64),rgba(3,7,18,.92));border:2px solid rgba(34,211,238,.5);box-shadow:0 24px 72px rgba(0,0,0,.58),inset 0 0 70px rgba(34,211,238,.1);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}}
 .visual-canvas-box>div:not(.visual-label),.visual-canvas-box>svg{{max-width:88%;max-height:84%}}
 .visual-canvas-box:before{{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,rgba(34,211,238,.14),transparent 42%);animation:panelPulse 2.4s ease-in-out infinite alternate}}@keyframes panelPulse{{to{{opacity:.35;transform:scale(1.08)}}}}
 .subtitle-capsule{{position:absolute;z-index:5;left:0;right:0;bottom:54px;width:100%;min-height:104px;padding:18px 28px;border-radius:22px;background:rgba(8,15,32,.96);border:1px solid rgba(34,211,238,.42);backdrop-filter:blur(18px);display:flex;align-items:center;gap:18px;font-size:{30 if height > width else 23}px;line-height:1.34;color:#f8fafc;box-shadow:0 16px 42px rgba(0,0,0,.68)}}
@@ -629,6 +636,9 @@ def generate_threejs_composition(plan: dict, aspect_info: dict, model: str = "")
     for index, scene in enumerate(plan["scenes"]):
         start, length = scene["start"], scene["duration"]
         kind = scene["type"]
+        controls=scene_render.validate(scene.get('renderControls',{}))
+        entrance=scene_render.entrance(scene,f'#th_sc_{index}',True) if controls['transition']!='legacy' else f'tl.to("#th_sc_{index}", {{opacity:1, duration: 0.45, ease: "power2.out"}}, {start});'
+        exit_animation=scene_render.exit_tween(scene,f'#th_sc_{index}') if controls['transition']!='legacy' else f'tl.to("#th_sc_{index}", {{opacity: 0, scale: 1.05, duration: 0.35, ease: "power2.in"}}, {max(start + 0.1, scene["end"] - 0.35)});'
         sections.append(f'''<section class="scene-hud" id="th_sc_{index}" data-start="{start}" data-duration="{length}">
             <div class="chapter-badge"><span class="badge-dot"></span> TAHAP {index + 1:02d} / {len(plan["scenes"]):02d} · 3D {html.escape(kind.upper())}</div>
             <div class="hud-center">
@@ -642,14 +652,15 @@ def generate_threejs_composition(plan: dict, aspect_info: dict, model: str = "")
         </section>''')
         animation.append(f'''
         tl.set("#th_sc_{index}", {{display:"flex", opacity:0}}, {start});
-        tl.to("#th_sc_{index}", {{opacity:1, duration: 0.45, ease: "power2.out"}}, {start});
+        {entrance}
         tl.from("#th_sc_{index} .chapter-badge", {{y: -25, opacity: 0, duration: 0.5, ease: "back.out(1.4)"}}, {start + 0.05});
         tl.from("#th_sc_{index} .reticle-box", {{scale: 0.78, opacity: 0, duration: 0.6, ease: "back.out(1.5)"}}, {creative_profile.reveal(scene, .1)});
         tl.from("#th_sc_{index} .subtitle-capsule", {{y: 25, opacity: 0, duration: 0.45, ease: "power2.out"}}, {start + 0.2});
-        tl.to("#th_sc_{index}", {{opacity: 0, scale: 1.05, duration: 0.35, ease: "power2.in"}}, {max(start + 0.1, scene['end'] - 0.35)});
+        {exit_animation}
         tl.set("#th_sc_{index}", {{display: "none"}}, {scene['end']});
         ''')
 
+    shot_controls=json.dumps([{'start':shot['start'],'end':shot['end'],'controls':scene_render.validate(shot.get('renderControls',{}))} for shot in plan['scenes']],allow_nan=False)
     title = html.escape(plan["topic"])
     return f'''<!doctype html><html lang="id"><head><meta charset="utf-8"><title>{title}</title><style>
 *{{box-sizing:border-box}}
@@ -702,6 +713,8 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
     const rimLight = new THREE.PointLight(0xa855f7, 5.0, 40);
     rimLight.position.set(-6, -4, 8);
     scene.add(rimLight);
+    const shotControls = {shot_controls};
+    {scene_render.THREE_SCRIPT}
 
     // 1200 Floating Star Particles
     const pGeo = new THREE.BufferGeometry();
@@ -776,8 +789,7 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
             wireMesh.rotation.y = -t * 0.55;
             ring1.rotation.z = t * 0.85;
             ring2.rotation.x = t * 0.75;
-            camera.position.x = Math.sin(t * 0.25) * 2.0;
-            camera.position.y = Math.cos(t * 0.2) * 1.5;
+            applySceneControls(t);
             camera.lookAt(0, 0, 0);
             renderer.render(scene, camera);
     }}
@@ -955,6 +967,8 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         if raw_plan.get('motionDesign') is not None and job.get('engine')!='continuous':
             raise ValueError('Desain kontinu hanya tersedia untuk adapter Continuous Motion')
         plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
+        if job.get('engine') not in {'opuscar','threejs'} and any('renderControls' in scene for scene in plan['scenes']):
+            raise ValueError('Kontrol kamera/lighting render hanya tersedia untuk Opuscar dan Three.js')
         if job.get('engine')=='continuous' and not plan.get('motionDesign'):
             raise ValueError('Desain gerak kontinu wajib dipertahankan saat mengedit')
         # Clicking approve also saves the editor. Preserve approval for an unchanged plan.
@@ -1186,6 +1200,7 @@ def _run_job(job_id: str) -> None:
         # naskah bertimecode dan produksi offline: model tetap dapat dipilih di UI,
         # tetapi hanya dipakai oleh mode planner/web yang memang meminta generasi AI.
         prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
+        prompt+='\nAdapter yang dipilih: '+job['engine']+'.'
         if job.get('motionDesign'):
             concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
             prompt+='\nKonsep yang sudah dipilih pengguna: '+concept['idea']+' '+concept['carry']+'\nRencana harus menutup seluruh durasi tanpa celah; beri ruang diam, tanpa mengganti konsep atau mengubah timecode pengguna.'
@@ -1193,6 +1208,8 @@ def _run_job(job_id: str) -> None:
         if job.get('motionDesign'):data['motionDesign']=job['motionDesign']
         else:data.pop('motionDesign',None)
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
+        if job.get('engine') not in {'opuscar','threejs'} and any('renderControls' in scene for scene in plan['scenes']):
+            raise ValueError('Model mengembalikan kontrol render yang tidak didukung adapter ini')
         if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])
         _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan})
     except Exception as exc:

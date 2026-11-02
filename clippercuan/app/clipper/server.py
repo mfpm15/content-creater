@@ -417,6 +417,15 @@ def _clip_words_full(pid: str, cid: str):
     return p, clip, wordtools.clip_words_with_p(tw, clip)
 
 
+@app.get('/api/projects/{pid}/clips/{cid}/preflight')
+def clip_preflight(pid: str, cid: str):
+    from . import preflight
+    p=_get(pid)
+    clip=next((c for c in p.get('clips',[]) if c.get('id')==cid),None)
+    if clip is None:raise HTTPException(404,'Klip tidak ditemukan')
+    return preflight.analyze(clip,p.get('media',{}).get('duration'),project.resolve_caption_track(pid))
+
+
 @app.get("/api/projects/{pid}/clips/{cid}/quality")
 def clip_quality(pid: str, cid: str, low: float = 0.55):
     """Saran kualitas transkrip: filler, kata berulang, kata low-confidence + pratinjau potong jeda."""

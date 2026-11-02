@@ -14,7 +14,7 @@ import traceback
 import uuid
 from pathlib import Path
 
-from . import asr, candidates, caption_workspace, download, highlights, llm, media, render, transcribe
+from . import asr, candidates, caption_workspace, download, highlights, llm, media, preflight, render, transcribe
 from .config import DEFAULTS, PROJECTS_DIR, deep_merge
 
 _LOCK = threading.RLock()
@@ -304,6 +304,9 @@ def _pipeline(pid: str) -> None:
            message=f"{len(ranked)} kandidat siap dipilih", viral_readiness=round(sum(x["score"] for x in ranked) / max(1, len(ranked))))
     if cfg.get("auto_render"):
         picks = auto_picks(ranked, target, float(cfg.get("min_score", 45)))
+        if not picks:
+            update(pid,status='candidates_ready',progress=1,message='Tidak ada kandidat Top 5 yang dapat dirender otomatis; pilih kandidat secara manual')
+            return
         select_candidates(pid, [x["id"] for x in picks])
         batch_render(pid)
 
@@ -336,8 +339,9 @@ def clip_target(cfg: dict, duration: float) -> int:
 
 def auto_picks(ranked: list[dict], target: int, min_score: float = 45) -> list[dict]:
     """Render otomatis maksimal Top 5; kandidat lain tetap draft dan dapat dipilih pengguna."""
-    good = [x for x in ranked if not x.get("banned") and (x.get("pinned") or float(x.get("score", 0)) >= min_score)]
-    return (good or ranked[:1])[:min(max(1, target), 5)]
+    eligible = [x for x in ranked[:5] if not x.get('banned')]
+    good = [x for x in eligible if x.get('pinned') or float(x.get('score',0)) >= min_score]
+    return (good or eligible[:1])[:min(max(1,target),5)]
 
 
 def _sample_frames(p: dict, pr: media.Probe, src: Path | None, n: int = 8) -> list:
@@ -549,6 +553,8 @@ def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.P
     _set_clip(pid, cid, status="rendering")
     seg = None
     try:
+        check=preflight.analyze(clip,p.get('media',{}).get('duration'),words)
+        if not check['can_render']:raise ValueError('; '.join(check['errors']))
         if p["media"].get("remote"):  # mode hemat: ambil potongan klip saja, render, lalu hapus
             s0 = max(0.0, float(clip["start"]) - 1.0)
             e0 = min(float(p["media"]["duration"] or 1e9), float(clip["end"]) + 1.0)
@@ -604,11 +610,7 @@ def edit_clip(pid: str, cid: str, changes: dict, rerender: bool = True) -> dict:
         raise KeyError(cid)
     dur = p.get("media", {}).get("duration") or 1e9
     if "start" in changes or "end" in changes:
-        s = max(0.0, float(changes.get("start", clip["start"])))
-        e = min(dur, float(changes.get("end", clip["end"])))
-        if e - s < 1:
-            raise ValueError("Durasi klip minimal 1 detik")
-        changes["start"], changes["end"] = round(s, 2), round(e, 2)
+        changes['start'],changes['end']=preflight.bounded_times(changes.get('start',clip['start']),changes.get('end',clip['end']),dur)
         if "words" not in changes:
             changes["words"] = None       # hitung ulang dari transkrip
         if "crop_keys" not in changes:
@@ -633,9 +635,7 @@ def add_clip(pid: str, start: float, end: float, title: str = "") -> dict:
         if not p.get("media"):
             raise ValueError("Video belum siap")
         dur = p["media"]["duration"]
-        s, e = max(0.0, float(start)), min(dur, float(end))
-        if e - s < 1:
-            raise ValueError("Durasi klip minimal 1 detik")
+        s,e=preflight.bounded_times(start,end,dur)
         n = max([int(c["id"].split("_")[-1]) for c in p["clips"]] + [0]) + 1
         words = resolve_caption_track(pid)
         text = " ".join(w["w"] for w in words if s <= w["s"] <= e)
@@ -899,6 +899,12 @@ def batch_render(pid: str, ids: list[str] | None = None) -> dict:
     with _LOCK:
         p = load(pid)
         wanted = set(ids or [x["id"] for x in p["candidates"] if x.get("selected")])
+        pending=[c for c in p['candidates'] if c['id'] in wanted and c.get('status') not in {'queued','rendering','done'}]
+        words=resolve_caption_track(pid) if pending else []
+        for clip in pending:
+            if clip.get('banned'):raise ValueError('Kandidat yang dilarang tidak dapat dirender')
+            check=preflight.analyze(clip,p.get('media',{}).get('duration'),words)
+            if not check['can_render']:raise ValueError('; '.join(check['errors']))
         queued = 0
         for c in p["candidates"]:
             if c["id"] in wanted and c.get("status") not in {"queued", "rendering", "done"}:

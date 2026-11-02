@@ -69,4 +69,4 @@ Benchmark baru: fixture suara Whisper 11 detik untuk audio, serta sampel video P
 
 Studi OneTake (PolyForm Noncommercial), Motion JS dan dokumentasi Three.js tercatat pada REFERENCES.md; kode/aset OneTake tidak disalin. Validasi terbaru dan demo 15 detik ada pada [STATUS-2026-11-02.md](STATUS-2026-11-02.md). KreasiPintar belum terbaca karena 403.
 
-Audit renderer terbaru: [RENDERER-AUDIT-2026-11-02.md](RENDERER-AUDIT-2026-11-02.md). Clock GSAP/CSS/WebGL kini disatukan dan seed 3D stabil. Remotion tetap di OpenCreator, belum engine Video Studio; banyak arahan sinematik masih catatan, bukan seluruh kontrol render.
+Audit renderer: [RENDERER-AUDIT-2026-11-02.md](RENDERER-AUDIT-2026-11-02.md). Clock GSAP/CSS/WebGL disatukan dan seed 3D stabil. Penerapan berikutnya: [INTEGRATION-REVIEW-2026-11-02.md](INTEGRATION-REVIEW-2026-11-02.md): kontrol kamera/lighting/transisi eksplisit pada GSAP/Three.js (24 kasus frame statis), diagnostik angka/sitasi artikel, preflight kandidat dan koreksi Top 5 Clipper termasuk fallback banned. Remotion tetap di OpenCreator, belum engine Video Studio; arahan sinematik bebas tetap catatan, di luar parameter yang didukung.

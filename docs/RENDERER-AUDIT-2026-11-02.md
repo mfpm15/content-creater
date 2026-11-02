@@ -32,6 +32,8 @@ Audit dilakukan pada main `dfb65fc` dan perubahan clock dalam sesi ini. Kode/man
 
 ## Gap arsitektur yang masih nyata
 
+Pembaruan sesudah audit ini: kontrol kamera/lighting/transisi yang eksplisit telah diterapkan pada GSAP/Three.js, dengan uji 24 kasus frame statis. Baca [INTEGRATION-REVIEW-2026-11-02.md](INTEGRATION-REVIEW-2026-11-02.md) untuk schema, pemetaan adapter dan batasnya. Field arahan bebas di bawah tetap tidak otomatis menjadi kode/render parameter.
+
 - `onScreenText`, narration, waktu, subject dan visual family berpengaruh pada hasil sesuai adapter. Sebaliknya, banyak string `camera`, `lighting`, `composition`, `transition`, `typography` dan creative direction dipertahankan untuk review tetapi **belum diterjemahkan menjadi semua parameter render**. Menulis arahan sinematik yang detail tidak otomatis membuat renderer melaksanakannya. GSAP memakai banyak easing/transisi tetap; kamera/material Three.js juga preset.
 - Komposisi Remotion membutuhkan timeline dengan `shots`, `captions`, path image/audio, rasio, fps dan totalFrames yang valid. Default Root berisi `shots=[]`/`captions=[]` dan 30 frame; `assertTimeline` menolak total coverage tersebut. Launcher preview kosong bukan bukti render siap. Worker OpenCreator memang memasukkan props/aset valid dari prosesnya sendiri, sehingga alur tersebut berbeda dari launcher tanpa props.
 - Guard path worker Remotion yang dibaca memakai containment secara leksikal. Resolusi symlink/junction, batas request jaringan browser dan hardening asset server perlu audit/tes paket khusus sebelum alur tersebut dipakai untuk input baru dari Video Studio. Ini catatan baca sumber, bukan klaim eksploit berhasil. Tidak mengubah daemon/runtime OpenCreator atau menyatakan lisensi/remotion runtime selesai dipasang.

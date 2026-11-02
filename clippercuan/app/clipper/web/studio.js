@@ -544,10 +544,15 @@ async function pageProject(pid) {
     const relWords = () => (c.words?.length ? c.words : words.map(w => ({ ...w, s: +(w.s - c.start).toFixed(3), e: +(w.e - c.start).toFixed(3) })));
     const seekTo = t => { if (vid.hidden) return; vid.currentTime = (cur.status === 'done' && cur.file ? 0 : c.start) + t; vid.play().catch(() => {}); };
     (async () => {
-      let r; try { r = await api(`/api/projects/${P.id}/clips/${c.id}/quality`); } catch (e) { qBox.innerHTML = '<h4>Kualitas transkrip</h4><p class="muted">Belum ada kata transkrip untuk klip ini.</p>'; return; }
+      let readiness = '';
+      try {
+        const check = await api(`/api/projects/${P.id}/clips/${c.id}/preflight`);
+        readiness = `<h4>Pemeriksaan sebelum render</h4><p>${check.can_render ? 'Batas waktu valid; kualitas isi tetap perlu ditinjau.' : 'Perbaiki batas waktu sebelum render.'}</p>${[...check.errors,...check.warnings].map(text=>`<p class="warn-t">${esc(text)}</p>`).join('')}<small>${check.word_count} kata · pemeriksaan lokal, bukan prediksi performa</small>`;
+      } catch { readiness = '<p class="warn-t">Pemeriksaan sebelum render belum tersedia.</p>'; }
+      let r; try { r = await api(`/api/projects/${P.id}/clips/${c.id}/quality`); } catch (e) { qBox.innerHTML = readiness + '<h4>Kualitas transkrip</h4><p class="muted">Belum ada kata transkrip untuk klip ini.</p>'; return; }
       const q = r.quality, sl = r.silence, grp = (cls, items, label) => items.length ? `<div class="q-grp"><b>${label} <em>${items.length}</em></b><div class="q-chips">${items.slice(0, 16).map(x => `<button type="button" class="q-chip ${cls}" data-s="${x.s}" title="${x.p != null ? 'keyakinan ' + Math.round(x.p * 100) + '%' : 'lompat ke kata ini'}">${esc(x.w)} <small>${fmt(x.s)}</small></button>`).join('')}${items.length > 16 ? `<span class="muted">+${items.length - 16}</span>` : ''}</div></div>` : '';
       const clean = !q.fillers.length && !q.repeats.length && !q.low_confidence.length;
-      qBox.innerHTML = `<h4>Kualitas transkrip <span class="muted"><small>saran, tidak otomatis</small></span></h4>
+      qBox.innerHTML = `${readiness}<h4>Kualitas transkrip <span class="muted"><small>saran, tidak otomatis</small></span></h4>
         <div class="q-stats"><span><b>${q.words}</b> kata</span><span class="${q.fillers.length ? 'warn-t' : ''}"><b>${q.fillers.length}</b> filler</span><span class="${q.repeats.length ? 'warn-t' : ''}"><b>${q.repeats.length}</b> berulang</span><span class="${q.low_confidence.length ? 'warn-t' : ''}"><b>${q.low_confidence.length}</b> ragu-ragu</span></div>
         ${clean ? '<p class="muted">Tidak ada filler atau kata mencurigakan. Transkrip terlihat bersih.</p>' : ''}${grp('fl', q.fillers, 'Filler (eh, hmm, anu…)')}${grp('rp', q.repeats, 'Kata berulang')}${grp('lc', q.low_confidence, 'Kata ragu-ragu (cek ejaan)')}
         ${!q.has_probability ? '<p class="muted"><small>Sumber transkrip ini tidak menyimpan keyakinan per kata, jadi kata ragu-ragu tidak bisa dideteksi.</small></p>' : ''}

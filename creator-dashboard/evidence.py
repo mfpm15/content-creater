@@ -5,6 +5,15 @@ import uuid
 from datetime import date
 from urllib.parse import urlsplit, parse_qsl
 
+CITATIONS = re.compile(r'\[(\d+(?:\s*[,;]\s*\d+)*)\]')
+NUMBERS = re.compile(r'(?<!\w)[+−-]?\d+(?:[.,]\d+)*(?:\s*%)?')
+
+
+def number_tokens(text: str) -> set[str]:
+    """Literal numeric comparison only; unit conversions/meaning require review."""
+    return {re.sub(r'\s+', '', token).replace('−', '-')
+            for token in NUMBERS.findall(CITATIONS.sub('', text))}
+
 
 def safe_url(url: str) -> str:
     if len(url)>4096 or any(ord(char)<33 for char in url):raise ValueError('URL sumber tidak valid')
@@ -27,7 +36,8 @@ def claims(article: dict) -> list:
         for text in texts:
             if not text.strip(): continue
             key=hashlib.sha256(text.encode()).hexdigest()[:24]
-            result.append({'id':key,'block':index,'text':text,'citations':re.findall(r'\[(\d+)\]',text)})
+            citations=[number for group in CITATIONS.findall(text) for number in re.findall(r'\d+',group)]
+            result.append({'id':key,'block':index,'text':text,'citations':citations})
     return result
 
 
@@ -58,6 +68,9 @@ def update(ledger: dict, action: dict) -> dict:
 
 def audit(article: dict, ledger: dict | None = None, max_age_days: int = 0) -> dict:
     ledger=ledger or {};sources={s['id']:s for s in ledger.get('sources',[])};report=[]
+    references=article.get('references',[])
+    known_citations={str(i) for i in range(1,len(references)+1)}
+    cited=set()
     for claim in claims(article):
         linked=[sources[i] for i in ledger.get('links',{}).get(claim['id'],[]) if i in sources]
         acceptable=[]
@@ -67,7 +80,24 @@ def audit(article: dict, ledger: dict | None = None, max_age_days: int = 0) -> d
                 try: age=(date.today()-date.fromisoformat(source.get('published_at',''))).days;fresh=0<=age<=max_age_days
                 except ValueError: fresh=False
             if source.get('verified') and source.get('excerpt') and fresh: acceptable.append(source['id'])
-        report.append({**claim,'source_ids':[s['id'] for s in linked], 'status':'user_supported' if acceptable else 'needs_review'})
+        citation_ids={value.lstrip('0') or '0' for value in claim['citations']}
+        cited.update(citation_ids)
+        unknown=sorted(citation_ids-known_citations,key=lambda value:(len(value),value))
+        numbers=number_tokens(claim['text'])
+        excerpt_numbers=set().union(*(number_tokens(str(source.get('excerpt',''))) for source in linked))
+        missing=sorted(numbers-excerpt_numbers)
+        warnings=[]
+        if unknown:warnings.append('Nomor sitasi tidak ada di daftar pustaka: '+', '.join(map(str,unknown)))
+        if missing:warnings.append('Angka belum ditemukan secara literal dalam kutipan sumber tertaut: '+', '.join(missing))
+        report.append({**claim,'source_ids':[s['id'] for s in linked], 'status':'user_supported' if acceptable else 'needs_review',
+                       'unknown_citations':unknown,'numbers_absent_from_excerpts':missing,'review_warnings':warnings})
+    ref_groups={}
+    for index,ref in enumerate(references,1):ref_groups.setdefault(' '.join(str(ref).casefold().split()),[]).append(index)
+    diagnostics={'uncited_references':[i for i in range(1,len(references)+1) if str(i) not in cited],
+                 'duplicate_reference_groups':[group for group in ref_groups.values() if len(group)>1],
+                 'claims_with_warnings':sum(bool(claim['review_warnings']) for claim in report),
+                 'numeric_check':'literal_tokens_only_not_semantic_verification'}
     return {'revision':ledger.get('revision',0),'sources':list(sources.values()),'claims':report,
             'unreviewed':sum(c['status']=='needs_review' for c in report),
+            'diagnostics':diagnostics,
             'method':'paragraph_claim_review_not_automatic_truth_verification','max_age_days':max_age_days}

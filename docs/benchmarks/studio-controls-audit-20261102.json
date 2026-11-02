@@ -1,0 +1,283 @@
+{
+  "media_playback": false,
+  "platform": "Linux Chromium software WebGL",
+  "viewport": {
+    "width": 480,
+    "height": 854
+  },
+  "sdk": {
+    "gsap": "3.13.0",
+    "three": "0.160.0"
+  },
+  "results": [
+    {
+      "engine": "opuscar",
+      "case": "legacy",
+      "sample_seconds": 1.25,
+      "frame_sha256": "86ca18d3c916f9d23c2c4376efff6629950a4ee5d620b448611d70bc63cf1cb8",
+      "differs_from_legacy": false,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "camera-locked",
+      "sample_seconds": 1.25,
+      "frame_sha256": "d4a06fe62b1b2efd3193b3f67fa45668e7174f8b76830a4510df9c681c09740a",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "camera-push-in",
+      "sample_seconds": 1.25,
+      "frame_sha256": "1649920fe22bb6a19651a3bf90fc424dd57be7966a2bea54b1f07c8bfd8cab50",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "camera-pull-out",
+      "sample_seconds": 1.25,
+      "frame_sha256": "7fab38e3b5755cb413b41f7cb1a065ded9ef5199d14671cb6315d3f50def4616",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "camera-pan-left",
+      "sample_seconds": 1.25,
+      "frame_sha256": "ae50fa7e76517f55012daedcc4144d542f8f71e42d019ea080a482cac990844e",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "camera-pan-right",
+      "sample_seconds": 1.25,
+      "frame_sha256": "5112259faea6d07369edcce0df23c73b23185872cadde5e75494f4006f453c59",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "camera-orbit",
+      "sample_seconds": 1.25,
+      "frame_sha256": "bfab85816ee0fa26782774cf3a015dc1c727718a9154209ac393fcc510e2e6be",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "lighting-soft",
+      "sample_seconds": 1.25,
+      "frame_sha256": "100c96274a8482009285a9a8568b121b356c3d3093890ded04db7b265eb6d298",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "lighting-dramatic",
+      "sample_seconds": 1.25,
+      "frame_sha256": "b1b74e50da110bd39caf42142797b677a2cd8ad0ee94efbef2120907037ed227",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "transition-fade",
+      "sample_seconds": 0.15,
+      "frame_sha256": "99cba88abe93ea8383e5b681375f337b7226bbab308c2db2337758f8312bd9b9",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "transition-cut",
+      "sample_seconds": 0.15,
+      "frame_sha256": "a0649b40e2f6a425e1fa2cc7645a245fe6b9aa462aa5774af0aad38e804d00c2",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "opuscar",
+      "case": "transition-slide",
+      "sample_seconds": 0.15,
+      "frame_sha256": "b7b656a16b0b790a38bd648b51461bea3766c9a61eadd3f8e5924ed10d0f4a89",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "legacy",
+      "sample_seconds": 1.25,
+      "frame_sha256": "dca93226961a8b2eb232dd9b2d793506e82b5b0d13c8c2b2c2ca5f80b7aa2c32",
+      "differs_from_legacy": false,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "camera-locked",
+      "sample_seconds": 1.25,
+      "frame_sha256": "c6ccd17ab12b69d14d83686c30089d204bc56985248d72c83c228f757f694c53",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "camera-push-in",
+      "sample_seconds": 1.25,
+      "frame_sha256": "50994bfd78e53e50c96b13839d0faff3f46e3e65ea0e27c29769f7a4fa8d2020",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "camera-pull-out",
+      "sample_seconds": 1.25,
+      "frame_sha256": "650abf45ecf22a0e87b0f637f59cbc46b0fbaf0baa564240d6b0ad377cfd84cf",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "camera-pan-left",
+      "sample_seconds": 1.25,
+      "frame_sha256": "734d5f4f226ce20e2cce370cfdd4730c1902e795dec16464e65083446281ce1b",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "camera-pan-right",
+      "sample_seconds": 1.25,
+      "frame_sha256": "25205173782a5d56af72a7a8312b7758774822798019e054733e9d31747ed3a7",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "camera-orbit",
+      "sample_seconds": 1.25,
+      "frame_sha256": "df03277baa133d183e85620217c1691bde44a1250f6a9968dba8988cbec84922",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "lighting-soft",
+      "sample_seconds": 1.25,
+      "frame_sha256": "01802f899c316f8367b38927a17fdbb285a95820fba2608e356847e498dec2cf",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "lighting-dramatic",
+      "sample_seconds": 1.25,
+      "frame_sha256": "b41772c4e3eaab44cf29800c0abea039079b02039b429c4d601997606323d6c8",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "transition-fade",
+      "sample_seconds": 0.15,
+      "frame_sha256": "896b4bd7174008294d98c8a2f4c8d3d5964a798ebfefa49ebd64cb223a6e30b5",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "transition-cut",
+      "sample_seconds": 0.15,
+      "frame_sha256": "ba8b60e1d4d8830634dd14bae557c6f574f007cab3f3997c375045a4526ea8e9",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    },
+    {
+      "engine": "threejs",
+      "case": "transition-slide",
+      "sample_seconds": 0.15,
+      "frame_sha256": "c5b50299d412225ac23380fb2572f134e511d41ba3428907b1a41e4dcddad4c0",
+      "differs_from_legacy": true,
+      "backwards_seek_identical": true,
+      "reload_identical": true,
+      "wall_time_stable": true,
+      "browser_errors": []
+    }
+  ],
+  "checks": "Static frame effects, time determinism, legacy reset; not a human review or Windows GPU benchmark.",
+  "source_sha256": {
+    "scene_render.py": "ac432afc918daebe41313ec2ae5670b76fa1129f5e9a64eb1a5aaac7d3bc0b82",
+    "video_drafter.py": "ee2d40e1089395e42eaea15e9c0afad4e9323d7f40e0386d983a75c70751326d"
+  }
+}

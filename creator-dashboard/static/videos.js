@@ -34,6 +34,7 @@ let activeAspect = '9:16';
 let activeReviewStage = null;
 let activeRevision = 0;
 let activeScenePlan = null;
+let activeReviewEngine = null;
 let resultSlug = null;
 let engineRuntime = {};
 let researchReady = false;
@@ -179,7 +180,7 @@ function updateEngineExperience() {
   } else if (eng === 'lottie') {
     elements.engineNotice.innerHTML = `<strong style="color:#22d3ee">Lottie Motion Adapter</strong><br>Animasi vektor ringan bebas build dengan preview web interaktif dan ekspor lottie.json siap pakai.`;
   } else {
-    elements.engineNotice.innerHTML = `<strong style="color:#a855f7">Opuscar / GSAP Cinematic</strong><br>Motion graphics prosedural kaya ilustrasi dinamis (radar HUD, bar chart neon, network nodes, compare core) dengan continuous living motion tanpa dead frame (Output MP4).`;
+    elements.engineNotice.innerHTML = `<strong style="color:#a855f7">Opuscar / GSAP Cinematic</strong><br>Ilustrasi prosedural dengan kontrol gerak ilustrasi, lighting dan transisi pada review adegan (Output MP4). Ritme dan kualitas cerita tetap perlu ditinjau.`;
   }
   const researchSelect=document.getElementById('researchMode');
   if (!researchReady && researchSelect.value === 'web') researchSelect.value='planner';
@@ -296,6 +297,13 @@ function showResult(result, aspectId) {
 
 function sceneEditor(scene, index) {
   const field = (name, label, multiline = false) => `<label>${label}${multiline ? `<textarea data-scene="${index}" data-field="${name}">${escapeHtml(scene[name] || '')}</textarea>` : `<input data-scene="${index}" data-field="${name}" value="${escapeHtml(scene[name] || '')}">`}</label>`;
+  const controls = scene.renderControls || {};
+  const select = (name, label, choices) => `<label>${label}<select data-render-scene="${index}" data-render-field="${name}">${choices.map(value => `<option value="${value}" ${value === (controls[name] || 'legacy') ? 'selected' : ''}>${value}</option>`).join('')}</select></label>`;
+  const renderControls = ['opuscar','threejs'].includes(activeReviewEngine) ? `<details><summary>Kontrol gambar yang diterapkan saat render</summary>
+    <p>2D: gerak ilustrasi dan filter lighting; 3D: kamera dan intensitas lampu. Transisi mengatur panel adegan (HUD pada 3D). Legacy mempertahankan perilaku bawaan; arahan bebas di bawah tetap catatan produksi.</p>
+    ${select('camera','Kamera render',['legacy','locked','push-in','pull-out','pan-left','pan-right','orbit'])}
+    ${select('lighting','Lighting render',['legacy','soft','dramatic'])}${select('transition','Transisi render',['legacy','fade','cut','slide'])}
+    <label>Kekuatan kamera (0–1)<input type="number" min="0" max="1" step="0.05" data-render-scene="${index}" data-render-field="strength" value="${escapeHtml(controls.strength ?? .5)}"></label></details>` : '';
   return `<article class="review-card scene-editor">
     <h4>Adegan ${index + 1} · ${escapeHtml(scene.start)}-${escapeHtml(scene.end)}s</h4>
     <div class="editor-row">${field('start','Mulai')}${field('end','Selesai')}</div>
@@ -303,7 +311,7 @@ function sceneEditor(scene, index) {
     <div class="editor-row">${field('visualFamily','Visual family')}${field('shotPurpose','Tujuan shot')}</div>
     ${field('action','Aksi')}${field('setting','Setting')}${field('composition','Komposisi',true)}
     <div class="editor-row">${field('foreground','Foreground')}${field('midground','Midground')}</div>
-    ${field('background','Background')}${field('camera','Kamera',true)}${field('lighting','Lighting')}
+    ${renderControls}${field('background','Background')}${field('camera','Arahan kamera',true)}${field('lighting','Arahan lighting')}
     <div class="editor-row">${field('colorMood','Color mood')}${field('transition','Transisi')}</div>
     ${field('typography','Tipografi')}${field('continuity','Kontinuitas',true)}${field('soundCue','Sound cue')}
     <details><summary>Timing visual per kata (opsional)</summary>
@@ -326,6 +334,7 @@ function researchMarkup(research) {
 }
 
 function renderReview(job) {
+  activeReviewEngine = job.engine;
   activeScenePlan = structuredClone(job.scenePlan);
   activeJobId = job.jobId;
   activeRevision = job.revision || 0;
@@ -396,6 +405,15 @@ function collectEditedPlan() {
     if (cueIndex !== '') scenes[index].visualCueWord = Number(cueIndex);
     else delete scenes[index].visualCueWord;
   });
+  const controls = new Map();
+  elements.reviewGrid.querySelectorAll('[data-render-scene]').forEach(input => {
+    const index = Number(input.dataset.renderScene);
+    if (!controls.has(index)) controls.set(index, {});
+    controls.get(index)[input.dataset.renderField] = input.dataset.renderField === 'strength' ? Number(input.value) : input.value;
+  });
+  for (const [index, value] of controls) {
+    if (scenes[index].renderControls || ['camera','lighting','transition'].some(key => value[key] !== 'legacy')) scenes[index].renderControls = value;
+  }
   return { ...structuredClone(activeScenePlan), scenes };
 }
 
