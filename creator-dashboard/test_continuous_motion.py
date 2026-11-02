@@ -141,6 +141,8 @@ class ContinuousMotionTests(unittest.TestCase):
             self.assertGreater(report['motion_review']['rendered_pixel_motion']['samples'],10)
             self.assertEqual(len(report['motion_review']['boundaries']),1)
             self.assertEqual(report['motion_review']['frames'],60)
+            self.assertLess(report['motion_review']['captured_frames'],60)
+            self.assertGreater(report['motion_review']['reused_static_frames'],0)
             self.assertEqual(report['motion_review']['boundaries'][0]['status'],'carried')
             with video.open('rb') as source:digest=hashlib.file_digest(source,'sha256').hexdigest()
             self.assertEqual(report['artifact_sha256'],digest)
@@ -148,6 +150,13 @@ class ContinuousMotionTests(unittest.TestCase):
             track=next(row for row in probe['streams'] if row['codec_type']=='video')
             self.assertEqual((track['width'],track['height'],track['r_frame_rate']),(160,288,'30/1'))
             self.assertTrue(any(row['codec_type']=='audio' for row in probe['streams']))
+            reference=self.root/'uncached';reference.mkdir()
+            (reference/'index.html').write_bytes((folder/'index.html').read_bytes())
+            uncached,_=motion.render(reference,job['scenePlan'],aspect,reuse_static_frames=False)
+            def decoded_hashes(path):
+                output=subprocess.check_output(['ffmpeg','-v','error','-i',str(path),'-an','-f','framemd5','-'])
+                return [line for line in output.splitlines() if not line.startswith(b'#')]
+            self.assertEqual(decoded_hashes(video),decoded_hashes(uncached))
             with video_bundle.build(folder) as archive:
                 with zipfile.ZipFile(archive) as content:
                     self.assertIn('review.json',content.namelist())

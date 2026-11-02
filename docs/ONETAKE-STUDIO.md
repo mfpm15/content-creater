@@ -63,3 +63,11 @@ Bukti uji dan status CI terbaru dicatat pada dokumen status sesi ini; jangan men
 - Analisis file encoded: 149 sampel luminansi 10 fps pada lebar160; 85,91% berperubahan rendah pada ambang rata-rata 0,1/255. Ini area average resolusi kecil; dapat melewatkan objek kecil dan tidak menjadi ukuran estetika.
 - Browser berhasil mendekode, seek dan **memutar maju** MP4 15 detik; ketiga konsep juga diuji ulang pada preview dengan batas carrier dan repeat piksel.
 - Hasil JSON terukur: [continuous-motion-20261102.json](benchmarks/continuous-motion-20261102.json). Media/pekerjaan uji tinggal di `.data/benchmarks/`, tidak masuk Git atau konfigurasi pengguna.
+
+## Optimisasi tanpa pemutaran video
+
+Setelah pengguna meminta fokus pada fitur/menu dan optimisasi, tidak ada pemutaran video tambahan. Capture pada hold yang mempunyai state visual identik kini memakai ulang satu PNG terakhir; encoder tetap menerima semua frame sehingga durasi/30 fps/audio sinkron tetap terjaga. State key mencakup beat, transisi dan ukuran viewport. Komposisi tanpa key valid menggunakan capture biasa.
+
+Uji file 15 detik yang sama: **77 capture, 373 frame dipakai ulang dari total 450** (pengurangan capture 82,89%). Seluruh **450 hash frame terdekode identik** dengan file pembanding. Wall time teramati 21,245 detik; baseline sebelumnya 148,104 detik mempunyai beban paralel berbeda, jadi jangan menganggap rasio waktu tersebut sebagai jaminan laptop. [Laporan optimisasi](benchmarks/continuous-motion-optimization-20261102.json).
+
+Hasil MP4 pada menu sekarang memakai preload metadata dan tidak autoplay/loop. Validasi berikutnya menggunakan unit test, render dan analisis file, bukan pemutaran media.

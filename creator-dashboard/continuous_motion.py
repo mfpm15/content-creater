@@ -122,12 +122,17 @@ function shape(i){
  if(concept==='focus'){const sizes=[[.44,.22],[.24,.12],[.58,.28],[.3,.16]],v=sizes[i%sizes.length];return [W*(.5+(i%2? .08:-.06)),H*.51,W*v[0],H*v[1],18]}
  const n=Math.min(12,i+1);return [W*.5,H*.52,W*(.34+Math.min(n,6)*.035),H*(.17+Math.ceil(n/4)*.045),22];
 }
-let current=0,playing=false,clock=0;
+let current=0,playing=false,clock=0,lastVisualKey='';
 function draw(seconds){
  const t=Math.max(0,Math.min(D.duration,Number.isFinite(seconds)?seconds:0));current=t;
  let i=Math.max(0,scenes.findIndex(s=>t>=s.start&&t<s.end));if(t===D.duration)i=scenes.length-1;
  let from=i,to=i,u=0;
  for(let k=0;k<D.sheet.transitions.length;k++){const edge=D.sheet.transitions[k];if(t>=edge.start&&t<=edge.end){from=k;to=k+1;const x=clamp((t-edge.start)/(edge.end-edge.start));u=(1-Math.cos(Math.PI*x))/2;break}}
+ const key=`${innerWidth}x${innerHeight}:${i}:${from}:${to}:${u}`;
+ window.__renderKey=key;
+ byId('seek').value=t;byId('time').textContent=t.toFixed(1)+'s';
+ if(key===lastVisualKey)return true;
+ lastVisualKey=key;
  const a=shape(from),b=shape(to),s=a.map((v,j)=>mix(v,b[j],u));
  hero.setAttribute('x',s[0]-s[2]/2);hero.setAttribute('y',s[1]-s[3]/2);hero.setAttribute('width',s[2]);hero.setAttribute('height',s[3]);hero.setAttribute('rx',s[4]);
  route.setAttribute('d',concept==='trace'?'M '+Array.from({length:from+1},(_,n)=>shape(n).slice(0,2).join(' ')).concat([s.slice(0,2).join(' ')]).join(' L '):'');
@@ -247,7 +252,8 @@ def pixel_motion(video: Path) -> dict:
         return {'status':'unmeasured','reason':'Pixel analyzer unavailable or timed out'}
 
 
-def render(directory: Path, plan: dict, aspect: dict, progress=None, timeout: float = 600) -> tuple[Path, dict]:
+def render(directory: Path, plan: dict, aspect: dict, progress=None, timeout: float = 600,
+           reuse_static_frames: bool = True) -> tuple[Path, dict]:
     """Stream one PNG frame at a time to FFmpeg. One browser, no render queue."""
     missing = runtime_issues()
     if missing: raise RuntimeError('Runtime kontinu belum siap: '+', '.join(missing))
@@ -282,11 +288,16 @@ def render(directory: Path, plan: dict, aspect: dict, progress=None, timeout: fl
                 process = subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=errors,env=env)
                 timer = threading.Timer(max(.1,timeout-(time.monotonic()-started)),process.kill)
                 timer.daemon=True;timer.start()
+                captured=0;last_key=None;last_png=None
                 try:
                     for frame in range(frames):
                         if time.monotonic()-started>timeout:raise TimeoutError('Continuous render timed out')
-                        page.evaluate('(t)=>{window.__seek(t)}',frame/30)
-                        process.stdin.write(page.locator('#stage').screenshot(timeout=15000,animations='disabled'))
+                        key=page.evaluate('(t)=>{window.__seek(t);return window.__renderKey}',frame/30)
+                        if not reuse_static_frames or not isinstance(key,str) or not key or last_png is None or key!=last_key:
+                            last_png=page.locator('#stage').screenshot(timeout=15000,animations='disabled')
+                            captured+=1
+                        last_key=key
+                        process.stdin.write(last_png)
                         if progress and frame%30==0:progress(frame/frames)
                     process.stdin.close()
                     if process.wait(timeout=30):raise RuntimeError('FFmpeg encode failed')
@@ -297,7 +308,9 @@ def render(directory: Path, plan: dict, aspect: dict, progress=None, timeout: fl
                     if process.stdin and not process.stdin.closed:process.stdin.close()
                 if page_errors:raise RuntimeError('Composition raised a browser error')
                 temporary.replace(target)
-                report.update(frames=frames,fps=30,wall_seconds=round(time.monotonic()-started,3),
+                report.update(frames=frames,fps=30,captured_frames=captured,reused_static_frames=frames-captured,
+                              capture_optimization='consecutive_identical_authored_visual_state' if reuse_static_frames else 'disabled',
+                              wall_seconds=round(time.monotonic()-started,3),
                               composition_sha256=hashlib.sha256(source.read_bytes()).hexdigest())
                 return target,report
             finally:browser.close()

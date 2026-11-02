@@ -264,7 +264,7 @@ function showResult(result, aspectId) {
     elements.downloadBtn.href = result.lottieUrl;
     elements.downloadBtn.textContent = 'Unduh lottie.json';
   } else {
-    elements.videoContainer.innerHTML = `<video controls autoplay loop playsinline src="${escapeHtml(result.videoUrl)}">Browser Anda tidak mendukung video.</video>`;
+    elements.videoContainer.innerHTML = `<video controls playsinline preload="metadata" src="${escapeHtml(result.videoUrl)}">Browser Anda tidak mendukung video.</video>`;
     elements.downloadBtn.href = result.videoUrl;
     elements.downloadBtn.textContent = 'Unduh Video MP4';
   }

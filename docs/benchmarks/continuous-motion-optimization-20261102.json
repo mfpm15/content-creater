@@ -1,0 +1,24 @@
+{
+  "measured_at_utc": "2026-11-02T07:45:08.736461+00:00",
+  "method": "Consecutive identical authored visual states, one PNG cache only",
+  "dimensions": {
+    "width": 1080,
+    "height": 1920
+  },
+  "fps": 30,
+  "duration_seconds": 15,
+  "encoded_frames": 450,
+  "captured_frames": 77,
+  "reused_static_frames": 373,
+  "capture_reduction_fraction": 0.8289,
+  "optimized_wall_seconds": 21.245,
+  "previous_observed_wall_seconds": 148.104,
+  "decoded_frame_md5_sequences_identical": true,
+  "decoded_frames_compared": 450,
+  "validation": "FFmpeg decoded-file analysis only; no media playback",
+  "limitations": [
+    "Cloud Linux, single browser; wall-time runs had different concurrent load",
+    "Not a Windows laptop benchmark",
+    "No motion blur, resolution, frame-rate or authored timing changes"
+  ]
+}
