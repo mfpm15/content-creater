@@ -39,6 +39,17 @@ class ProductionAutomationTests(unittest.TestCase):
             plan=example();mutate(plan)
             with self.assertRaises(ValueError):remotion_adapter.manifest(plan,{'width':320,'height':568})
 
+    def test_metric_labels_preserve_signs_and_do_not_duplicate_headline_and_narration(self):
+        plan=example()
+        props,_=remotion_adapter.manifest(plan,{'width':320,'height':568})
+        self.assertEqual(props['shots'][1]['subject'],'25%')
+        plan['scenes'][1]['onScreenText']='Profit -3,5%'
+        props,_=remotion_adapter.manifest(plan,{'width':320,'height':568})
+        self.assertEqual(props['shots'][1]['subject'],'-3,5%')
+        plan['scenes'][1].update(onScreenText='Rp2.000',narration='Nilai Rp2.000')
+        props,_=remotion_adapter.manifest(plan,{'width':320,'height':568})
+        self.assertEqual(props['shots'][1]['subject'],'')
+
     def test_explicit_cues_keep_timestamp_provenance(self):
         plan=example();scene=plan['scenes'][0]
         scene['wordCues']=[{'word':word,'start':i*.25,'end':i*.25+.2} for i,word in enumerate(scene['narration'].split())]

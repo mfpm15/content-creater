@@ -1,4 +1,9 @@
 /** Pure validation shared by the renderer entry and composition. No URLs/assets/scripts. */
+/** @param {string} text @returns {string[]} */
+export function literalNumbers(text) {
+  return text.match(/(?<![\w.,+−-])[+−-]?\d+(?:[.,]\d+)*(?:\s*%)?/g) || [];
+}
+
 export function validateManifest(value) {
   const fail = () => { throw new Error('Invalid Video Studio timeline'); };
   const integer = n => Number.isSafeInteger(n);

@@ -1,13 +1,13 @@
 import React from 'react';
 import {AbsoluteFill, Composition, interpolate, registerRoot, useCurrentFrame, useVideoConfig} from 'remotion';
-import {validateManifest} from './timeline.mjs';
+import {literalNumbers, validateManifest} from './timeline.mjs';
 import type {Shot, StudioProps} from './types';
 
 // Original procedural artwork. Numbers are literal labels from narration/title,
 // never fabricated bar values or performance predictions.
 const Illustration: React.FC<{shot: Shot; progress: number; accent: string}> = ({shot, progress, accent}) => {
   const positions = [[130,180],[400,120],[670,180]];
-  const numbers = shot.subject.match(/\d+(?:[.,]\d+)*(?:\s*%)?/g)?.slice(0,3) || [];
+  const numbers = literalNumbers(shot.subject).slice(0,3);
   return <svg viewBox="0 0 800 500" width="100%" height="100%" aria-hidden="true">
     <defs><radialGradient id="glow"><stop stopColor={accent} stopOpacity=".24"/><stop offset="1" stopColor={accent} stopOpacity="0"/></radialGradient></defs>
     <ellipse cx="400" cy="250" rx="380" ry="240" fill="url(#glow)"/>

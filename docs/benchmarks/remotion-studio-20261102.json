@@ -28,9 +28,9 @@
       "layout_issues": [],
       "deterministic_repeat": true,
       "first_frame_rgb_stddev": [
-        17.88914454029774,
-        21.223471326109543,
-        21.314059644662557
+        17.88169639922954,
+        21.21654732249712,
+        21.316332028312782
       ],
       "sample_frames": [
         {
@@ -46,10 +46,10 @@
       ],
       "frame_sha256": [
         "a872cc5bd8ca030ae40b6ce9474b288eefcff7a821a8080d1a4f6d63d79ac800",
-        "1d90d813591473da241f983da8f8777ca7e218f563a430dc707450d6e7751573"
+        "8dc162edf8c4aed543155f38cce303245bd00b46dd8e00d1c3a83b014cc0613d"
       ],
-      "wall_seconds": 25.249,
-      "mp4_bytes": 327318,
+      "wall_seconds": 43.674,
+      "mp4_bytes": 318250,
       "media_playback": false
     },
     {
@@ -77,9 +77,9 @@
       "layout_issues": [],
       "deterministic_repeat": true,
       "first_frame_rgb_stddev": [
-        14.86310939491826,
-        17.79733498518729,
-        17.989146778616693
+        14.863290208188051,
+        17.79558691668174,
+        17.986752773026755
       ],
       "sample_frames": [
         {
@@ -95,10 +95,10 @@
       ],
       "frame_sha256": [
         "ff9c161533f8f8f614d68bb52b81333fda654bb99b5fbd2a2df1299e1e533297",
-        "512b5f92e45a1fbad0af6d28c5d927b1ace6a5614752fbe98ec9115944bad6d1"
+        "1eaa9cacb37e9d4198dbb19d1054654d1e442017ccb30306b293b801d3441482"
       ],
-      "wall_seconds": 16.338,
-      "mp4_bytes": 83568,
+      "wall_seconds": 113.379,
+      "mp4_bytes": 81306,
       "media_playback": false
     },
     {
@@ -126,9 +126,9 @@
       "layout_issues": [],
       "deterministic_repeat": true,
       "first_frame_rgb_stddev": [
-        19.91146606248849,
-        22.702954939034882,
-        22.716468637040872
+        19.911432816634616,
+        22.702919355299848,
+        22.71649729648026
       ],
       "sample_frames": [
         {
@@ -144,10 +144,10 @@
       ],
       "frame_sha256": [
         "c0a0df9e76fb22bc6af357e4c8a35ef20bc7c871246ee2a6c82838ef453d004d",
-        "cd53fe15171390772cb4b3dec5679be89212451d8f8671561a1036ed2f1dd4d2"
+        "498c4505bfa1678889467b4db260e19dec13336af77a8edb36b9671888ce51b9"
       ],
-      "wall_seconds": 15.747,
-      "mp4_bytes": 91432,
+      "wall_seconds": 15.71,
+      "mp4_bytes": 88745,
       "media_playback": false
     },
     {
@@ -175,9 +175,9 @@
       "layout_issues": [],
       "deterministic_repeat": true,
       "first_frame_rgb_stddev": [
-        20.70013019685303,
-        23.770122776670412,
-        23.814750387904184
+        20.700127831018005,
+        23.77014335903374,
+        23.81473608111424
       ],
       "sample_frames": [
         {
@@ -193,18 +193,18 @@
       ],
       "frame_sha256": [
         "6f0e3b4deedf6e0301b22d5ceba5c46fdd1698f385ec1fb0724d85926d88434b",
-        "655a96392edbe1aeadd93cfbacbe817921f7b82bac41a52c5cf707a1d1a11182"
+        "ba48883814ca0b33c43ce57eaf9f708763a72e68cd986ebbb49716ab0518e4e3"
       ],
-      "wall_seconds": 26.166,
-      "mp4_bytes": 117920,
+      "wall_seconds": 18.795,
+      "mp4_bytes": 111413,
       "media_playback": false
     }
   ],
   "source_sha256": {
-    "creator-dashboard/apps/video-studio-remotion/src/Studio.tsx": "ad24dabc4a39f83ec12bcbf50fa45c533654847a133e7f3eab619a2f84958799",
-    "creator-dashboard/apps/video-studio-remotion/src/timeline.mjs": "b76676cfb0fd5c8df935f0e8502a2a798222c221dcb1059c370e0f12e6af24e6",
+    "creator-dashboard/apps/video-studio-remotion/src/Studio.tsx": "c7ed32d1626463dbff2d3f5297a0ccc87a5f40ee7e9eb762c90dc811b0c3a424",
+    "creator-dashboard/apps/video-studio-remotion/src/timeline.mjs": "270167a54c4be2f555a17966fc0b8482d5159247ce890f9614f0fd7fb07f2a8c",
     "creator-dashboard/apps/video-studio-remotion/render.mjs": "e523996a3f0f8ee229bfc3686366525514d25b8aa80aab2478f906e99de35909",
-    "creator-dashboard/remotion_adapter.py": "d8d9e26921e858cc3f994593a2a764d6dce2052c356462ce4efdd797f5334022",
+    "creator-dashboard/remotion_adapter.py": "98d52064a3ca9285e9a80050160635482a4de3e039669c98609aa6c39e7c13bb",
     "creator-dashboard/audio_mastering.py": "281c834b51c388cc41a24268ed476b33589621b3e6a1350ab36b20b44e0c2e8a",
     "creator-dashboard/video_delivery.py": "111a2165efcae94d6575423621fc61a02f44fdaa59a66961663e77bb93a4a7eb",
     "creator-dashboard/video_drafter.py": "77a0c91b7d7f33e02d587d690036d6bc29097cd33e09cb49e5c2b582306081dc"

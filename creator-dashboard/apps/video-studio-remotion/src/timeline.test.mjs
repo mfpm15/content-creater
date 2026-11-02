@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {validateManifest} from './timeline.mjs';
+import {literalNumbers,validateManifest} from './timeline.mjs';
 
 const example=()=>({version:1,width:320,height:568,fps:30,totalFrames:60,topic:'Studio',
   brand:{background:'#080f20',accent:'#22d3ee',text:'#ffffff',wordmark:'Studio',font:'Arial'},
   shots:[{id:'s1',startFrame:0,endFrame:60,title:'A complete thought',subject:'25%',family:'data',camera:'push-in',strength:.5,lighting:'soft',transition:'fade'}],
   captions:[{startFrame:0,endFrame:60,text:'Not 20, but 25 percent.'}]});
+
+test('numeric labels retain signs and never extract a tail from currency text',()=>{
+  assert.deepEqual(literalNumbers('-3,5% +2.0 25%'),['-3,5%','+2.0','25%']);
+  assert.deepEqual(literalNumbers('Rp2.000 Rp-3,5'),[]);
+});
 
 test('valid timeline remains unchanged and text is data',()=>{
   const value=example();value.shots[0].title='</script><img src=x>';

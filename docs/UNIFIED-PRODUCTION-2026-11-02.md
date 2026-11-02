@@ -7,7 +7,7 @@ Paket sebelumnya adalah Stickman/OpenCreator: memakai protokol workspace, aset g
 Sekarang **Remotion Editorial** tersedia di `/videos` dengan alur yang sama: brief → Scene Plan → approval → Storyboard → approval → render → review → paket produksi. `remotion_adapter.py` mengubah plan menjadi manifest frame 30 fps; komposisi React asli di `apps/video-studio-remotion` merender diagram bergerak dan caption. Tidak memerlukan daemon OpenCreator. Dependency tetap terisolasi dengan lockfile, sesuai arsitektur multi-aplikasi; pengguna memakai satu menu.
 
 - Runtime terkunci: Remotion, bundler dan renderer **4.0.473**, React **18.3.1**, TypeScript **5.7.3**, Node ≥22. `setup-core.bat` memasangnya dengan `npm ci --ignore-scripts`.
-- Empat keluarga: `process`, `data`, `comparison`, `concept`. Keluarga lain dipetakan ke concept dan dijelaskan di UI. Data numerik diambil dari teks yang diberikan, tanpa bar/persentase pertumbuhan sintetis. Diagram proses tiga node adalah metafora, bukan ekstraksi otomatis seluruh langkah naskah.
+- Empat keluarga: `process`, `data`, `comparison`, `concept`. Keluarga lain dipetakan ke concept dan dijelaskan di UI. Data numerik memakai judul yang disetujui terlebih dahulu, lalu narasi jika judul tidak mengandung angka. Tanda minus/plus/desimal dipertahankan; judul 25% dan narasi 25 persen tidak dijadikan dua statistik. Potongan angka dari token mata uang tertempel tidak diekstrak menjadi nilai salah. Tanpa bar/persentase pertumbuhan sintetis. Diagram proses tiga node adalah metafora, bukan ekstraksi otomatis seluruh langkah naskah.
 - Kamera/lighting/transisi memakai allowlist yang sama dengan 2D. Warna, font sistem dan wordmark brand diterapkan. Style mengikuti engine; pilihan gaya yang backend tidak gunakan tidak lagi dapat dipilih.
 - Audio `music` lokal atau `tts` opsional. Mode audio tersimpan dan bertahan saat edit/resume/varian rasio. Musik tidak membutuhkan provider atau environment TTS. Tidak menerima audio pribadi.
 - Caption memakai cue kata pengguna jika tersedia; tanpa cue, seluruh teks dibagi menjadi potongan pendek dan durasinya **diperkirakan**, bukan forced alignment. Tidak mengklaim sinkron kata terhadap suara.
@@ -49,7 +49,7 @@ Referensi tambahan tetap relevan: Whisper/PySceneDetect untuk invariant/benchmar
 
 ## Bukti verifikasi
 
-- **133 tes dashboard lulus**, **227 tes Clipper lulus**, compile Python, Ruff F/E9, sintaks JavaScript, typecheck komposisi Remotion dan suite validator timeline Node lulus.
+- **134 tes dashboard lulus**, **227 tes Clipper lulus**, compile Python, Ruff F/E9, sintaks JavaScript, typecheck komposisi Remotion dan suite validator timeline Node lulus.
 - Uji pipeline offline memakai dua approval, MP4 + AAC nyata, loudnorm dua tahap, review, varian rasio dan paket produksi. Tanpa model/riset/TTS jaringan.
 - Empat render nyata: 9:16 **1080×1920**, 16:9 640×360, 1:1 480×480, 4:5 480×600. Masing-masing 2 detik, **60 frame terdekode**, H.264/YUV420/BT.709; audio −14 LUFS, true peak −4.4 dBFS, frame pertama tidak flat, repeat frame identik, tanpa temuan pada 20 observasi layout stabil per kasus. [Bukti dan hash source/frame](benchmarks/remotion-studio-20261102.json).
 - Smoke UI fixture: lima engine, plan tidak berubah saat dibuka, kontrol Remotion terkumpul, peringatan artikel tampil, tombol usulan satu klik menghasilkan proposal yang tetap menunggu approval, teks HTML tidak dieksekusi. HTTP dashboard/redaksi dan health/Top 5 Clipper lulus. Tidak memutar media.
@@ -60,3 +60,5 @@ Keamanan: props JSON privat/temporer, ukuran dibatasi dan divalidasi dua lapis, 
 ## Mencoba di Windows dari GitHub
 
 Tutup aplikasi, lalu jalankan `git pull --ff-only`, `setup-core.bat`, `start-dashboard.bat`. Setup perlu dijalankan lagi karena ada dependency Remotion baru. Buka **Video Studio → Remotion Editorial → Naskah sendiri → Musik/foley lokal** untuk uji tanpa provider. Tinjau Scene Plan dan Storyboard, setujui keduanya, lalu periksa frame, laporan media dan MP4 hasil. TTS opsional memerlukan akses layanan suara yang sudah digunakan proyek.
+
+Implementasi utama `530f809` lulus [Windows 41430689110](https://github.com/mfpm15/content-creater/actions/runs/41430689110) dan [Clipper 41430689180](https://github.com/mfpm15/content-creater/actions/runs/41430689180), keduanya **Success**. Koreksi label metrik setelah review frame diuji lokal dengan 134 tes dashboard dan empat render ulang; hasil CI koreksi dicatat sesudah run selesai. Kode Clipper tidak berubah pada koreksi tersebut.
