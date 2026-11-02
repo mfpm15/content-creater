@@ -1,5 +1,7 @@
 # Perbaikan lintas menu — 2 November 2026
 
+Pembaruan sesudah commit ini: [Remotion kini engine Video Studio, mastering/delivery dipakai lintas pipeline, dan Article memiliki proposal satu klik](UNIFIED-PRODUCTION-2026-11-02.md). Catatan “Remotion belum engine Video Studio” di bagian akhir adalah keadaan checkpoint `0832ee6`.
+
 Perubahan ini menerapkan bagian yang terukur dari referensi pada Video Studio, Article Drafter dan ClipperCuan. Keberadaan sebuah repo/skill tidak berarti semua kemampuan upstream sudah tersedia. Katalog sumber dan batas lisensi tetap di [REFERENCES.md](REFERENCES.md), audit adapter di [RENDERER-AUDIT-2026-11-02.md](RENDERER-AUDIT-2026-11-02.md).
 
 ## Penerapan dan akar masalah

@@ -890,6 +890,7 @@ def _get_article(slug: str) -> dict:
                 "summary": "", "images": [], "markdown": "", "files": [], "path": str(directory),
                 "sectionsDone": done, "sectionsTotal": total, "wordCount": 0, "referencesCount": 0}
     import article_tools
+    evidence_report=article_tools.evidence_report(slug)
     images = [{**image, "hasFile": find_image(directory, image["id"]) is not None} for image in article["images"]]
     return {
         "slug": slug,
@@ -897,7 +898,8 @@ def _get_article(slug: str) -> dict:
         "article_revision": article_tools.digest(article),
         "sections": article_tools.sections(article),
         "rewrite_proposals": article_tools.proposals(slug),
-        "evidence": article_tools.evidence_report(slug),
+        "evidence": evidence_report,
+        "improvements": article_tools.improvement_plan(article,evidence_report),
         "title": article["title"],
         "summary": article["summary"],
         "images": images,

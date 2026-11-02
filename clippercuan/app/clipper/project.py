@@ -570,7 +570,7 @@ def _render_one(pid: str, cid: str, words: list[dict] | None = None, pr: media.P
             try:
                 report = delivery.check_all(output)
                 res["delivery"] = report
-                res["delivery_status"] = "passed" if all(r["ok"] for r in report.values()) else "needs_attention"
+                res["delivery_status"] = delivery.summary(report)
             except (OSError, ValueError, media.FFmpegError):
                 res["delivery_status"] = "unmeasured"
         res["caption_revision"] = load_caption_workspace(pid).get("revision", 0)

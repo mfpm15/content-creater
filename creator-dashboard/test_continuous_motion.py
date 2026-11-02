@@ -113,10 +113,9 @@ class ContinuousMotionTests(unittest.TestCase):
 
     def test_music_build_skips_tts_and_provider_environment(self):
         plan=example()
-        with patch.object(vd,'resolve_python',return_value=Path('missing-python')),patch.object(vd,'_write_procedural_audio'),patch.object(vd.subprocess,'run') as run:
+        with patch.object(vd,'resolve_python',side_effect=AssertionError('No TTS for music')),patch.object(vd,'_write_procedural_audio'),patch.object(vd.audio_mastering,'normalize',return_value={}) as mastering:
             vd._build_audio(self.root,plan)
-            self.assertEqual(run.call_count,1)
-            self.assertNotIn('tts_zh.py',' '.join(run.call_args.args[0]))
+            mastering.assert_called_once()
 
     def test_real_offline_mp4_two_approvals_and_production_bundle(self):
         missing=motion.runtime_issues()

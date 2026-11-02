@@ -37,6 +37,7 @@ let activeScenePlan = null;
 let activeReviewEngine = null;
 let resultSlug = null;
 let engineRuntime = {};
+let engineStyles = {};
 let researchReady = false;
 let brandCatalog = { revision: 0, kits: [] };
 let brandsReady = false;
@@ -135,6 +136,7 @@ async function loadOptions() {
     for (const concept of motionConcepts) conceptSelect.add(new Option(concept.name, concept.id));
     describeMotionConcept();
     engineRuntime=Object.fromEntries(data.engines.map(engine=>[engine.id,engine.runtimeMissing||[]]));
+    engineStyles=Object.fromEntries(data.engines.map(engine=>[engine.id,engine.defaultStyle]));
     researchReady=!!data.research?.ready;
     const researchSelect = document.getElementById('researchMode');
     const webOption = researchSelect.querySelector('option[value="web"]');
@@ -169,12 +171,18 @@ async function loadOptions() {
 
 function updateEngineExperience() {
   const eng = elements.engineSelect.value;
-  document.getElementById('continuousControls').hidden = eng !== 'continuous';
+  if(engineStyles[eng])elements.styleSelect.value=engineStyles[eng];
+  elements.styleSelect.disabled=true;
+  elements.styleSelect.title='Gaya mengikuti adapter. Variasikan shot melalui rencana adegan.';
+  document.getElementById('continuousControls').hidden = !['continuous','remotion'].includes(eng);
+  document.getElementById('continuousConceptFields').hidden = eng !== 'continuous';
   document.getElementById('motionConcept').required = eng === 'continuous';
   elements.formEngineTitle.textContent = '1. Buat Brief Animasi';
   elements.generateBtn.textContent = 'Buat Scene Plan';
   if (eng === 'continuous') {
     elements.engineNotice.textContent = 'Continuous Motion: satu dunia visual, elemen utama berlanjut, jeda gerak, dan render MP4 lokal. Pilih konsep sebelum membuat rencana.';
+  } else if (eng === 'remotion') {
+    elements.engineNotice.textContent = 'Remotion Editorial: diagram process/data/comparison atau konsep abstrak, warna brand dan caption pendek. Musik lokal tersedia; TTS opsional. Tanpa cue kata, caption memakai estimasi durasi, bukan alignment audio. Pilih kontrol render pada review adegan.';
   } else if (eng === 'threejs') {
     elements.engineNotice.innerHTML = `<strong style="color:#38bdf8">Three.js 3D WebGL Adapter</strong><br>Dunia 3D sinematik dengan hero mesh icosahedron, orbiting rings, grid cyber, star particles, dan kamera orbit dinamis (Output MP4).`;
   } else if (eng === 'lottie') {
@@ -291,6 +299,10 @@ function showResult(result, aspectId) {
       }
     }
     for(const issue of result.review.issues||[]){const text=document.createElement('p');text.textContent=issue;reviewBox.append(text)}
+    for(const row of Object.values(result.review.delivery||{})){
+      const text=document.createElement('p');text.textContent=`${row.label}: ${row.status==='passed_working_profile'?'profil kerja media terpenuhi':row.issues.map(issue=>issue.message).join('; ')}. Profil referensi, bukan verifikasi ketentuan resmi platform.`;reviewBox.append(text);
+    }
+    if(result.review.remotion){const text=document.createElement('p');text.textContent='Remotion: frame asli tersedia di bawah. Caption tanpa cue kata memakai estimasi durasi, bukan alignment audio. Tetap periksa keterbacaan dan isi.';reviewBox.append(text)}
     for(const name of result.review.visual_review?.screenshots||[]){if(!/^review-frame-\d{1,2}\.png$/.test(name))continue;const link=document.createElement('a');link.href=`/api/videos/${encodeURIComponent(result.slug)}/${name}`;link.textContent=`${name} · `;link.target='_blank';link.rel='noopener';reviewBox.append(link)}
   }
 }
@@ -299,7 +311,7 @@ function sceneEditor(scene, index) {
   const field = (name, label, multiline = false) => `<label>${label}${multiline ? `<textarea data-scene="${index}" data-field="${name}">${escapeHtml(scene[name] || '')}</textarea>` : `<input data-scene="${index}" data-field="${name}" value="${escapeHtml(scene[name] || '')}">`}</label>`;
   const controls = scene.renderControls || {};
   const select = (name, label, choices) => `<label>${label}<select data-render-scene="${index}" data-render-field="${name}">${choices.map(value => `<option value="${value}" ${value === (controls[name] || 'legacy') ? 'selected' : ''}>${value}</option>`).join('')}</select></label>`;
-  const renderControls = ['opuscar','threejs'].includes(activeReviewEngine) ? `<details><summary>Kontrol gambar yang diterapkan saat render</summary>
+  const renderControls = ['opuscar','threejs','remotion'].includes(activeReviewEngine) ? `<details><summary>Kontrol gambar yang diterapkan saat render</summary>
     <p>2D: gerak ilustrasi dan filter lighting; 3D: kamera dan intensitas lampu. Transisi mengatur panel adegan (HUD pada 3D). Legacy mempertahankan perilaku bawaan; arahan bebas di bawah tetap catatan produksi.</p>
     ${select('camera','Kamera render',['legacy','locked','push-in','pull-out','pan-left','pan-right','orbit'])}
     ${select('lighting','Lighting render',['legacy','soft','dramatic'])}${select('transition','Transisi render',['legacy','fade','cut','slide'])}
@@ -360,6 +372,10 @@ function renderReview(job) {
   if (job.scenePlan?.brand) {
     const note = document.createElement('p');
     note.textContent = `Brand pekerjaan: ${job.scenePlan.brand.name} (salinan tetap)`;
+    elements.reviewGrid.prepend(note);
+  }
+  if(job.engine==='remotion'){
+    const note=document.createElement('p');note.textContent=`Remotion · audio ${job.scenePlan?.audioMode==='music'?'musik lokal tanpa dubbing':'TTS'}. Caption tanpa cue kata dibagi dengan estimasi; periksa terhadap audio. Keluarga selain process/data/comparison memakai diagram konsep.`;
     elements.reviewGrid.prepend(note);
   }
   if (job.scenePlan?.creativeDirection) {

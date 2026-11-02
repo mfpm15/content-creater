@@ -24,6 +24,8 @@ import creative_profile
 import continuous_motion
 import animation_clock
 import scene_render
+import remotion_adapter
+import audio_mastering
 
 ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
@@ -38,6 +40,7 @@ LLM_KEY = os.getenv("VIDEO_LLM_API_KEY", os.getenv("LLM_API_KEY") or os.getenv("
 LLM_TIMEOUT = int(os.getenv("VIDEO_LLM_TIMEOUT", "120"))
 
 STYLES = {
+    "remotion_editorial": {"id":"remotion_editorial","name":"Remotion Editorial","description":"Diagram editorial dengan timeline frame, caption pendek dan warna brand."},
     "opuscar_cinematic": {"id": "opuscar_cinematic", "name": "Opuscar Cinematic", "description": "Visual prosedural kaya ilustrasi dinamis (radar, graph, nodes, prism) tanpa teks slide mentah."},
     "threejs_3d": {"id": "threejs_3d", "name": "Three.js 3D Cinematic", "description": "Dunia WebGL 3D dengan partikel, pencahayaan neon ganda, grid cyber, dan hero object 3D."},
     "lottie_motion": {"id": "lottie_motion", "name": "Lottie Motion", "description": "Animasi vektor ringan dengan preview web dan ekspor lottie.json."},
@@ -55,6 +58,7 @@ ENGINES = {
     "threejs": {"id": "threejs", "name": "Three.js 3D", "description": "Dunia 3D prosedural WebGL dinamis dengan pencahayaan dan kamera orbit (MP4).", "defaultStyle": "threejs_3d", "output": "mp4"},
     "lottie": {"id": "lottie", "name": "Lottie", "description": "Animasi vektor ringan dengan preview web dan JSON.", "defaultStyle": "lottie_motion", "output": "lottie"},
     "continuous": {"id":"continuous","name":"Continuous Motion","description":"Diagram satu dunia dengan carrier berlanjut, jeda gerak, dan MP4 lokal tanpa CDN.","defaultStyle":"continuous_motion","output":"mp4"},
+    "remotion": {"id":"remotion","name":"Remotion Editorial","description":"Diagram editorial lokal, caption per potongan teks dan render MP4 berbasis frame.","defaultStyle":"remotion_editorial","output":"mp4"},
 }
 DEFAULT_MODELS = [
     {"id": "ag/gemini-3.8-flash-high", "name": "Gemini 3.8 Flash High", "provider": "Gemini", "tier": "utama"},
@@ -84,6 +88,7 @@ def options() -> dict:
 
 
 def runtime_issues(engine: str) -> list[str]:
+    if engine=='remotion':return remotion_adapter.runtime_issues()
     if engine=='lottie':return []
     if engine=='continuous':return continuous_motion.runtime_issues()
     missing=[]
@@ -292,6 +297,9 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
         creative_profile.timing(scene,raw)
         if 'renderControls' in raw:scene['renderControls']=scene_render.validate(raw['renderControls'])
     result={"topic": topic, "duration": duration, "scenes": scenes}
+    if 'audioMode' in data:
+        if data['audioMode'] not in ('music','tts'):raise ValueError('Audio harus music atau tts')
+        result['audioMode']=data['audioMode']
     if data.get('brand') is not None:result['brand']=creative_profile.snapshot(data['brand'])
     if data.get('creativeDirection') is not None:
         direction=data['creativeDirection']
@@ -339,7 +347,7 @@ Materi pengguna:
 Balas satu objek JSON valid saja dengan:
 1. creativeDirection: logline, audiencePromise, narrativeArc, visualThesis, pacingArc, paletteLogic, typographySystem, motionLanguage, soundStrategy, continuitySystem, riskChecks.
 2. scenes: array berisi start, end, narration, onScreenText, soundCue, type, shotPurpose, visualFamily, subject, action, setting, visual, metaphor, composition, foreground, midground, background, camera, lighting, colorMood, typography, transition, continuity.
-Untuk engine opuscar/threejs saja, renderControls opsional mengendalikan gambar: camera (legacy/locked/push-in/pull-out/pan-left/pan-right/orbit), strength (angka 0–1), lighting (legacy/soft/dramatic), transition (legacy/fade/cut/slide). Kamera 2D hanya mengubah ilustrasi, bukan judul/subtitle. Arahan bebas tetap catatan produksi, bukan kode. Jangan menambahkan kontrol ini pada lottie/continuous.
+Untuk engine opuscar/threejs/remotion saja, renderControls opsional mengendalikan gambar: camera (legacy/locked/push-in/pull-out/pan-left/pan-right/orbit), strength (angka 0–1), lighting (legacy/soft/dramatic), transition (legacy/fade/cut/slide). Kamera 2D hanya mengubah ilustrasi, bukan judul/subtitle. Arahan bebas tetap catatan produksi, bukan kode. Jangan menambahkan kontrol ini pada lottie/continuous. Remotion mendukung visualFamily process/data/comparison dan concept (keluarga lain menjadi concept), durasi ditutup tanpa gap, judul maksimal 120 karakter; jangan mengarang angka diagram.
 
 Pastikan jumlah scene proporsional terhadap durasi, setiap scene berbeda fungsi dan visualnya, total timing tepat {duration} detik, serta seluruh keputusan cukup detail untuk divisualkan tanpa menebak maksud sutradara."""
 
@@ -806,6 +814,7 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
 
 
 def generate_composition(plan: dict, aspect_info: dict, model: str = "", engine: str = "opuscar") -> str:
+    if engine=='remotion':return remotion_adapter.preview(plan)
     if engine=='continuous':return continuous_motion.composition(plan,aspect_info)
     if engine == "threejs":
         document=generate_threejs_composition(plan, aspect_info, model)
@@ -824,6 +833,9 @@ def audio_manifest(plan: dict) -> dict:
         if result['voiceMode']=='music':
             result['voice']=[]
             result['music']['duckUnderVoice']=False
+    if plan.get('audioMode'):
+        result['voiceMode']=plan['audioMode']
+        if plan['audioMode']=='music':result['voice']=[];result['music']['duckUnderVoice']=False
     return result
 
 
@@ -903,6 +915,7 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
                    "storyboard": None, "video": None, "revision": 0, "approvals": {},
                    "origin": {"slug": slug, "scene_plan_digest": hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()}}
+            if engine=='remotion':job['audioMode']=plan.get('audioMode','music')
             save_job(JOB_DIR, job)
             JOBS[key] = job
             jobs.append(copy.deepcopy(job))
@@ -967,8 +980,12 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         if raw_plan.get('motionDesign') is not None and job.get('engine')!='continuous':
             raise ValueError('Desain kontinu hanya tersedia untuk adapter Continuous Motion')
         plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
-        if job.get('engine') not in {'opuscar','threejs'} and any('renderControls' in scene for scene in plan['scenes']):
-            raise ValueError('Kontrol kamera/lighting render hanya tersedia untuk Opuscar dan Three.js')
+        if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
+            raise ValueError('Kontrol kamera/lighting render hanya tersedia untuk Opuscar, Three.js dan Remotion')
+        if job.get('engine')=='remotion':
+            if plan.get('audioMode')!=job.get('audioMode'):raise ValueError('Mode audio Remotion wajib dipertahankan saat mengedit')
+            remotion_adapter.manifest(plan,ASPECT_RATIOS[job['aspect']])
+        elif 'audioMode' in plan:raise ValueError('audioMode hanya tersedia pada adapter Remotion')
         if job.get('engine')=='continuous' and not plan.get('motionDesign'):
             raise ValueError('Desain gerak kontinu wajib dipertahankan saat mengedit')
         # Clicking approve also saves the editor. Preserve approval for an unchanged plan.
@@ -1056,6 +1073,9 @@ def start_job(payload: dict) -> dict:
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
     job = {"jobId": job_id, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    if engine=='remotion':
+        if payload.get('voiceMode','music') not in ('music','tts'):raise ValueError('Audio harus music atau tts')
+        job['audioMode']=payload.get('voiceMode','music')
     if engine=='continuous':
         job['motionDesign']=continuous_motion.design({'concept':payload.get('motionConcept'),'voiceMode':payload.get('voiceMode','music')},
                 [{'start':0,'end':duration}],duration)
@@ -1112,16 +1132,17 @@ def _write_procedural_audio(path: Path, plan: dict, sample_rate: int = 48000) ->
 def _build_audio(target: Path, plan: dict) -> Path:
     """Synthesize narration per scene, align it, mix music/foley, and normalize."""
     ffmpeg = shutil.which("ffmpeg") or str(ROOT / "bin" / "ffmpeg.exe")
-    python = resolve_python(OPUSCAR_DIR)
-    tts = OPUSCAR_DIR / "core" / "tts" / "tts_zh.py"
     if not Path(ffmpeg).is_file() and not shutil.which("ffmpeg"):
         raise RuntimeError("FFmpeg tidak ditemukan untuk audio mux")
-    if plan.get('motionDesign',{}).get('voiceMode')=='music':
+    if plan.get('audioMode')=='music' or plan.get('motionDesign',{}).get('voiceMode')=='music':
         bed=target/'music-foley.wav'
         _write_procedural_audio(bed,plan)
         final=target/'final-audio.wav'
-        subprocess.run([ffmpeg,'-y','-i',str(bed),'-af','loudnorm=I=-14:TP=-1.5:LRA=9','-ar','48000',str(final)],check=True,timeout=180,env=render_environment(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        mastering=audio_mastering.normalize(ffmpeg,bed,final)
+        (target/'audio-mastering.json').write_text(json.dumps(mastering),encoding='utf-8')
         return final
+    python = resolve_python(OPUSCAR_DIR)
+    tts = OPUSCAR_DIR / "core" / "tts" / "tts_zh.py"
     if not python.is_file():
         raise RuntimeError("Opuscar voice environment belum tersedia")
     lines = [{"id": scene["id"], "text": scene["narration"], "voice": "id-ID-ArdiNeural", "rate": "+8%"} for scene in plan["scenes"]]
@@ -1149,8 +1170,13 @@ def _build_audio(target: Path, plan: dict) -> Path:
     bed = target / "music-foley.wav"
     _write_procedural_audio(bed, plan)
     final = target / "final-audio.wav"
-    mix = "[0:a]volume=.32[bed];[bed][1:a]sidechaincompress=threshold=.025:ratio=8:attack=12:release=350[ducked];[ducked][1:a]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9[a]"
-    subprocess.run([ffmpeg, "-y", "-i", str(bed), "-i", str(voice_mix), "-filter_complex", mix, "-map", "[a]", "-t", str(plan["duration"]), "-ar", "48000", str(final)], check=True, timeout=600)
+    mix = "[0:a]volume=.32[bed];[bed][1:a]sidechaincompress=threshold=.025:ratio=8:attack=12:release=350[ducked];[ducked][1:a]amix=inputs=2:normalize=0[a]"
+    premaster=target/'premaster-audio.wav'
+    try:
+        subprocess.run([ffmpeg, "-y", "-i", str(bed), "-i", str(voice_mix), "-filter_complex", mix, "-map", "[a]", "-t", str(plan["duration"]), "-ar", "48000", str(premaster)], check=True, timeout=600,env=render_environment(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        mastering=audio_mastering.normalize(ffmpeg,premaster,final)
+        (target/'audio-mastering.json').write_text(json.dumps(mastering),encoding='utf-8')
+    finally:premaster.unlink(missing_ok=True)
     return final
 
 
@@ -1207,8 +1233,11 @@ def _run_job(job_id: str) -> None:
         data = {} if explicit or provided else _clean_json(_call_9router(prompt, job["model"]))
         if job.get('motionDesign'):data['motionDesign']=job['motionDesign']
         else:data.pop('motionDesign',None)
+        if job.get('engine')=='remotion':data['audioMode']=job['audioMode']
+        else:data.pop('audioMode',None)
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
-        if job.get('engine') not in {'opuscar','threejs'} and any('renderControls' in scene for scene in plan['scenes']):
+        if job.get('engine')=='remotion':remotion_adapter.manifest(plan,ASPECT_RATIOS[job['aspect']])
+        if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
             raise ValueError('Model mengembalikan kontrol render yang tidak didukung adapter ini')
         if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])
         _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan})
@@ -1242,21 +1271,26 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
             _update_job(job_id, {"status": "succeeded", "step": "Animasi Lottie selesai", "progress": 100, "video": {"slug": target.name, "title": job["topic"], "htmlUrl": f"/api/videos/{target.name}/index.html", "lottieUrl": f"/api/videos/{target.name}/lottie.json", "duration": plan["duration"], "engine": "lottie"}})
             return
         engine_label = ENGINES[job['engine']]['name']
-        _update_job(job_id, {"status": "rendering", "step": "Membuat musik/foley lokal tanpa dubbing" if plan.get("motionDesign",{}).get("voiceMode")=="music" else "Membuat dubbing, musik, foley, dan subtitle sebelum render visual", "progress": 55})
+        _update_job(job_id, {"status": "rendering", "step": "Membuat musik/foley lokal tanpa dubbing" if plan.get('audioMode')=='music' or plan.get("motionDesign",{}).get("voiceMode")=="music" else "Membuat dubbing, musik, foley, dan subtitle sebelum render visual", "progress": 55})
         final_audio = _build_audio(target, plan)
         _update_job(job_id, {"step": f"Merender visual dinamis {engine_label}", "progress": 72})
         renderer = HYPERFRAMES_APP_DIR / "node_modules" / "hyperframes" / "bin" / "hyperframes.mjs"
         silent = target / "silent.mp4"
         motion_report=None
+        remotion_report=None
         if job['engine']=='continuous':
             silent,motion_report=continuous_motion.render(target,plan,ASPECT_RATIOS[job['aspect']],
                 progress=lambda fraction:_update_job(job_id,{'progress':72+round(fraction*16),'step':f'Render kontinu {round(fraction*100)}%'}))
+        elif job['engine']=='remotion':
+            silent,remotion_report=remotion_adapter.render(target,plan,ASPECT_RATIOS[job['aspect']])
         else:
             subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", "30", "--workers", "1"], cwd=target, check=True, timeout=600,env=render_environment())
         _update_job(job_id, {"step": "Melakukan mux audio dan video", "progress": 90})
         output = _mux_video(target, silent, final_audio, plan["duration"])
         from video_review import review
         review_result = review(output, plan["duration"], plan)
+        if remotion_report:
+            review_result['remotion']=remotion_report
         if motion_report:
             motion_report['rendered_pixel_motion']=continuous_motion.pixel_motion(output)
             review_result['motion_review']=motion_report

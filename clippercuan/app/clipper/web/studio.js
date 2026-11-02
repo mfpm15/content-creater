@@ -548,6 +548,9 @@ async function pageProject(pid) {
       try {
         const check = await api(`/api/projects/${P.id}/clips/${c.id}/preflight`);
         readiness = `<h4>Pemeriksaan sebelum render</h4><p>${check.can_render ? 'Batas waktu valid; kualitas isi tetap perlu ditinjau.' : 'Perbaiki batas waktu sebelum render.'}</p>${[...check.errors,...check.warnings].map(text=>`<p class="warn-t">${esc(text)}</p>`).join('')}<small>${check.word_count} kata · pemeriksaan lokal, bukan prediksi performa</small>`;
+        if(check.last_delivery?.status!=='unmeasured' && check.last_delivery){
+          readiness+=`<h4>Pemeriksaan media hasil terakhir</h4><p>${check.last_delivery.status==='passed'?'Profil kerja media terpenuhi; isi tetap perlu direview.':'Ada temuan pada hasil terakhir; periksa sebelum ekspor.'}</p>${check.last_delivery.issues.map(issue=>`<p class="warn-t">${esc(issue.platform)}: ${esc(issue.message)}</p>`).join('')}`;
+        }
       } catch { readiness = '<p class="warn-t">Pemeriksaan sebelum render belum tersedia.</p>'; }
       let r; try { r = await api(`/api/projects/${P.id}/clips/${c.id}/quality`); } catch (e) { qBox.innerHTML = readiness + '<h4>Kualitas transkrip</h4><p class="muted">Belum ada kata transkrip untuk klip ini.</p>'; return; }
       const q = r.quality, sl = r.silence, grp = (cls, items, label) => items.length ? `<div class="q-grp"><b>${label} <em>${items.length}</em></b><div class="q-chips">${items.slice(0, 16).map(x => `<button type="button" class="q-chip ${cls}" data-s="${x.s}" title="${x.p != null ? 'keyakinan ' + Math.round(x.p * 100) + '%' : 'lompat ke kata ini'}">${esc(x.w)} <small>${fmt(x.s)}</small></button>`).join('')}${items.length > 16 ? `<span class="muted">+${items.length - 16}</span>` : ''}</div></div>` : '';

@@ -1,5 +1,7 @@
 # Audit integrasi renderer — 2 November 2026
 
+**Status sesudah audit ini:** [Remotion Editorial sudah terintegrasi di Video Studio](UNIFIED-PRODUCTION-2026-11-02.md), dengan runtime/komposisi asli dan render nyata empat rasio. Tabel/gap di bawah mencatat keadaan audit awal sebelum adapter tersebut; pipeline Stickman OpenCreator tetap berbeda.
+
 Audit dilakukan pada main `dfb65fc` dan perubahan clock dalam sesi ini. Kode/manifest/panduan relevan dibaca terarah. Validasi berupa tes, sampling frame HTML/WebGL dan analisis file; **tidak memutar media**.
 
 ## Yang benar-benar terhubung

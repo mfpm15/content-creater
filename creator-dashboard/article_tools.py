@@ -13,6 +13,7 @@ from pathlib import Path
 import article_drafter as ad
 import article_storage
 import evidence
+import humanizer
 
 LOCK=threading.RLock()
 PROTECTED=re.compile(r'\[\d+(?:[,;\s]+\d+)*\]|(?:Rp\s*|\$)?\d+(?:[.,]\d+)*(?:\s*%)?|\b[A-Z]{2,}\b|\b(?:tidak|bukan|belum|jangan|not|never)\b|[“"]([^”"\n]+)[”"]')
@@ -62,6 +63,27 @@ def evidence_report(slug):
     ledger=ad._read_json(directory/'evidence.json',{})
     inp=ad._read_json(directory/'input.json',{})
     return evidence.audit(article,ledger,int(inp.get('freshness_days') or 0))
+
+
+def improvement_plan(article, report):
+    """Prioritize local findings; only propose language changes, never invent evidence."""
+    items=[]
+    for section in sections(article):
+        blocks=article['blocks'][section['start']:section['end']]
+        text=humanizer.article_text(blocks)
+        writing=humanizer.lint(text) if article.get('lang')=='Indonesia' else {'findings':[]}
+        findings=[item['msg'] for item in writing['findings']]
+        if any(len(value.split())>120 for _,_,_,value in _fields(blocks)):
+            findings.append('Paragraf sangat panjang; ringkas susunan kalimat tanpa menghapus fakta')
+        claims=[claim for claim in report['claims'] if section['start']<=claim['block']<section['end']]
+        source_checks=sum(claim['status']=='needs_review' or bool(claim.get('review_warnings')) for claim in claims)
+        if not findings and not source_checks:continue
+        items.append({'section':section['index'],'heading':section['heading'],'language_findings':findings,
+                      'source_checks':source_checks,'can_propose_language':bool(findings) and bool(_fields(blocks)),
+                      'instruction':'Rapikan bahasa sesuai temuan berikut tanpa menambah fakta atau mengubah nama, angka, negasi, kutipan dan sitasi: '+'; '.join(findings) if findings else '',
+                      'priority':source_checks*10+len(findings)})
+    return {'article_revision':digest(article),'sections':sorted(items,key=lambda item:(-item['priority'],item['section'])),
+            'method':'local_editorial_triage_not_fact_check','requires_approval':True}
 
 
 def update_evidence(slug,payload):

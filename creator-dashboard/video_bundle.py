@@ -15,7 +15,7 @@ from security import redact, redact_tree
 MAX_BYTES=2*1024**3
 MAX_TEXT_BYTES=4_000_000
 FILES=('video.mp4','lottie.json','index.html','subtitles.srt','scene-plan.json','audio-manifest.json','research.json','review.json',
-       'final-audio.wav','voice.wav','music-foley.wav')
+       'final-audio.wav','voice.wav','music-foley.wav','remotion-timeline.json','render-report.json','audio-mastering.json')
 GATE=threading.BoundedSemaphore(1)
 SENSITIVE={'apikey','token','accesstoken','refreshtoken','password','clientsecret','privatekey','authorization','secret'}
 

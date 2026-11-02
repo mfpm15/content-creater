@@ -14,7 +14,7 @@ if errorlevel 1 goto :missing_ffmpeg
 node -e "process.exit(Number(process.versions.node.split('.')[0])>=22?0:1)"
 if errorlevel 1 goto :missing_node
 
-echo [1/4] Dashboard, artikel, Analytics dan review...
+echo [1/5] Dashboard, artikel, Analytics dan review...
 if not exist "creator-dashboard\.venv\Scripts\python.exe" (
   uv venv --python 3.12 "creator-dashboard\.venv"
   if errorlevel 1 goto :failed
@@ -22,7 +22,7 @@ if not exist "creator-dashboard\.venv\Scripts\python.exe" (
 uv pip install --python "creator-dashboard\.venv\Scripts\python.exe" -r "creator-dashboard\requirements-review.txt"
 if errorlevel 1 goto :failed
 
-echo [2/4] ClipperCuan...
+echo [2/5] ClipperCuan...
 if not exist "clippercuan\app\.venv\Scripts\python.exe" (
   uv venv --python 3.12 "clippercuan\app\.venv"
   if errorlevel 1 goto :failed
@@ -30,7 +30,7 @@ if not exist "clippercuan\app\.venv\Scripts\python.exe" (
 uv pip install --python "clippercuan\app\.venv\Scripts\python.exe" -r "clippercuan\app\requirements.txt"
 if errorlevel 1 goto :failed
 
-echo [3/4] HyperFrames dari lockfile...
+echo [3/5] HyperFrames dari lockfile...
 set "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1"
 set "PUPPETEER_SKIP_DOWNLOAD=1"
 set "HYPERFRAMES_NO_TELEMETRY=1"
@@ -39,7 +39,13 @@ call npm ci --no-audit --no-fund
 if errorlevel 1 (popd & goto :failed)
 popd
 
-echo [4/4] Environment suara Opuscar...
+echo [4/5] Remotion Video Studio dari lockfile...
+pushd "creator-dashboard\apps\video-studio-remotion"
+call npm ci --ignore-scripts --no-audit --no-fund
+if errorlevel 1 (popd & goto :failed)
+popd
+
+echo [5/5] Environment suara Opuscar...
 if not exist "creator-dashboard\apps\lemo-opuscar\.venv\Scripts\python.exe" (
   uv venv --python 3.12 "creator-dashboard\apps\lemo-opuscar\.venv"
   if errorlevel 1 goto :failed

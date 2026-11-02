@@ -59,12 +59,21 @@ jobs:
         shell: pwsh
         run: |
           $python = ".\creator-dashboard\.venv\Scripts\python.exe"
-          foreach ($pattern in @("test_windows_runtime.py", "test_remaining_features.py", "test_video_drafter.py", "test_youtube_analytics.py", "test_video_bundle.py", "test_creative_profile.py", "test_continuous_motion.py", "test_animation_clock.py", "test_studio_controls.py")) {
+          foreach ($pattern in @("test_windows_runtime.py", "test_remaining_features.py", "test_video_drafter.py", "test_youtube_analytics.py", "test_video_bundle.py", "test_creative_profile.py", "test_continuous_motion.py", "test_animation_clock.py", "test_studio_controls.py", "test_production_automation.py")) {
             & $python -m unittest discover -s creator-dashboard -p $pattern
             if ($LASTEXITCODE -ne 0) { throw "Tests failed: $pattern" }
           }
           & $python creator-dashboard/test_dashboard.py
           if ($LASTEXITCODE -ne 0) { throw "Dashboard HTTP smoke failed" }
+      - name: Check Remotion types and timeline safety
+        shell: pwsh
+        run: |
+          Push-Location creator-dashboard/apps/video-studio-remotion
+          npm run typecheck
+          if ($LASTEXITCODE -ne 0) { throw "Remotion typecheck failed" }
+          npm test
+          if ($LASTEXITCODE -ne 0) { throw "Remotion timeline tests failed" }
+          Pop-Location
       - name: Test the real Windows launcher from a path with spaces
         shell: pwsh
         run: |

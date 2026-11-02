@@ -256,6 +256,20 @@ function renderArticleTools(article) {
     show.onclick=()=>{const apply=el('button',{type:'button'},'Setujui & terapkan usulan tersimpan');comparison.replaceChildren(el('h4',{},'Sebelum'),el('pre',{},proposal.before.join('\n\n')),el('h4',{},'Usulan — periksa makna dan nama'),el('pre',{},proposal.after.join('\n\n')),apply);apply.onclick=async()=>{apply.disabled=true;try{renderArticle(await send('apply-rewrite',{proposal_id:proposal.id,approve:true}))}catch(error){toast(error.message);apply.disabled=false}}};rewritePanel.append(show);
   }
   root.append(rewritePanel);
+  if(article.improvements){
+    const plan=el('details',{},el('summary',{},`Rencana perbaikan otomatis: ${article.improvements.sections.length} bagian`));
+    plan.append(el('p',{},'Prioritas berasal dari pemeriksaan lokal. Saran bahasa dibuat sebagai usulan; fakta/sumber harus diperiksa dan perubahan memerlukan persetujuan Anda.'));
+    for(const item of article.improvements.sections){
+      const row=el('div',{},el('h4',{},item.heading),el('p',{},`${item.source_checks} paragraf perlu pemeriksaan sumber. ${item.language_findings.join('. ')}`));
+      if(item.can_propose_language){
+        const button=el('button',{type:'button'},'Usulkan perbaikan bahasa bagian ini');
+        button.onclick=()=>{section.value=String(item.section);instruction.value=item.instruction;rewritePanel.open=true;propose.click();rewritePanel.scrollIntoView({block:'center'})};
+        row.append(button);
+      }
+      plan.append(row);
+    }
+    root.append(plan);
+  }
   const diagramPanel=el('details',{},el('summary',{},'Diagram lokal → SVG, PNG, dan Word'));
   const kind=el('select',{},el('option',{value:'flow'},'Alur berurutan'),el('option',{value:'mindmap'},'Mind map satu tingkat')),
     labels=el('textarea',{placeholder:'Satu label per baris, maksimal 60 karakter. Mind map: baris pertama adalah pusat.'}),diagramTitle=el('input',{placeholder:'Judul diagram'}),diagram=el('button',{type:'button'},'Buat dan sisipkan diagram');

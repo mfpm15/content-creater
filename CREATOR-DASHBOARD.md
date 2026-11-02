@@ -13,11 +13,11 @@ start-dashboard.bat
 
 Untuk memperbarui, tutup aplikasi terlebih dahulu, lalu jalankan `git pull --ff-only`, `setup-core.bat`, dan `start-dashboard.bat`. Jika Git melaporkan konflik/perubahan lokal, pertahankan perubahan tersebut; jangan memakai `git reset --hard` atau menghapus `.data`, `output`, maupun credential lokal. ZIP di bagian lain hanya alternatif distribusi.
 
-Dashboard lokal ini menjadi pintu masuk untuk lima repository yang sekarang tersusun di `creator-dashboard\apps`:
+Dashboard lokal ini menjadi pintu masuk untuk fitur inti dan aplikasi tambahan di `creator-dashboard\apps`:
 
 - **MoneyPrinterTurbo** untuk membuat video faceless dari topik.
 - **OpenCreator** untuk workspace kreator dan workflow berbasis Agent.
-- **Remotion Studio** untuk video editor visual berbasis React (timeline, preview, layer dragging).
+- **Remotion Editorial di Video Studio** untuk diagram bergerak, caption dan render MP4 berbasis frame, melalui dua tahap persetujuan. Tidak memerlukan daemon OpenCreator. [Fitur, pengujian dan batas](docs/UNIFIED-PRODUCTION-2026-11-02.md).
 - **HyperFrames Studio** untuk HTML-native video editor & renderer (seekable GSAP timeline, no build step).
 - **Lemo-Opuscar Studio** untuk katalog 59 preset gaya film prosedural (Canvas/WebGL + foley audio).
 - **Short Video Factory** untuk editor desktop, template, dan finishing.
@@ -73,7 +73,8 @@ Creator Control Center        3210
 MoneyPrinterTurbo WebUI       8501
 Podcastfy API                 8080
 OpenCreator Web              19861
-Remotion Studio               3300
+Remotion Video Studio         3210 (menu dashboard)
+Remotion preview OpenCreator  3300 (opsional)
 HyperFrames Studio            4000
 Lemo-Opuscar Studio           3500
 Clipper Cuan                  8765

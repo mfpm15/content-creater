@@ -68,7 +68,7 @@
       "id": "remotion-studio",
       "name": "Remotion Studio",
       "shortName": "Remotion",
-      "description": "Preview komposisi React/Remotion milik OpenCreator. Membutuhkan dependency dan timeline props yang valid; terpisah dari adapter Video Studio.",
+      "description": "Launcher preview Stickman milik OpenCreator memerlukan dependency dan timeline valid. Remotion Editorial sudah tersedia sebagai engine terpadu di menu Video Studio melalui runtime tersendiri.",
       "category": "Internal Render Adapter",
       "hidden": true,
       "icon": "film",
@@ -91,7 +91,8 @@
       "capabilities": [
         "React compositions",
         "Frame-based timeline",
-        "Stickman render via OpenCreator"
+        "Stickman render via OpenCreator",
+        "Editorial render via Video Studio"
       ]
     },
     {

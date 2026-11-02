@@ -419,11 +419,15 @@ def _clip_words_full(pid: str, cid: str):
 
 @app.get('/api/projects/{pid}/clips/{cid}/preflight')
 def clip_preflight(pid: str, cid: str):
-    from . import preflight
+    from . import delivery, preflight
     p=_get(pid)
     clip=next((c for c in p.get('clips',[]) if c.get('id')==cid),None)
     if clip is None:raise HTTPException(404,'Klip tidak ditemukan')
-    return preflight.analyze(clip,p.get('media',{}).get('duration'),project.resolve_caption_track(pid))
+    report=preflight.analyze(clip,p.get('media',{}).get('duration'),project.resolve_caption_track(pid))
+    reports=clip.get('delivery') or {}
+    report['last_delivery']={'status':delivery.summary(reports),'issues':[
+        {'platform':name,'code':issue.get('code'),'message':issue.get('msg','')} for name,row in reports.items() for issue in row.get('issues',[])]}
+    return report
 
 
 @app.get("/api/projects/{pid}/clips/{cid}/quality")

@@ -68,12 +68,29 @@ def review(path: Path, duration: float, plan: dict | None = None) -> dict:
                          'manual_required':'A cut need not land on a beat; approved timings remain unchanged'}
     except (OSError,ValueError,TypeError,AttributeError):pass
     visual={'status':'unmeasured','reason':'No plan/HTML or video geometry'}
-    if plan and video and (path.parent/'index.html').is_file():
+    renderer_report=None
+    if (path.parent/'render-report.json').is_file():
+        try:
+            candidate=json.loads((path.parent/'render-report.json').read_text('utf-8'))
+            if candidate.get('adapter')=='remotion':renderer_report=candidate
+        except (OSError,ValueError,AttributeError):pass
+    if renderer_report:
+        screenshots=[row['file'] for row in renderer_report.get('frames',[]) if re.fullmatch(r'review-frame-[0-5]\.png',row.get('file','')) and (path.parent/row['file']).is_file()]
+        visual={'status':'renderer_frames_captured' if screenshots else 'unmeasured','screenshots':screenshots,
+                'manual_required':'Review actual Remotion frames, layout and caption/audio timing'}
+        layout=renderer_report.get('layout',{})
+        visual['layout']=layout
+        if layout.get('issues'):
+            visual['status']='needs_attention';issues.append('Remotion text layout needs review')
+    elif plan and video and (path.parent/'index.html').is_file():
         try:
             from visual_review import inspect
             visual=inspect(path.parent/'index.html',plan,int(video['width']),int(video['height']))
         except (OSError,ValueError,KeyError,RuntimeError):
             visual={'status':'unmeasured','reason':'Optional browser review unavailable'}
         if visual['status']=='needs_attention':issues.append('Text overflow found in sampled scenes')
-    return {'status':'needs_attention' if issues else 'passed_media_checks','issues':issues,'duration':actual,
+    from video_delivery import evaluate
+    delivery=evaluate(video,actual,measured) if video else {}
+    video_format={key:video.get(key) for key in ('width','height','codec_name','pix_fmt','color_range','color_space','avg_frame_rate')} if video else {}
+    return {'status':'needs_attention' if issues else 'passed_media_checks','issues':issues,'duration':actual,'delivery':delivery,'video_format':video_format,
             'audio':measured,'pacing':pacing,'beat_review':beat_review,'visual_review':visual,'manual_required':True}

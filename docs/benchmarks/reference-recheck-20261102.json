@@ -1,0 +1,69 @@
+{
+  "scope": "Catalog pins, targeted source/documentation review; no upstream code/assets copied",
+  "files": [
+    {
+      "reference": "ffmpeg-skill",
+      "pin": "a2c8433",
+      "file": "scripts/check.py",
+      "status": "readable",
+      "bytes": 32184,
+      "sha256": "ef1b669f86d6a3bf69f5085c42c56f2aa09efc9225ca5015794d8bd188a26706"
+    },
+    {
+      "reference": "ghost-editor",
+      "pin": "ce17272",
+      "file": "README.md",
+      "status": "readable",
+      "bytes": 6446,
+      "sha256": "976ce9b48b13b5465137b856d06431b4aeb49e08d07bd779db2fa8edba5c6647"
+    },
+    {
+      "reference": "claude-shorts",
+      "pin": "a369fad",
+      "file": "scripts/snap_boundaries.py",
+      "status": "readable",
+      "bytes": 9580,
+      "sha256": "dd5ef01e3ed510f7008ee542607c613a3509f591b32b776653c3c1a86db09610"
+    },
+    {
+      "reference": "openmontage",
+      "pin": "195eab2",
+      "file": "README.md",
+      "status": "readable",
+      "bytes": 42901,
+      "sha256": "d10e96ce97d87a2519cda2c51261f8dac3daf0b7272cde574c2861ab8d40ab38"
+    },
+    {
+      "reference": "animate",
+      "pin": "7e5eb56",
+      "file": "README.md",
+      "status": "readable",
+      "bytes": 8298,
+      "sha256": "a70aaa9cbcd8f464edf700aa211950b05e38f133d6b1bee158e31dacd4eaf3a4"
+    },
+    {
+      "reference": "handy",
+      "pin": "7bfb2e2",
+      "file": "README.md",
+      "status": "readable",
+      "bytes": 25234,
+      "sha256": "b2d0628109601879669ba25860e5ad7073113ba62111ca69f76b68f6bb34f2a9"
+    },
+    {
+      "reference": "agent-reach",
+      "pin": "14c2134",
+      "file": "README.md",
+      "status": "readable",
+      "bytes": 16010,
+      "sha256": "679ed9b797891acf06d4605addaef032993b63af67c97ac2bd8be76ea854ce34"
+    },
+    {
+      "reference": "youtube-automation-agent",
+      "pin": "e973d51",
+      "file": "README.md",
+      "status": "readable",
+      "bytes": 11686,
+      "sha256": "32526f1a91b202e739fce1a6defa7fce4d871146fc692f74056708e9b84486c8"
+    }
+  ]
+}

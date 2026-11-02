@@ -96,3 +96,9 @@ def check_all(path: str | Path) -> dict:
     lufs = measure_lufs(Path(path)) if pr.has_audio else None
     info = {"duration": pr.duration, "width": pr.width, "height": pr.height, "fps": pr.fps, "has_audio": pr.has_audio, "lufs": lufs}
     return {pid: evaluate(info, pid) for pid in PLATFORMS}
+
+
+def summary(reports: dict) -> str:
+    """A warning is actionable, even when the format itself is technically valid."""
+    if not reports:return 'unmeasured'
+    return 'needs_attention' if any(not row.get('ok') or row.get('issues') for row in reports.values()) else 'passed'
