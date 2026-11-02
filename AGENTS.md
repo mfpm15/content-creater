@@ -148,3 +148,51 @@ Brand kit Video Studio: `GET/POST /api/videos/brands`, katalog `output/brand-kit
 Studi referensi Clipper menambahkan `timeline_thirds` berisi bukti per bagian waktu sama, bukan segmentasi cerita. Benchmark publik dan pemetaan enam situs kini ada di `docs/benchmarks/README.md`; fixture hanya di `.data/benchmarks/`, tidak di Git. Tambahan referensi kode Whisper MIT/PySceneDetect BSD-3-Clause hanya ide/tes, tanpa dependency baru. Sampel film menemukan 4/5 cut acuan; jangan menganggap threshold sudah terkalibrasi luas. Sesuai pengguna, jangan menambahkan upload audio pribadi atau manajemen antrean render pada pengembangan ini; CSV asli tetap ditunda.
 
 Pengembangan brand/cue (`117044e`) lulus native Windows run 41322161629 **Success**: setup, tes terpilih termasuk brand/timing, HTTP dan launcher path berspasi. Regresi lokal: 105 tes dashboard, 194 Clipper. Tetap bedakan dari uji provider/GPU laptop.
+
+## 6. Handoff Clipper Cuan — 2 November 2026
+
+Bagian ini adalah catatan kelanjutan kerja untuk agen berikutnya. Baca bersama aturan umum di atas, lalu verifikasi ulang keadaan Git dan runtime sebelum mengubah kode.
+
+### Sudah dikerjakan
+
+- Pipeline unduhan mode Full diperkuat dengan timeout CDN, retry unduhan/fragment, fragment paralel, pesan progres yang lebih jelas, dan dukungan melanjutkan file parsial.
+- Metadata sumber otomatis tersedia melalui `source-info.json` dan dapat dimasukkan sebagai watermark sumber pada hasil klip.
+- Proyek uji Anthropic `20261102-104242-4e8d` berhasil mengunduh sumber 2560x1440, menjalankan Whisper lokal, membuat kandidat, dan menyelesaikan 10 hasil render lama tanpa error. Data proyek berada di `.data/ClipperCuan/` dan tidak boleh masuk Git.
+- Caption publikasi tidak lagi mencampur bahasa. Video Inggris memakai hook, isi, CTA, dan hashtag Inggris; video Indonesia memakai seluruh elemen dalam bahasa Indonesia. Mode `auto` mengikuti bahasa transkrip yang terdeteksi.
+- Setiap kandidat baru memiliki `summary` singkat untuk menjelaskan inti klip. Metadata 15 kandidat proyek Anthropic lama juga telah diperbarui tanpa merender ulang MP4.
+- Model editorial utama untuk pemilihan momen, judul, ringkasan, dan paket posting adalah `ag/gemini-3.8-flash-high`. Model lain hanya fallback ketika High gagal.
+- Auto-render untuk mode Full dan Hemat Disk dibatasi maksimal **Top 5 berdasarkan ranking** melalui `project.auto_picks()`. Kandidat peringkat 6 dan seterusnya tetap `draft_candidate` dan hanya dirender setelah dipilih pengguna.
+- Perubahan utama sudah berada pada commit `9c34637e88ef71d05baba450abff7258bac762c5` di `origin/main` dengan pesan `Improve ClipperCuan pipeline and cap auto-render to top 5`.
+- Validasi terakhir: compile Python lulus; 202 tes Clipper lulus; 56 tes Creator Dashboard lulus dan 6 dilewati sesuai environment; smoke test `/api/health` lulus; kontrak runtime Top 5 lulus; pemeriksaan diff dan secret tidak menemukan masalah.
+
+### Sedang dikerjakan
+
+- Tidak ada migrasi atau render aktif yang wajib ditunggu pada saat handoff ini.
+- Service lokal terakhir berjalan pada `127.0.0.1:8765` dengan 9Router dan Gemini 3.8 Flash High, tetapi agen berikutnya wajib memeriksa ulang karena status proses lokal tidak persisten lintas sesi atau restart.
+- Fokus saat ini adalah observasi stabilitas pada penggunaan nyata setelah perubahan Top 5, terutama mode Hemat Disk, kegagalan URL stream sementara, dan alur pengguna memilih kandidat peringkat 6 ke bawah.
+
+### Akan dikerjakan berikutnya
+
+1. Jalankan satu proyek baru mode Full dan satu proyek baru mode Hemat Disk dengan `auto_render=True`; buktikan hanya rank 1–5 yang berubah menjadi queued/rendering/done dan rank 6 ke bawah tetap draft.
+2. Uji tombol/manual API pemilihan kandidat rank 6 ke bawah, lalu pastikan hanya kandidat yang dipilih yang dirender dan hasil Top 5 lama tidak berubah.
+3. Tinjau UI Studio agar batas auto-render Top 5 dijelaskan secara eksplisit kepada pengguna, termasuk pesan bahwa kandidat lain tetap tersedia untuk render manual.
+4. Tambahkan pengujian integrasi yang memeriksa state proyek setelah auto-render, bukan hanya unit test `auto_picks()`.
+5. Pantau log download/render mode Hemat Disk untuk URL kedaluwarsa, retry, dan penggunaan ruang. Jangan mengubah pipeline stabil tanpa reproduksi dan regression test.
+6. Bila mengubah ranking, caption, download, atau render, pertahankan Gemini 3.8 Flash High sebagai model utama, caption satu bahasa, summary kandidat, watermark sumber, dan batas auto-render Top 5.
+
+### Instruksi wajib bagi agen berikutnya
+
+1. Mulai dengan `git pull --ff-only`, `git status --short`, dan baca `AGENTS.md`. Jangan menimpa perubahan lokal pengguna.
+2. Jangan menghapus atau memasukkan `.data/`, video sumber, audio, model Whisper, log, project JSON runtime, credential, atau hasil render ke Git.
+3. Jangan merender ulang proyek lama hanya untuk memperbarui caption/summary. Perbarui metadata secara atomik jika memang diperlukan dan buat backup atau temporary replacement.
+4. Pertahankan pemisahan kandidat dan render. Membuat 10–15 kandidat diperbolehkan; yang otomatis masuk antrean render tetap maksimal lima kandidat terbaik.
+5. Kandidat manual, pinned, atau yang dipilih pengguna dapat dirender setelah tahap otomatis, tetapi jangan otomatis mengantrikan rank 6 ke bawah.
+6. Setelah perubahan Clipper, dari `clippercuan/app` jalankan minimal:
+   - `python -m compileall -q clipper tests`
+   - `python -m pytest -q`
+   - smoke test `/api/health`
+   - pemeriksaan langsung bahwa `auto_picks()` mengembalikan rank 1–5 untuk sepuluh kandidat sehat.
+7. Jika perubahan menyentuh Creator Dashboard, jalankan tes dashboard terkait. Jangan menyatakan seluruh monorepo lulus bila hanya subset yang dijalankan.
+8. Sebelum commit, jalankan `git diff --check`, periksa diff untuk secret/data runtime, dan pastikan tidak ada file media atau `.env` yang staged.
+9. Gunakan commit yang fokus dan push ke `origin/main` hanya setelah semua validasi relevan lulus. Setelah push, bandingkan `git rev-parse HEAD` dengan `git ls-remote origin refs/heads/main` dan pastikan working tree bersih.
+10. Laporkan secara terpisah: perubahan kode, validasi otomatis, smoke test runtime, hasil render nyata, dan hal yang belum diuji. Jangan menyebut metadata check sebagai review visual atau uji kualitas video manusia.
