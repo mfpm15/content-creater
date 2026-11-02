@@ -46,14 +46,23 @@ def inspect(path: Path, plan: dict, width: int, height: int) -> dict:
                 step='page_load'
                 page.goto(origin+'/'+path.name, wait_until='load', timeout=20000)
                 step='timeline_ready'
-                page.wait_for_function('Boolean(window.__timelines?.video)',timeout=10000)
+                page.wait_for_function('()=>Boolean(window.__timelines?.video)',timeout=10000)
                 page.evaluate('()=>{window.__timelines.video.pause?.();}')
                 step='font_ready'
-                page.wait_for_function('!document.fonts || document.fonts.status === "loaded"',timeout=5000)
+                page.wait_for_function('()=>!document.fonts || document.fonts.status === "loaded"',timeout=5000)
                 step='sample_frames'
                 for index, scene in enumerate(plan['scenes'][:20]):
                     point = (float(scene['start'])+float(scene['end']))/2
-                    page.evaluate('(t)=>{window.__timelines.video.seek(t);}',point)
+                    page.evaluate('''(t)=>{
+                        if (typeof window.__seek === 'function') window.__seek(t);
+                        else {
+                            window.__timelines.video.seek(t, false);
+                            for (const animation of document.getAnimations()) {
+                                const host=animation.effect?.target?.closest?.('[data-start]');
+                                animation.pause();animation.currentTime=Math.max(0,t-(Number(host?.dataset.start)||0))*1000;
+                            }
+                        }
+                    }''',point)
                     found = page.evaluate('''() => [...document.querySelectorAll('.hero-title,.subtitle-capsule,.scene-title,.subtitle')].filter(e=>{
                       let n=e;while(n){const s=getComputedStyle(n);if(s.visibility==='hidden'||s.display==='none'||Number(s.opacity)===0)return false;n=n.parentElement}return true;
                     }).filter(e=>{const r=e.getBoundingClientRect();return r.left<0||r.top<0||r.right>innerWidth+1||r.bottom>innerHeight+1||e.scrollWidth>e.clientWidth+2||e.scrollHeight>e.clientHeight+2}).map(e=>e.textContent.slice(0,120))''')

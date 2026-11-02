@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-02",
+  "baseline_commit": "dfb65fc",
+  "scope": "Static HTML/WebGL samples only; no media playback",
+  "viewport": {
+    "width": 480,
+    "height": 854
+  },
+  "runtime": "Cloud Linux Chromium, software WebGL allowed; SDK URLs fulfilled from pinned temporary copies",
+  "checks": [
+    {
+      "engine": "opuscar",
+      "sdk": {
+        "gsap": "3.13.0"
+      },
+      "wall_time_stable": true,
+      "out_of_order_identical": true,
+      "reload_identical": true,
+      "suppressed_seek_changes_frame": true,
+      "sample_sha256": "86ca18d3c916f9d23c2c4376efff6629950a4ee5d620b448611d70bc63cf1cb8",
+      "browser_errors": [],
+      "media_playback": false
+    },
+    {
+      "engine": "threejs",
+      "sdk": {
+        "gsap": "3.13.0",
+        "three": "0.160.0"
+      },
+      "wall_time_stable": true,
+      "out_of_order_identical": true,
+      "reload_identical": true,
+      "suppressed_seek_changes_frame": true,
+      "sample_sha256": "ef894ca6c9c923f95ddd605629c49d587689e3bc9225ae0887a42e0c16d474af",
+      "browser_errors": [],
+      "media_playback": false
+    }
+  ],
+  "source_sha256": {
+    "animation_clock.py": "8060c8f7a01e2e7047bab3ff99864d0e59890a2aafcb5add2df22283921dbcb6",
+    "video_drafter.py": "ac38e441b99c9fbec84b3196abc691fc93a6a7e465831231f43dff188ccb3639",
+    "visual_review.py": "2d62c21b7ef724a253f003d0d64645f4240e3495a947a0cd046e92056f181040"
+  },
+  "limitations": [
+    "No Remotion runtime execution; dependencies absent",
+    "Not a Windows GPU or provider/TTS benchmark",
+    "Not all frames, semantic correctness or aesthetic quality"
+  ]
+}

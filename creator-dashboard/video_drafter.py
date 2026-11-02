@@ -22,6 +22,7 @@ from video_job_store import save_job, recover_jobs
 from runtime_config import resolve_python
 import creative_profile
 import continuous_motion
+import animation_clock
 
 ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
@@ -615,6 +616,8 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
     {''.join(animation)}
     window.__timelines = window.__timelines || {{}};
     window.__timelines.video = tl;
+    {animation_clock.SCRIPT}
+    attachAnimationClock(tl, null, {duration});
     </script>
 </div>
 </body></html>'''
@@ -682,7 +685,7 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
     <script>
     const width = {width}, height = {height}, duration = {duration};
     const canvas = document.getElementById('webglCanvas');
-    const renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true, alpha: true, powerPreference: 'high-performance' }});
+    const renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }});
     renderer.setSize(width, height);
     renderer.setPixelRatio(1);
 
@@ -704,10 +707,15 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
     const pGeo = new THREE.BufferGeometry();
     const pCount = 1200;
     const pos = new Float32Array(pCount * 3);
+    let starSeed = {int.from_bytes(hashlib.sha256(plan['topic'].encode('utf-8')).digest()[:4], 'little') or 1};
+    function seededStar() {{
+        starSeed ^= starSeed << 13; starSeed ^= starSeed >>> 17; starSeed ^= starSeed << 5;
+        return (starSeed >>> 0) / 4294967296;
+    }}
     for (let i = 0; i < pCount * 3; i += 3) {{
-        pos[i] = (Math.random() - 0.5) * 40;
-        pos[i+1] = (Math.random() - 0.5) * 60;
-        pos[i+2] = (Math.random() - 0.5) * 35;
+        pos[i] = (seededStar() - 0.5) * 40;
+        pos[i+1] = (seededStar() - 0.5) * 60;
+        pos[i+2] = (seededStar() - 0.5) * 35;
     }}
     pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const pMat = new THREE.PointsMaterial({{ size: 0.18, color: 0x38bdf8, transparent: true, opacity: 0.75 }});
@@ -758,8 +766,8 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
         t: duration,
         duration: duration,
         ease: "none",
-        onUpdate: () => {{
-            const t = clock.t;
+    }}, 0);
+    function drawThreeFrame(t) {{
             particles.rotation.y = t * 0.04;
             grid.position.z = (t * 2.5) % 3.3 - 8;
             heroMesh.rotation.x = t * 0.45;
@@ -772,13 +780,14 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
             camera.position.y = Math.cos(t * 0.2) * 1.5;
             camera.lookAt(0, 0, 0);
             renderer.render(scene, camera);
-        }}
-    }}, 0);
+    }}
 
     {''.join(animation)}
 
     window.__timelines = window.__timelines || {{}};
     window.__timelines.video = tl;
+    {animation_clock.SCRIPT}
+    attachAnimationClock(tl, drawThreeFrame, duration);
     </script>
 </div>
 </body></html>'''

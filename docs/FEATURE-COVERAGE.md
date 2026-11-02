@@ -68,3 +68,5 @@ Gunakan `setup-core.bat`, lalu `start-dashboard.bat`. Browser Edge/Chrome didete
 Benchmark baru: fixture suara Whisper 11 detik untuk audio, serta sampel video PySceneDetect 10,469 detik dengan 4/5 cut acuan, precision 1,0 dan recall 0,8. Tidak mengubah threshold berdasarkan satu sampel. Upload audio pribadi dan pengembangan manajemen antrean render dikeluarkan dari lingkup sesuai pengguna.
 
 Studi OneTake (PolyForm Noncommercial), Motion JS dan dokumentasi Three.js tercatat pada REFERENCES.md; kode/aset OneTake tidak disalin. Validasi terbaru dan demo 15 detik ada pada [STATUS-2026-11-02.md](STATUS-2026-11-02.md). KreasiPintar belum terbaca karena 403.
+
+Audit renderer terbaru: [RENDERER-AUDIT-2026-11-02.md](RENDERER-AUDIT-2026-11-02.md). Clock GSAP/CSS/WebGL kini disatukan dan seed 3D stabil. Remotion tetap di OpenCreator, belum engine Video Studio; banyak arahan sinematik masih catatan, bukan seluruh kontrol render.

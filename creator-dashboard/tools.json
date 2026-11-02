@@ -68,7 +68,7 @@
       "id": "remotion-studio",
       "name": "Remotion Studio",
       "shortName": "Remotion",
-      "description": "Video editor visual berbasis React: live preview frame-by-frame, timeline player, drag-and-drop layer canvas, dan Claude Code Agent Skills.",
+      "description": "Preview komposisi React/Remotion milik OpenCreator. Membutuhkan dependency dan timeline props yang valid; terpisah dari adapter Video Studio.",
       "category": "Internal Render Adapter",
       "hidden": true,
       "icon": "film",
@@ -89,11 +89,9 @@
         "Remotion 4.0+"
       ],
       "capabilities": [
-        "React Video Studio",
-        "Live Canvas Preview",
-        "Timeline Scrubbing",
-        "Interactive Drag & Drop",
-        "Claude Code Agent Skills"
+        "React compositions",
+        "Frame-based timeline",
+        "Stickman render via OpenCreator"
       ]
     },
     {
