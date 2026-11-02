@@ -21,12 +21,13 @@ class VideoDrafterTest(unittest.TestCase):
 
     def test_options_expose_render_adapters_and_primary_models(self):
         opts = video_drafter.options()
-        self.assertEqual([item["id"] for item in opts["engines"]], ["opuscar", "threejs", "lottie"])
+        self.assertEqual([item["id"] for item in opts["engines"]], ["opuscar", "threejs", "lottie", "continuous"])
         self.assertEqual(opts["defaultEngine"], "opuscar")
         self.assertFalse(next(item for item in opts["engines"] if item["id"] == "threejs").get("disabled", False))
         self.assertEqual(opts["workflow"], ["brief", "research", "scene_plan", "storyboard", "render"])
         self.assertEqual(opts["research"]["provider"], "Google Search grounding")
-        self.assertTrue(opts["research"]["required"])
+        self.assertFalse(opts["research"]["required"])
+        self.assertEqual(opts["research"]["requiredForModes"], ["web"])
         self.assertEqual(opts["models"][0]["provider"], "Gemini")
         self.assertTrue(any(item["provider"] == "GPT" for item in opts["models"]))
         self.assertTrue(any(item["provider"] == "Claude" and item["tier"] == "tambahan" for item in opts["models"]))

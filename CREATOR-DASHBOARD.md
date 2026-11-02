@@ -269,3 +269,7 @@ Cakupan cue: Lottie bentuk/judul, Opuscar judul/panel visual, Three.js panel ret
 Clipper → Studio → **Pelajari tempo video ini** sekarang menampilkan bukti awal/tengah/akhir: jumlah cut/kata, kata/detik, cakupan timestamp dan kutipan. Ketiganya bagian waktu sama; bukan pemahaman struktur cerita. Tidak tersedianya transkrip dilaporkan jelas. Lihat [hasil benchmark publik](docs/benchmarks/README.md).
 
 Ekspor Lottie baru menyertakan field teks wajib untuk player standar (`t.m`). Untuk file Lottie hasil lama, buat pekerjaan/variasi baru dan selesaikan review agar mendapat ekspor yang diperbaiki; artefak lama tidak ditimpa otomatis.
+
+### Film kontinu lokal
+
+Video Studio → **Continuous Motion** → pilih satu dari tiga konsep, atau tekan **Coba contoh lokal 15 detik**. Mode naskah lokal + musik dapat menghasilkan MP4 tanpa provider. Periksa beat sheet, setujui dua tahap, lalu tinjau laporan media/gerak dan unduh hasil. [Panduan, sumber OneTake dan batas implementasi](docs/ONETAKE-STUDIO.md). Adapter ini memakai Playwright/browser/FFmpeg dari setup core yang sudah ada.

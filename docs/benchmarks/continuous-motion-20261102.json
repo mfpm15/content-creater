@@ -1,0 +1,128 @@
+{
+  "scenario": "15-second local example via actual UI, two approvals, full resolution",
+  "status": "succeeded",
+  "engine": "continuous",
+  "aspect": "9:16",
+  "duration": 15,
+  "motion_review": {
+    "status": "sampled",
+    "method": "authored_boundary_dom_tracking_and_repeat_pixels",
+    "boundaries": [
+      {
+        "at": 4.0,
+        "carrier": "motion-hero",
+        "status": "carried",
+        "center_travel_px": 360.611,
+        "size_delta_px": 0.0,
+        "samples": [
+          {
+            "id": "motion-hero",
+            "x": 310.35467529296875,
+            "y": 916.8706665039062,
+            "width": 43.20001220703125,
+            "height": 43.20001220703125,
+            "opacity": 1,
+            "viewportWidth": 1080,
+            "viewportHeight": 1920
+          },
+          {
+            "id": "motion-hero",
+            "x": 661.6453247070312,
+            "y": 998.329345703125,
+            "width": 43.20001220703125,
+            "height": 43.199951171875,
+            "opacity": 1,
+            "viewportWidth": 1080,
+            "viewportHeight": 1920
+          }
+        ]
+      },
+      {
+        "at": 9.0,
+        "carrier": "motion-hero",
+        "status": "carried",
+        "center_travel_px": 248.032,
+        "size_delta_px": 0.0,
+        "samples": [
+          {
+            "id": "motion-hero",
+            "x": 686.9512939453125,
+            "y": 1034.8824462890625,
+            "width": 43.20001220703125,
+            "height": 43.199951171875,
+            "opacity": 1,
+            "viewportWidth": 1080,
+            "viewportHeight": 1920
+          },
+          {
+            "id": "motion-hero",
+            "x": 457.84869384765625,
+            "y": 1129.9176025390625,
+            "width": 43.20001220703125,
+            "height": 43.199951171875,
+            "opacity": 1,
+            "viewportWidth": 1080,
+            "viewportHeight": 1920
+          }
+        ]
+      }
+    ],
+    "boundary_count_expected": 2,
+    "deterministic_repeat": true,
+    "repeat_sample_seconds": 7.5,
+    "continuity_status": "measured_primary_carrier",
+    "issues": [],
+    "motion_blur": false,
+    "manual_required": true,
+    "limitations": [
+      "Primary carrier only, not semantic understanding or all visual elements",
+      "Layout sampled at scene midpoints; no claim of all-frame safe area",
+      "Single-frame capture; no shutter motion blur or 4K60 claim"
+    ],
+    "frames": 450,
+    "fps": 30,
+    "wall_seconds": 148.104,
+    "composition_sha256": "0b8aef8128edf42b9c4d67b572dc8139874c1714a415f46926fdbed5cdf4e929",
+    "rendered_pixel_motion": {
+      "status": "measured",
+      "method": "encoded_luminance_absolute_difference",
+      "sample_fps": 10,
+      "analysis_width": 160,
+      "samples": 149,
+      "low_change_threshold_8bit": 0.1,
+      "low_change_fraction": 0.8591,
+      "max_mean_change_8bit": 2.2007,
+      "limitations": "Low-resolution area average can miss small objects; text changes also contribute. Not aesthetic validation."
+    }
+  },
+  "media_status": "passed_media_checks",
+  "audio": {
+    "status": "measured",
+    "integrated_lufs": -15.2,
+    "true_peak_dbfs": -1.5,
+    "silence_starts": [
+      0.0392083,
+      4.638542,
+      9.638583
+    ]
+  },
+  "browser_errors": [],
+  "measured_at_utc": "2026-11-02T07:27:38.159647+00:00",
+  "media_sha256": "c3cb32eda2750d02c86e5a3b74000654bd2c032080e3d855c6f38a29d47dd3b6",
+  "dimensions": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30
+  },
+  "runtime": "Cloud Linux, single Chromium browser, concurrent regression tests",
+  "source": {
+    "skill_reference": "feitangyuan/onetake",
+    "upstream_commit": "013a61ac8d98883c73733f59c06e49e9ba444f14",
+    "usage": "Ideas only; original adapter, no upstream source/assets"
+  },
+  "boundaries_of_evidence": [
+    "Not a Windows laptop/GPU/TTS provider benchmark",
+    "Single 15-second authored example, not an arbitrary motion-generation evaluation",
+    "No 4K60 or shutter motion blur test"
+  ]
+}

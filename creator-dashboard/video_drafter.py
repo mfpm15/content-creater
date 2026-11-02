@@ -1,4 +1,4 @@
-"""Opuscar-only dynamic video planning and rendering pipeline."""
+"""Reviewed video planning and rendering across independent local adapters."""
 from __future__ import annotations
 
 import html
@@ -21,6 +21,7 @@ from security import open_authenticated, render_environment
 from video_job_store import save_job, recover_jobs
 from runtime_config import resolve_python
 import creative_profile
+import continuous_motion
 
 ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
@@ -38,6 +39,7 @@ STYLES = {
     "opuscar_cinematic": {"id": "opuscar_cinematic", "name": "Opuscar Cinematic", "description": "Visual prosedural kaya ilustrasi dinamis (radar, graph, nodes, prism) tanpa teks slide mentah."},
     "threejs_3d": {"id": "threejs_3d", "name": "Three.js 3D Cinematic", "description": "Dunia WebGL 3D dengan partikel, pencahayaan neon ganda, grid cyber, dan hero object 3D."},
     "lottie_motion": {"id": "lottie_motion", "name": "Lottie Motion", "description": "Animasi vektor ringan dengan preview web dan ekspor lottie.json."},
+    "continuous_motion": {"id":"continuous_motion","name":"Continuous Motion","description":"Diagram kontinu dengan pilihan konsep, hold dan carrier berlanjut."},
 }
 ASPECT_RATIOS = {
     "9:16": {"id": "9:16", "width": 1080, "height": 1920, "label": "9:16 Vertikal"},
@@ -50,6 +52,7 @@ ENGINES = {
     "opuscar": {"id": "opuscar", "name": "Opuscar / GSAP", "description": "Motion graphics prosedural kaya animasi & ilustrasi dinamis (MP4).", "defaultStyle": "opuscar_cinematic", "output": "mp4"},
     "threejs": {"id": "threejs", "name": "Three.js 3D", "description": "Dunia 3D prosedural WebGL dinamis dengan pencahayaan dan kamera orbit (MP4).", "defaultStyle": "threejs_3d", "output": "mp4"},
     "lottie": {"id": "lottie", "name": "Lottie", "description": "Animasi vektor ringan dengan preview web dan JSON.", "defaultStyle": "lottie_motion", "output": "lottie"},
+    "continuous": {"id":"continuous","name":"Continuous Motion","description":"Diagram satu dunia dengan carrier berlanjut, jeda gerak, dan MP4 lokal tanpa CDN.","defaultStyle":"continuous_motion","output":"mp4"},
 }
 DEFAULT_MODELS = [
     {"id": "ag/gemini-3.8-flash-high", "name": "Gemini 3.8 Flash High", "provider": "Gemini", "tier": "utama"},
@@ -75,11 +78,12 @@ def get_available_models() -> list[dict]:
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
     research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": True, "ready": research_ready,"modes":["planner","web","provided"]}}
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
     if engine=='lottie':return []
+    if engine=='continuous':return continuous_motion.runtime_issues()
     missing=[]
     if not shutil.which('node'):missing.append('Node.js')
     if not shutil.which('ffmpeg') and not (ROOT/'bin'/'ffmpeg.exe').is_file():missing.append('FFmpeg')
@@ -285,6 +289,14 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
     for scene,raw in zip(scenes,source):creative_profile.timing(scene,raw)
     result={"topic": topic, "duration": duration, "scenes": scenes}
     if data.get('brand') is not None:result['brand']=creative_profile.snapshot(data['brand'])
+    if data.get('creativeDirection') is not None:
+        direction=data['creativeDirection']
+        if not isinstance(direction,dict) or len(json.dumps(direction,allow_nan=False).encode('utf-8'))>16000:
+            raise ValueError('Creative direction harus objek JSON maksimal 16 KB')
+        result['creativeDirection']=copy.deepcopy(direction)
+    if data.get('motionDesign') is not None:
+        result['motionDesign']=continuous_motion.design(data['motionDesign'],scenes,duration)
+        result['motionBeatSheet']=continuous_motion.beat_sheet(result)
     return result
 
 
@@ -773,6 +785,7 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
 
 
 def generate_composition(plan: dict, aspect_info: dict, model: str = "", engine: str = "opuscar") -> str:
+    if engine=='continuous':return continuous_motion.composition(plan,aspect_info)
     if engine == "threejs":
         document=generate_threejs_composition(plan, aspect_info, model)
     else:document=generate_opuscar_composition(plan, aspect_info, model)
@@ -780,9 +793,17 @@ def generate_composition(plan: dict, aspect_info: dict, model: str = "", engine:
 
 
 def audio_manifest(plan: dict) -> dict:
-    return {"duration": plan["duration"], "voice": [{"id": scene["id"], "start": scene["start"], "end": scene["end"], "text": scene["narration"]} for scene in plan["scenes"]], "subtitles": [{"start": scene["start"], "end": scene["end"], "text": scene["narration"]} for scene in plan["scenes"]], "soundCues": [{"at": scene["start"], "cue": scene["soundCue"]} for scene in plan["scenes"] if scene["soundCue"]], "music": {"start": 0, "end": plan["duration"], "duckUnderVoice": True, "targetLufs": -14,
+    result = {"duration": plan["duration"], "voice": [{"id": scene["id"], "start": scene["start"], "end": scene["end"], "text": scene["narration"]} for scene in plan["scenes"]], "subtitles": [{"start": scene["start"], "end": scene["end"], "text": scene["narration"]} for scene in plan["scenes"]], "soundCues": [{"at": scene["start"], "cue": scene["soundCue"]} for scene in plan["scenes"] if scene["soundCue"]], "music": {"start": 0, "end": plan["duration"], "duckUnderVoice": True, "targetLufs": -14,
             "beat_markers": [round(.125+i*.5,3) for i in range(math.ceil(plan['duration']*2)) if .125+i*.5<plan['duration']],
             "beat_method": "known_procedural_envelope_peaks_2hz_not_external_music_detection"}}
+    if plan.get('motionDesign'):
+        holds=continuous_motion.beat_sheet(plan)['beats']
+        result['music']['beat_markers']=[t for t in result['music']['beat_markers'] if not any(b['holdStart']+.04<t<b['holdEnd']-.04 for b in holds)]
+        result['voiceMode']=plan['motionDesign']['voiceMode']
+        if result['voiceMode']=='music':
+            result['voice']=[]
+            result['music']['duckUnderVoice']=False
+    return result
 
 
 def _srt_time(seconds: float) -> str:
@@ -922,7 +943,11 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         raw_plan = payload.get("scenePlan")
         if not isinstance(raw_plan, dict) or not isinstance(raw_plan.get("scenes"), list):
             raise ValueError("Scene plan tidak valid")
+        if raw_plan.get('motionDesign') is not None and job.get('engine')!='continuous':
+            raise ValueError('Desain kontinu hanya tersedia untuk adapter Continuous Motion')
         plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
+        if job.get('engine')=='continuous' and not plan.get('motionDesign'):
+            raise ValueError('Desain gerak kontinu wajib dipertahankan saat mengedit')
         # Clicking approve also saves the editor. Preserve approval for an unchanged plan.
         if plan == job.get("scenePlan"):
             return copy.deepcopy(job)
@@ -1008,6 +1033,9 @@ def start_job(payload: dict) -> dict:
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
     job = {"jobId": job_id, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    if engine=='continuous':
+        job['motionDesign']=continuous_motion.design({'concept':payload.get('motionConcept'),'voiceMode':payload.get('voiceMode','music')},
+                [{'start':0,'end':duration}],duration)
     if payload.get('brandId'):
         kit=next((row for row in creative_profile.catalog(VIDEOS_DIR.parent/'brand-kits.json')['kits'] if row['id']==payload['brandId']),None)
         if not kit:raise ValueError('Brand tidak ditemukan; muat ulang daftar')
@@ -1034,6 +1062,8 @@ def _write_procedural_audio(path: Path, plan: dict, sample_rate: int = 48000) ->
     """Create music bed and cue-driven foley without external assets."""
     cues = [(float(item["at"]), str(item["cue"]).lower()) for item in audio_manifest(plan)["soundCues"]]
     frames = bytearray()
+    holds=continuous_motion.beat_sheet(plan)['beats'] if plan.get('motionDesign') else []
+    hold_index=0
     for sample in range(round(plan["duration"] * sample_rate)):
         t = sample / sample_rate
         pulse = 0.55 + 0.45 * math.sin(2 * math.pi * 2 * t)
@@ -1043,6 +1073,13 @@ def _write_procedural_audio(path: Path, plan: dict, sample_rate: int = 48000) ->
             if 0 <= local < 0.35:
                 frequency = 1200 if any(word in cue_name for word in ("bell", "chime", "ding")) else 420
                 value += 0.18 * (1 - local / 0.35) * math.sin(2 * math.pi * frequency * local)
+        if holds:
+            while hold_index+1<len(holds) and t>=holds[hold_index]['end']:hold_index+=1
+            hold=holds[hold_index]
+            # Leave audible pauses only on this adapter, with short ramps against clicks.
+            if hold['holdStart']<=t<=hold['holdEnd']:
+                edge=min(t-hold['holdStart'],hold['holdEnd']-t)
+                value*=max(0,1-edge/.04)
         frames.extend(int(max(-1, min(1, value)) * 32767).to_bytes(2, "little", signed=True))
     with wave.open(str(path), "wb") as output:
         output.setparams((1, 2, sample_rate, len(frames) // 2, "NONE", "not compressed"))
@@ -1056,6 +1093,12 @@ def _build_audio(target: Path, plan: dict) -> Path:
     tts = OPUSCAR_DIR / "core" / "tts" / "tts_zh.py"
     if not Path(ffmpeg).is_file() and not shutil.which("ffmpeg"):
         raise RuntimeError("FFmpeg tidak ditemukan untuk audio mux")
+    if plan.get('motionDesign',{}).get('voiceMode')=='music':
+        bed=target/'music-foley.wav'
+        _write_procedural_audio(bed,plan)
+        final=target/'final-audio.wav'
+        subprocess.run([ffmpeg,'-y','-i',str(bed),'-af','loudnorm=I=-14:TP=-1.5:LRA=9','-ar','48000',str(final)],check=True,timeout=180,env=render_environment(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        return final
     if not python.is_file():
         raise RuntimeError("Opuscar voice environment belum tersedia")
     lines = [{"id": scene["id"], "text": scene["narration"], "voice": "id-ID-ArdiNeural", "rate": "+8%"} for scene in plan["scenes"]]
@@ -1117,12 +1160,12 @@ def _run_job(job_id: str) -> None:
         mode=job.get('researchMode','planner')
         provided=mode=='provided'
         web=mode=='web'
-        step = "Mencari sumber melalui Google Search" if web else "Menyusun creative direction dengan model terpilih"
+        step = "Mencari sumber melalui Google Search" if web else "Menyusun naskah lokal untuk review" if provided else "Menyusun creative direction dengan model terpilih"
         _update_job(job_id, {"status": "researching", "step": step, "progress": 10})
         if web:
             research = _research_web(job["topic"], job["script"])
         elif provided:
-            research = {'provider':'Naskah pengguna + 9Router','mode':'provided','summary':'Naskah dipertahankan lalu diterjemahkan menjadi arahan produksi oleh model terpilih. Fakta tidak diverifikasi otomatis.','sources':[],'sourceCount':0}
+            research = {'provider':'Naskah pengguna lokal','mode':'provided','summary':'Rencana lokal deterministik tanpa panggilan model atau Web Search. Fakta tidak diverifikasi otomatis.','sources':[],'sourceCount':0}
         else:
             research = {'provider':'Creative planning 9Router','mode':'planner','summary':'Treatment dikembangkan dari judul oleh model terpilih tanpa Web Search. Klaim faktual spesifik harus ditinjau sebelum persetujuan.','sources':[],'sourceCount':0}
         _update_job(job_id, {"research": research, "step": "Konteks siap; menyusun Scene Plan sinematik", "progress": 20})
@@ -1133,10 +1176,14 @@ def _run_job(job_id: str) -> None:
         # Mode provided tetap merupakan jalur lokal deterministik. Ini penting untuk
         # naskah bertimecode dan produksi offline: model tetap dapat dipilih di UI,
         # tetapi hanya dipakai oleh mode planner/web yang memang meminta generasi AI.
-        data = {} if explicit or provided else _clean_json(_call_9router(build_scene_prompt(job["topic"], planning_input, job["duration"], job["aspect"]), job["model"]))
+        prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
+        if job.get('motionDesign'):
+            concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
+            prompt+='\nKonsep yang sudah dipilih pengguna: '+concept['idea']+' '+concept['carry']+'\nRencana harus menutup seluruh durasi tanpa celah; beri ruang diam, tanpa mengganti konsep atau mengubah timecode pengguna.'
+        data = {} if explicit or provided else _clean_json(_call_9router(prompt, job["model"]))
+        if job.get('motionDesign'):data['motionDesign']=job['motionDesign']
+        else:data.pop('motionDesign',None)
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
-        if isinstance(data.get('creativeDirection'), dict):
-            plan['creativeDirection'] = data['creativeDirection']
         if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])
         _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan})
     except Exception as exc:
@@ -1168,17 +1215,28 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
             (target / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
             _update_job(job_id, {"status": "succeeded", "step": "Animasi Lottie selesai", "progress": 100, "video": {"slug": target.name, "title": job["topic"], "htmlUrl": f"/api/videos/{target.name}/index.html", "lottieUrl": f"/api/videos/{target.name}/lottie.json", "duration": plan["duration"], "engine": "lottie"}})
             return
-        engine_label = "Three.js 3D" if job["engine"] == "threejs" else "Opuscar / GSAP"
-        _update_job(job_id, {"status": "rendering", "step": "Membuat dubbing, musik, foley, dan subtitle sebelum render visual", "progress": 55})
+        engine_label = ENGINES[job['engine']]['name']
+        _update_job(job_id, {"status": "rendering", "step": "Membuat musik/foley lokal tanpa dubbing" if plan.get("motionDesign",{}).get("voiceMode")=="music" else "Membuat dubbing, musik, foley, dan subtitle sebelum render visual", "progress": 55})
         final_audio = _build_audio(target, plan)
         _update_job(job_id, {"step": f"Merender visual dinamis {engine_label}", "progress": 72})
         renderer = HYPERFRAMES_APP_DIR / "node_modules" / "hyperframes" / "bin" / "hyperframes.mjs"
         silent = target / "silent.mp4"
-        subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", "30", "--workers", "1"], cwd=target, check=True, timeout=600,env=render_environment())
+        motion_report=None
+        if job['engine']=='continuous':
+            silent,motion_report=continuous_motion.render(target,plan,ASPECT_RATIOS[job['aspect']],
+                progress=lambda fraction:_update_job(job_id,{'progress':72+round(fraction*16),'step':f'Render kontinu {round(fraction*100)}%'}))
+        else:
+            subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", "30", "--workers", "1"], cwd=target, check=True, timeout=600,env=render_environment())
         _update_job(job_id, {"step": "Melakukan mux audio dan video", "progress": 90})
         output = _mux_video(target, silent, final_audio, plan["duration"])
         from video_review import review
         review_result = review(output, plan["duration"], plan)
+        if motion_report:
+            motion_report['rendered_pixel_motion']=continuous_motion.pixel_motion(output)
+            review_result['motion_review']=motion_report
+            if motion_report['issues']:
+                review_result['status']='needs_attention'
+                review_result['issues'].append('Continuous motion layout needs review')
         with output.open('rb') as source:
             review_result['artifact_sha256']=hashlib.file_digest(source,'sha256').hexdigest()
         (target / "review.json").write_text(json.dumps(review_result), encoding="utf-8")

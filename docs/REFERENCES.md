@@ -96,3 +96,9 @@ Dua repo tambahan dibaca terarah dalam checkout sementara `/tmp`, bukan dependen
 | [Breakthrough/PySceneDetect](https://github.com/Breakthrough/PySceneDetect) | `55f20ff3448ed336df032ac6270cf47d215dc2c4` | BSD-3-Clause | `scenedetect/detectors/content_detector.py`: skor perubahan HSV/luma dan kalibrasi; `tests/test_detectors.py`: titik potong berbasis frame sebagai acuan regresi. Ditambahkan benchmark satu-ke-satu dengan precision/recall dan pembagian bukti tempo per sepertiga waktu. Tidak mengimpor detector upstream. |
 
 Fixture video PySceneDetect berasal dari commit branch resources `e68d06a78e5241d82300d4924a53629feecbcb6b`, berbeda dari commit kode. Hak media tidak diasumsikan mengikuti lisensi kode; tidak dimasukkan ke Git. Sumber, hash, hasil, batas dan cara ulang Windows ada di [benchmarks/README.md](benchmarks/README.md). Keenam situs produk pengguna kini berhasil dibaca HTTP 200; perbandingan tersebut adalah studi halaman publik, bukan pengujian akun/layanan mereka.
+
+## OneTake dan rekomendasi motion — 2 November 2026
+
+Studi terarah [OneTake](https://github.com/feitangyuan/onetake), commit `013a61ac8d98883c73733f59c06e49e9ba444f14`, meliputi SKILL, README/lisensi dan dokumen rhythm, composition, reference-deconstruction, motion-library, product-demo, 3D serta sound. **PolyForm Noncommercial 1.0.0**, bukan MIT; tidak menyalin kode, font, template, film atau aset ke produk. Implementasi sendiri: `continuous_motion.py`, konsep eksplisit, beat sheet, carrier berlanjut, seek absolut dan pengukuran browser sebelum ekspor MP4. Tidak mengklaim seluruh pipeline OneTake.
+
+README/lisensi Motion JS (MIT), dokumentasi pengantar Three.js dan rekomendasi agent tooling juga ditinjau tanpa memasang installer pihak ketiga. Pin sumber, cara memakai Video Studio, bagian yang diadopsi dan batasnya ada di [ONETAKE-STUDIO.md](ONETAKE-STUDIO.md). Halaman KreasiPintar tambahan pengguna belum terbaca karena 403; belum dipetakan fiturnya.

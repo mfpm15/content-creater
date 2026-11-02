@@ -1,6 +1,6 @@
 # Cakupan pengembangan dan batas validasi
 
-Diperbarui 1 November 2026. Dokumen ini mencatat kemampuan proyek, bukan klaim kesetaraan dengan produk lain.
+Diperbarui 2 November 2026. Dokumen ini mencatat kemampuan proyek, bukan klaim kesetaraan dengan produk lain.
 
 ## Referensi produk dari pengguna
 
@@ -22,6 +22,7 @@ Keenam URL berhasil dibaca HTTP 200 pada 1 November 2026. [Pemetaan fitur, sumbe
 | Video Studio | Gerbang Scene Plan/Storyboard, resume, variasi 9:16/1:1/4:5/16:9 dari satu rencana; mode naskah sendiri lokal tanpa provider | Tiap rasio direview ulang; MP4 memerlukan runtime HyperFrames/Opuscar/TTS yang siap |
 | Brand kit Video Studio | Katalog lokal berversi, snapshot per job, aksen/latar/teks/font sistem dan wordmark teks pada HTML/Lottie | Tanpa logo gambar/remote CSS; warna material 3D tidak seluruhnya diganti; font tidak di-embed |
 | Timing visual per kata | Cue input eksplisit, validasi isi/angka/negasi/waktu; pemicu visual per adapter, tersimpan saat edit/variasi/ekspor | Bukan ASR/forced alignment; waktu perlu dicocokkan dengan TTS hasil; efek lain mengikuti timing adegan |
+| Continuous Motion | Tiga konsep eksplisit, carrier SVG berlanjut, beat sheet/hold, MP4 lokal tanpa CDN, musik tanpa provider atau TTS opsional; probe browser dan perubahan piksel encoded | Diagram prosedural, bukan seluruh OneTake; tanpa shutter blur/4K60/replika UI otomatis; assemble maksimal 12 beat. [Panduan](ONETAKE-STUDIO.md) |
 | Lottie | Data ekspor sama dengan sumber preview mandiri, teks aman, bentuk dan transform dasar | Subset vektor sederhana, tanpa audio/3D/aset eksternal; bukan seluruh Motion Plan |
 | Review video | ffprobe, loudness/true peak/silence, estimasi kecepatan narasi, delta cut ke grid envelope musik prosedural | Bukan deteksi beat musik eksternal atau timestamp per kata; timing disetujui tidak otomatis diubah |
 | Review visual | Screenshot midpoint maksimal 20 adegan dan cek overflow elemen teks | Opsional Playwright/browser; bukan review semua frame/transisi/estetika; `unmeasured` bila tidak siap |
@@ -65,3 +66,5 @@ Keenam URL berhasil dibaca HTTP 200 pada 1 November 2026. [Pemetaan fitur, sumbe
 Gunakan `setup-core.bat`, lalu `start-dashboard.bat`. Browser Edge/Chrome dideteksi tanpa mewajibkan PATH. Dependency/venv cloud Linux tidak didistribusikan; Windows memasangnya ulang. `package-release.ps1` memakai helper ZIP Python yang diuji dengan filter source/secret/cache dan mempertahankan folder source build/projects. Hasil uji cloud, fixture path Windows dan validasi ZIP tidak menggantikan smoke test Windows native. Lihat [DISTRIBUTION.md](../DISTRIBUTION.md).
 
 Benchmark baru: fixture suara Whisper 11 detik untuk audio, serta sampel video PySceneDetect 10,469 detik dengan 4/5 cut acuan, precision 1,0 dan recall 0,8. Tidak mengubah threshold berdasarkan satu sampel. Upload audio pribadi dan pengembangan manajemen antrean render dikeluarkan dari lingkup sesuai pengguna.
+
+Studi OneTake (PolyForm Noncommercial), Motion JS dan dokumentasi Three.js tercatat pada REFERENCES.md; kode/aset OneTake tidak disalin. Validasi terbaru dan demo 15 detik ada pada [STATUS-2026-11-02.md](STATUS-2026-11-02.md). KreasiPintar belum terbaca karena 403.

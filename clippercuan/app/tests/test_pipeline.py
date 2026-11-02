@@ -52,6 +52,8 @@ def test_source_identity_uses_platform_creator_and_safe_local_filename():
     assert remote["label"] == "Sumber: YouTube · Kanal Resmi"
     local = download.source_identity(r"C:\video\episode-12.mp4")
     assert local["label"] == "Sumber: episode-12"
+    for path in (r'\\private-server\personal\episode-12.mp4', '/private/personal/episode-12.mp4'):
+        assert download.source_identity(path)['label'] == 'Sumber: episode-12'
     assert len(remote["label"]) <= 80
 
 

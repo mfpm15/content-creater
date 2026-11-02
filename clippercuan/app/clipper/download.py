@@ -19,7 +19,7 @@ def source_identity(source: str, info: dict | None = None) -> dict:
     """Identitas publik ringkas untuk atribusi di video, tanpa menampilkan URL panjang."""
     info = info or {}
     if not is_url(source):
-        name = Path(source).stem.split("__", 1)[-1] or "file lokal"
+        name = Path(source.replace('\\', '/')).stem.split("__", 1)[-1] or "file lokal"
         return {"platform": "File lokal", "creator": "", "label": f"Sumber: {name}"[:80]}
     host = (urlparse(source.strip()).hostname or "sumber video").lower().removeprefix("www.")
     platform = str(info.get("extractor_key") or info.get("extractor") or "").strip()

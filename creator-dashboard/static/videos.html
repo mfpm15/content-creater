@@ -167,9 +167,9 @@
             <select id="researchMode" name="researchMode">
               <option value="planner" selected>Judul → Motion Planner 9Router</option>
               <option value="web">Riset web + Motion Planner 9Router</option>
-              <option value="provided">Naskah sendiri → Motion Planner 9Router</option>
+              <option value="provided">Naskah sendiri → rencana lokal tanpa provider</option>
             </select>
-            <small>Mode Judul membuat konsep, alur narasi, Scene Plan, dan Storyboard melalui model yang dipilih. Mode Riset Web menambahkan sumber terverifikasi bila Google/Gemini Search tersedia. Mode Naskah Sendiri mempertahankan materi Anda lalu menyempurnakan arahan produksi. Semua hasil tetap melalui tahap review sebelum render.</small>
+            <small>Mode Judul memakai model terpilih. Riset Web menambahkan sumber yang tetap perlu diperiksa. Naskah Sendiri membuat rencana lokal tanpa memanggil model. Semua hasil tetap direview sebelum render.</small>
           </label>
           <label>Brand kit
             <select id="brandSelect"><option value="">Tampilan bawaan</option></select>
@@ -230,6 +230,15 @@
               </select>
             </label>
           </div>
+
+          <section id="continuousControls" hidden>
+            <h3>Pilih konsep film kontinu</h3>
+            <label>Ide visual utama<select id="motionConcept"><option value="">Pilih satu konsep terlebih dahulu</option></select></label>
+            <div id="motionConceptDetails"></div>
+            <label>Audio<select id="motionVoice"><option value="music">Musik/foley prosedural, tanpa dubbing — lokal</option><option value="tts">Narasi TTS + musik — memerlukan layanan suara</option></select></label>
+            <button id="motionExample" type="button" class="secondary-button">Coba contoh lokal 15 detik</button>
+            <p>Diagram vektor dengan elemen berlanjut dan jeda gerak. Output draf 30 fps. Pada mode musik, naskah tampil sebagai teks tanpa dibacakan.</p>
+          </section>
 
           <select name="style" id="styleSelect" hidden><option value="opuscar_cinematic" selected>Opuscar Cinematic</option></select>
           <button id="generateBtn" class="primary-button" type="submit" style="width: 100%; margin-top: 18px; padding: 14px; font-size: 14px;">

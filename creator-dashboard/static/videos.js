@@ -39,6 +39,30 @@ let engineRuntime = {};
 let researchReady = false;
 let brandCatalog = { revision: 0, kits: [] };
 let brandsReady = false;
+let motionConcepts = [];
+
+function describeMotionConcept() {
+  const selected = document.getElementById('motionConcept').value;
+  const container = document.getElementById('motionConceptDetails');
+  container.replaceChildren();
+  for (const row of motionConcepts.filter(row => !selected || row.id === selected)) {
+    const card = document.createElement('article');card.className = 'review-card';
+    const title = document.createElement('h4');title.textContent = row.name;card.append(title);
+    for (const key of ['idea', 'carry', 'look', 'excludes']) {const p = document.createElement('p');p.textContent = row[key];card.append(p);}
+    container.append(card);
+  }
+}
+document.getElementById('motionConcept').addEventListener('change', describeMotionConcept);
+document.getElementById('motionExample').addEventListener('click', () => {
+  elements.engineSelect.value = 'continuous';
+  document.getElementById('motionConcept').value = 'trace';
+  document.getElementById('motionVoice').value = 'music';
+  document.getElementById('researchMode').value = 'provided';
+  elements.topic.value = 'Dari ide menjadi langkah';
+  elements.script.value = '0-4 Narasi: Mulai dari satu ide.\nTeks layar: Satu ide\nVisual: Penanda membuka jalur.\nSFX: click\n\n4-9 Narasi: Hubungkan langkah yang bermakna.\nTeks layar: Hubungkan langkah\nVisual: Penanda menelusuri hubungan.\nSFX: chime\n\n9-15 Narasi: Bangun hasil bersama.\nTeks layar: Bangun hasil\nVisual: Jalur menjadi satu rangkaian.\nSFX: click';
+  elements.durationSelect.value = '15';
+  describeMotionConcept();updateEngineExperience();
+});
 
 function displayBrands(data, selected = document.getElementById('brandSelect').value) {
   brandCatalog = data;
@@ -104,6 +128,11 @@ async function loadOptions() {
     const res = await fetch('/api/videos/options', { cache: 'no-store' });
     if (!res.ok) throw new Error('Gagal memuat opsi animasi');
     const data = await res.json();
+    motionConcepts = data.motionConcepts || [];
+    const conceptSelect = document.getElementById('motionConcept');
+    conceptSelect.replaceChildren(new Option('Pilih satu konsep terlebih dahulu', ''));
+    for (const concept of motionConcepts) conceptSelect.add(new Option(concept.name, concept.id));
+    describeMotionConcept();
     engineRuntime=Object.fromEntries(data.engines.map(engine=>[engine.id,engine.runtimeMissing||[]]));
     researchReady=!!data.research?.ready;
     const researchSelect = document.getElementById('researchMode');
@@ -139,9 +168,13 @@ async function loadOptions() {
 
 function updateEngineExperience() {
   const eng = elements.engineSelect.value;
+  document.getElementById('continuousControls').hidden = eng !== 'continuous';
+  document.getElementById('motionConcept').required = eng === 'continuous';
   elements.formEngineTitle.textContent = '1. Buat Brief Animasi';
   elements.generateBtn.textContent = 'Buat Scene Plan';
-  if (eng === 'threejs') {
+  if (eng === 'continuous') {
+    elements.engineNotice.textContent = 'Continuous Motion: satu dunia visual, elemen utama berlanjut, jeda gerak, dan render MP4 lokal. Pilih konsep sebelum membuat rencana.';
+  } else if (eng === 'threejs') {
     elements.engineNotice.innerHTML = `<strong style="color:#38bdf8">Three.js 3D WebGL Adapter</strong><br>Dunia 3D sinematik dengan hero mesh icosahedron, orbiting rings, grid cyber, star particles, dan kamera orbit dinamis (Output MP4).`;
   } else if (eng === 'lottie') {
     elements.engineNotice.innerHTML = `<strong style="color:#22d3ee">Lottie Motion Adapter</strong><br>Animasi vektor ringan bebas build dengan preview web interaktif dan ekspor lottie.json siap pakai.`;
@@ -161,7 +194,7 @@ function updateEngineExperience() {
   const planningNote = mode === 'web'
     ? 'Riset web akan memberi konteks bersumber, lalu model terpilih menyusun arahan kreatif, Scene Plan, dan Storyboard.'
     : provided
-      ? 'Model terpilih akan mempertahankan naskah Anda dan mengubahnya menjadi arahan produksi yang detail. Periksa fakta sebelum menyetujui.'
+      ? 'Rencana lokal dari naskah tanpa panggilan model. Periksa fakta dan arahan visual sebelum menyetujui.'
       : 'Cukup masukkan judul. Model terpilih akan bertindak sebagai sutradara, penulis narasi, dan storyboard artist untuk membuat rencana video lengkap tanpa mengarang klaim faktual spesifik.';
   note.textContent=(engineRuntime[eng]?.length?`Runtime belum siap: ${engineRuntime[eng].join(', ')}. `:'')+planningNote;
   elements.engineNotice.append(note);
@@ -248,6 +281,14 @@ function showResult(result, aspectId) {
     const heading=document.createElement('h3');heading.textContent='Pemeriksaan hasil render';
     const status=document.createElement('p');status.textContent=`${result.review.status==='passed_media_checks'?'Pemeriksaan media selesai':result.review.status==='needs_attention'?'Ada temuan untuk ditinjau':'Pemeriksaan belum lengkap atau gagal'}. Audio: ${result.review.audio?.status||'belum diukur'}. Visual: ${result.review.visual_review?.status||'belum diukur'}. Tetap periksa video secara manual.`;
     reviewBox.append(heading,status);
+    if(result.review.motion_review){
+      const motion=result.review.motion_review,p=document.createElement('p');
+      p.textContent=`Gerak kontinu: ${motion.boundaries.length}/${motion.boundary_count_expected} batas diperiksa pada elemen utama. Seek ulang pada sampel ${motion.repeat_sample_seconds}s: ${motion.deterministic_repeat?'piksel sama':'berubah'}. ${motion.boundaries.length?'Identitas/geometri carrier diukur; kualitas cerita tetap perlu ditinjau.':'Tanpa batas adegan, kontinuitas antaradegan belum diukur.'} Tanpa shutter motion blur.`;
+      reviewBox.append(p);
+      if(motion.rendered_pixel_motion?.status==='measured'){
+        const measured=document.createElement('p');measured.textContent=`Perubahan gambar rendah pada ${(motion.rendered_pixel_motion.low_change_fraction*100).toFixed(1)}% sampel resolusi kecil. Objek kecil dapat terlewat; angka ini bukan penilaian kualitas.`;reviewBox.append(measured);
+      }
+    }
     for(const issue of result.review.issues||[]){const text=document.createElement('p');text.textContent=issue;reviewBox.append(text)}
     for(const name of result.review.visual_review?.screenshots||[]){if(!/^review-frame-\d{1,2}\.png$/.test(name))continue;const link=document.createElement('a');link.href=`/api/videos/${encodeURIComponent(result.slug)}/${name}`;link.textContent=`${name} · `;link.target='_blank';link.rel='noopener';reviewBox.append(link)}
   }
@@ -311,6 +352,28 @@ function renderReview(job) {
     const note = document.createElement('p');
     note.textContent = `Brand pekerjaan: ${job.scenePlan.brand.name} (salinan tetap)`;
     elements.reviewGrid.prepend(note);
+  }
+  if (job.scenePlan?.creativeDirection) {
+    const section = document.createElement('section');section.className = 'review-card';
+    const title = document.createElement('h4');title.textContent = 'Arahan kreatif';section.append(title);
+    for (const [key, value] of Object.entries(job.scenePlan.creativeDirection)) {
+      const p = document.createElement('p');p.textContent = `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`;section.append(p);
+    }
+    elements.reviewGrid.prepend(section);
+  }
+  if (job.scenePlan?.motionDesign) {
+    const note = document.createElement('p');
+    const cfg = job.scenePlan.motionDesign;
+    note.textContent = `Film kontinu: ${motionConcepts.find(c => c.id === cfg.concept)?.name || cfg.concept}. Carrier berlanjut; audio ${cfg.voiceMode === 'music' ? 'prosedural tanpa dubbing' : 'TTS'}. Timing tetap memerlukan review.`;
+    elements.reviewGrid.prepend(note);
+    const sheet=job.scenePlan.motionBeatSheet;
+    if(sheet){
+      const card=document.createElement('section');card.className='review-card';
+      const title=document.createElement('h4');title.textContent='Beat sheet · ritme dan carry';card.append(title);
+      for(const beat of sheet.beats){const p=document.createElement('p');p.textContent=`${beat.start}–${beat.end}s · elemen utama berlanjut · tahan diam ${beat.holdStart.toFixed(2)}–${beat.holdEnd.toFixed(2)}s · ${beat.picture}`;card.append(p)}
+      for(const text of sheet.advisories){const p=document.createElement('p');p.textContent=text;card.append(p)}
+      elements.reviewGrid.prepend(card);
+    }
   }
 }
 
@@ -401,6 +464,8 @@ elements.form.addEventListener('submit', async event => {
     model: elements.modelSelect.value,
     researchMode: document.getElementById('researchMode').value,
     brandId: document.getElementById('brandSelect').value,
+    motionConcept: document.getElementById('motionConcept').value,
+    voiceMode: document.getElementById('motionVoice').value,
   };
   if (!payload.topic) {
     elements.formStatus.textContent = 'Topik animasi wajib diisi.';
