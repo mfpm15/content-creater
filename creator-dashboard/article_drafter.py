@@ -682,14 +682,23 @@ def clean_input(raw: object) -> dict:
 
 def slugify(text: str) -> str:
     base = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40].strip("-") or "artikel"
-    return f"{base}-{time.strftime('%m%d-%H%M%S')}-{uuid.uuid4().hex[:2]}"
+    return f"{base}-{time.strftime('%m%d-%H%M%S')}-{uuid.uuid4().hex[:12]}"
 
 
 def create(raw_input: object) -> str:
     inp = clean_input(raw_input)
-    slug = slugify(inp["title"] or inp["points"][:40])
-    directory = ARTICLES_DIR / slug
-    (directory / "images").mkdir(parents=True, exist_ok=True)
+    ARTICLES_DIR.mkdir(parents=True, exist_ok=True)
+    for _ in range(10):
+        slug = slugify(inp["title"] or inp["points"][:40])
+        directory = ARTICLES_DIR / slug
+        try:
+            directory.mkdir(mode=0o700)
+        except FileExistsError:
+            continue
+        break
+    else:
+        raise FileExistsError("Tidak dapat membuat folder artikel unik; coba lagi.")
+    (directory / "images").mkdir()
     _write_json(directory / "input.json", inp)
     return slug
 

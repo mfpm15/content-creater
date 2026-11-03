@@ -5,6 +5,23 @@ import video_delivery
 
 
 class AuditRegressions(unittest.TestCase):
+    def test_article_creation_never_reuses_existing_output(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp, patch.object(ad, 'ARTICLES_DIR', Path(tmp)):
+            existing = Path(tmp) / 'existing'
+            existing.mkdir()
+            original = existing / 'input.json'
+            original.write_text('{"points":"original"}', encoding='utf-8')
+            with patch.object(ad, 'slugify', side_effect=['existing', 'new']):
+                self.assertEqual(ad.create({'points': 'new article'}), 'new')
+            self.assertEqual(original.read_text(encoding='utf-8'), '{"points":"original"}')
+            self.assertTrue((Path(tmp) / 'new' / 'images').is_dir())
+            with patch.object(ad, 'slugify', return_value='existing'):
+                with self.assertRaises(FileExistsError):
+                    ad.create({'points': 'must not overwrite'})
+            self.assertEqual(original.read_text(encoding='utf-8'), '{"points":"original"}')
+
     def test_expansion_keeps_source_evidence(self):
         inp=ad.clean_input({'title':'Audit','points':'Catatan konteks unik','sources':'Bukti sumber unik','words':1000})
         outline={'title':'Audit','sections':[{'heading':'Bagian','goal':'Jelaskan','subheadings':[],'words':400}], 'images':[]}
