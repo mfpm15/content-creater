@@ -323,7 +323,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         self.send_error(404);return None
 
     def _video_file(self,path,content_type):
-        """Stream one validated file descriptor, with real seek support for MP4."""
+        """Stream one validated descriptor and release it before the response completes."""
         fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_NONBLOCK',0))
         with os.fdopen(fd,'rb') as source:
             info=os.fstat(source.fileno())
@@ -363,7 +363,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 while remaining>0:
                     block=source.read(min(512*1024,remaining))
                     if not block:break
-                    self.wfile.write(block);remaining-=len(block)
+                    remaining-=len(block)
+                    # On Windows the file must be closed before the client can
+                    # replace it. For the final block, close the descriptor first.
+                    if remaining==0:
+                        source.close()
+                    self.wfile.write(block)
             except (BrokenPipeError,ConnectionResetError):pass
 
     def _json(self, status: int, payload: Any) -> None:

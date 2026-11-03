@@ -84,7 +84,7 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
     brand=creative_profile.brand(plan.get('brand') or creative_profile.DEFAULT)
     props={'version':1,'width':width,'height':height,'fps':FPS,'totalFrames':total,'topic':plan['topic'],
            'brand':{key:brand[key] for key in ('background','accent','text','wordmark','font')},'shots':shots,'captions':captions}
-    return props,{'adapter':'remotion','version':'4.0.473','caption_timing':methods,
+    return props,{'adapter':'remotion','version':'4.0.540','caption_timing':methods,
                   'visual_families':['process','data','comparison','concept'],
                   'manual_required':'Story, semantics, readability and audio/caption timing require review'}
 

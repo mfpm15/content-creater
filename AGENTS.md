@@ -14,7 +14,7 @@ Repositori ini adalah kumpulan aplikasi konten dengan **dashboard/launcher bersa
 | Podcastfy | Python ^3.11; Poetry metadata 0.4.3; LangChain, provider LLM/TTS, FastAPI API; `pyproject.toml` dan `creator-dashboard/podcastfy-overrides.txt` |
 | OpenCreator | Node.js 22+ menurut panduan setup, pnpm **9.15.0**; TypeScript, React ^18.3.1, React Router ^6.30.1, Vite ^6.0.7; daemon Fastify 5.12.2 + better-sqlite3 ^12.11.1; Electron desktop |
 | Short Video Factory | Node.js ≥22.17, pnpm **10.12.4**; Vue ^3.5.17, Pinia ^3.0.3, Vue Router ^4.5.1, Vite ^7.0.3, TypeScript 5.6.2, Electron ^22.3.27, better-sqlite3 9.6.0 |
-| Adapter render | HyperFrames ^0.8.195; Remotion 4.0.473 pada adapter `video-studio-remotion` dan `opencreator/packages/stickman-remotion`; Lemo-Opuscar: Node ≥20, Python, Playwright, Three.js ^0.170.0 |
+| Adapter render | HyperFrames ^0.8.195; Remotion 4.0.540 pada adapter `video-studio-remotion`; OpenCreator Stickman tetap memiliki runtime terisolasi sendiri; Lemo-Opuscar: Node ≥20, Python, Playwright, Three.js ^0.170.0 |
 
 FFmpeg adalah prasyarat media bersama. Setiap aplikasi mempertahankan venv, package manager, konfigurasi provider, dan penyimpanannya sendiri; jangan menyatukan dependency Python/Node secara global.
 
@@ -226,7 +226,7 @@ Validasi perubahan lintas menu `0832ee6`: 126 tes dashboard dan 223 tes Clipper 
 
 ## 8. Produksi terpadu Remotion, FFmpeg dan Article
 
-Baca `docs/UNIFIED-PRODUCTION-2026-11-02.md` untuk peta delapan referensi, pemanggilan kode dan bukti/batas. Engine `remotion`/style `remotion_editorial` memakai SDK 4.0.473, React 18.3.1, TypeScript 5.7.3 di `apps/video-studio-remotion`, bukan daemon/worker Stickman. `setup-core.bat` kini memasang runtime tambahan dari lockfile. Pertahankan dependency terisolasi, jangan menyatukan pnpm workspace. Validasi lokal paket: `npm run typecheck`, `npm test`; CI Windows juga menjalankan pipeline MP4 nyata dari path berspasi.
+Baca `docs/UNIFIED-PRODUCTION-2026-11-02.md` untuk peta delapan referensi, pemanggilan kode dan bukti/batas. Engine `remotion`/style `remotion_editorial` memakai SDK 4.0.540, React 18.3.1, TypeScript 5.7.3 di `apps/video-studio-remotion`, bukan daemon/worker Stickman. Versi 4.0.540 menggantikan 4.0.473 untuk menutup advisory transitif pada `esbuild`, `ws`, dan `zod`; pertahankan semua paket Remotion pada versi persis yang sama. `setup-core.bat` memasang runtime tambahan dari lockfile. Pertahankan dependency terisolasi, jangan menyatukan pnpm workspace. Validasi lokal paket: `npm ci`, `npm audit --omit=dev`, `npm run typecheck`, `npm test`; CI Windows juga menjalankan pipeline MP4 nyata dari path berspasi.
 
 Manifest 30 fps divalidasi di Python dan Node: coverage penuh, frame integer, preset/warna/font allowlist, tanpa URL/script/aset remote. Renderer menerima JSON privat, browser terpasang, environment disaring; timeout/cleanup termasuk proses anak. Family process/data/comparison; lainnya concept. Caption tanpa wordCues adalah estimasi potongan teks, bukan alignment suara. Mode audio plan `audioMode=music|tts` hanya untuk Remotion, wajib dipertahankan saat edit/varian rasio; musik sepenuhnya lokal. Dua approval/revision tetap wajib. Frame pertama berisi konten, PNG midpoint dan repeat diuji; DOM review hanya komposisi terlihat pada interval stabil, bukan kalkulator tersembunyi atau seluruh kualitas semantik.
 
