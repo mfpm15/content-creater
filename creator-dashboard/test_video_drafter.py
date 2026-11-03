@@ -70,8 +70,8 @@ class VideoDrafterTest(unittest.TestCase):
         plan = {"topic": "Jenis", "duration": 10, "scenes": [{"id": "scene-1", "start": 0, "end": 10, "duration": 10, "narration": "Data 80%", "visual": "grafik", "onScreenText": "80%", "soundCue": "", "type": "data"}]}
         result = video_drafter.generate_composition(plan, video_drafter.ASPECT_RATIOS["9:16"], model="model-rahasia", engine="opuscar")
         self.assertIn('class="visual-canvas-box data-viz"', result)
-        self.assertIn('padding:66px 76px 290px', result)
-        self.assertIn('bottom:54px', result)
+        self.assertIn('grid-template-rows:minmax(0,28%) minmax(0,1fr)', result)
+        self.assertIn('.subtitle-capsule{position:relative', result)
         self.assertIn('max-height:760px', result)
         self.assertNotIn('min-height:700px', result)
         self.assertNotIn('<p>grafik</p>', result)  # Teks prompt mentah tidak ditampilkan

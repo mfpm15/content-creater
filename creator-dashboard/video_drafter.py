@@ -403,21 +403,13 @@ def _visual_markup(scene: dict, index: int) -> str:
     subject = html.escape(explicit_subject[:32]) if explicit_subject else ""
     label = f'<span class="visual-label">{subject}</span>' if subject else ""
     if family == "data":
-        number_match = re.search(r"\b\d+(?:[.,]\d+)?\s*%?", " ".join((scene.get("onScreenText", ""), scene.get("narration", ""))))
+        # A decorative chart is not evidence. Display only an approved literal
+        # metric, preserving its sign, decimal separators and percent suffix.
+        numeric = re.compile(r"(?<![\w.,+−-])[+−-]?\d+(?:[.,]\d+)*(?:\s*%)?")
+        number_match = numeric.search(scene.get("onScreenText", "")) or numeric.search(scene.get("narration", ""))
         metric = html.escape(number_match.group(0)) if number_match else ""
         return f'''<div class="visual-canvas-box data-viz" data-family="data">
             <div class="metric-counter"><span class="num">{metric}</span></div>
-            <div class="bars-wrapper">
-                <div class="bar-col"><span class="bar-fill f1"></span></div>
-                <div class="bar-col"><span class="bar-fill f2"></span></div>
-                <div class="bar-col"><span class="bar-fill f3"></span></div>
-                <div class="bar-col"><span class="bar-fill f4"></span></div>
-            </div>
-            <svg class="trend-spline" viewBox="0 0 400 110">
-                <defs><linearGradient id="g_{index}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient></defs>
-                <path class="glow-path" d="M10,95 Q100,20 200,60 T390,15" fill="none" stroke="url(#g_{index})" stroke-width="5" />
-                <circle class="pulse-node" cx="390" cy="15" r="7" fill="#22d3ee" />
-            </svg>
         </div>'''
     if family == "process":
         return '''<div class="visual-canvas-box process-viz" data-family="process">
@@ -478,7 +470,6 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
         layout = ("full-bleed" if family in ("cityscape", "nature") else "split-stage" if family in ("comparison", "balance") else "focus-stage")
         sections.append(f'''<section class="scene clip type-{html.escape(kind)} family-{html.escape(family)} layout-{layout} transition-{html.escape(scene.get("transition", "shape-morph"))}" id="sc_{index}" data-family="{html.escape(family)}" data-start="{start}" data-duration="{length}">
             <div class="scene-inner">
-                <div class="scene-orbit orbit-a"></div><div class="scene-orbit orbit-b"></div>
                 <div class="chapter-badge"><span class="badge-dot"></span> {index + 1:02d} / {len(plan["scenes"]):02d} · {html.escape(kind.upper())}</div>
                 <div class="content-stack">
                     <div class="copy-wrapper"><h2 class="hero-title">{html.escape(scene["onScreenText"])}</h2></div>
@@ -496,14 +487,11 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
         tl.from("#sc_{index} .visual-wrapper", {{scale: 0.58, rotation: -7, opacity: 0, duration: 0.8, ease: "back.out(1.55)"}}, {creative_profile.reveal(scene, .12)});
         tl.from("#sc_{index} .subtitle-capsule", {{y: 45, opacity: 0, duration: 0.5, ease: "power3.out"}}, {start + 0.18});
         {drift}
-        tl.to("#sc_{index} .orbit-a", {{rotation:{180 if index % 2 == 0 else -150}, duration:{length}, ease:"none"}}, {start});
-        tl.to("#sc_{index} .orbit-b", {{rotation:{-140 if index % 2 == 0 else 170}, duration:{length}, ease:"none"}}, {start});
         tl.from("#sc_{index} [data-family='{family}'] > *", {{opacity:0, y:{24 if index % 2 == 0 else -24}, stagger:0.07, duration:0.55, ease:"power2.out"}}, {start + 0.22});
         ''')
         if family == "data":
             animation.append(f'''
             tl.from("#sc_{index} .metric-counter", {{scale:0.72,opacity:0,duration:0.55,ease:"back.out(1.5)"}}, {start + 0.2});
-            tl.from("#sc_{index} .bar-fill", {{scaleY: 0, transformOrigin: "bottom", stagger: 0.1, duration: 0.8, ease: "power2.out"}}, {start + 0.3});
             ''')
         if family == "process":
             animation.append(f'''
@@ -536,52 +524,31 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
         tl.to("#sc_{index} .scene-inner", {{opacity:0,scale:1.035,filter:"blur(8px)",duration:0.22,ease:"power2.in"}}, {exit_start});
         ''')
 
+    unit = min(width, height) / 1080
     title = html.escape(plan["topic"])
     return f'''<!doctype html><html lang="id"><head><meta charset="utf-8"><title>{title}</title><style>
 *{{box-sizing:border-box}}
 html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}}
-#stage{{width:{width}px;height:{height}px;position:relative;background:radial-gradient(circle at 75% 8%,#155e75 0,#082f49 18%,#030712 58%);overflow:hidden}}
-#stage:before{{content:"";position:absolute;inset:-25%;background:conic-gradient(from 20deg,transparent,#0e749022,transparent 28%,#7c3aed18,transparent 56%);animation:ambientOrbit 14s linear infinite}}
-.bg-grid{{position:absolute;inset:-10%;background-image:linear-gradient(rgba(34,211,238,0.11) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,0.11) 1px,transparent 1px);background-size:54px 54px;transform:perspective(700px) rotateX(7deg) scale(1.15);mask-image:linear-gradient(to bottom,transparent 1%,black 14%,black 88%,transparent);pointer-events:none;animation:gridDrift 8s linear infinite}}
-.scanner-line{{position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#22d3ee,#a855f7,transparent);box-shadow:0 0 28px #22d3ee;opacity:0.45;animation:scanMove 3.2s linear infinite}}
-@keyframes scanMove{{0%{{top:4%}}100%{{top:94%}}}}@keyframes ambientOrbit{{to{{transform:rotate(360deg)}}}}@keyframes gridDrift{{to{{background-position:54px 54px}}}}
-.scene{{position:absolute;inset:0;padding:66px 76px 290px;overflow:hidden}}
-.scene-inner{{width:100%;height:100%;position:relative;display:flex;flex-direction:column;align-items:center;gap:16px}}
-.scene-orbit{{position:absolute;border:1px solid rgba(34,211,238,.16);border-radius:50%;pointer-events:none}}.orbit-a{{width:720px;height:720px;right:-360px;top:120px}}.orbit-b{{width:460px;height:460px;left:-270px;bottom:170px;border-style:dashed;border-color:rgba(168,85,247,.2)}}
-.chapter-badge{{position:relative;z-index:4;align-self:flex-start;display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:99px;background:rgba(8,47,73,.72);border:1px solid rgba(34,211,238,.48);color:#67e8f9;font-size:18px;font-weight:850;letter-spacing:.14em;box-shadow:0 8px 30px rgba(0,0,0,.25)}}
+#stage{{width:{width}px;height:{height}px;position:relative;background:#10151d;overflow:hidden}}
+.scene{{position:absolute;inset:0;padding:{round(54*unit)}px {round(76*unit)}px {round(80*unit)}px;overflow:hidden}}
+.scene-inner{{width:100%;height:100%;position:relative;display:flex;flex-direction:column;align-items:center;gap:{round(16*unit)}px}}
+.chapter-badge{{position:relative;z-index:4;align-self:flex-start;display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:99px;background:rgba(8,47,73,.72);border:1px solid rgba(34,211,238,.48);color:#67e8f9;font-size:{round(18*unit)}px;font-weight:850;letter-spacing:.14em;box-shadow:0 8px 30px rgba(0,0,0,.25)}}
 .badge-dot{{width:10px;height:10px;border-radius:50%;background:#22d3ee;box-shadow:0 0 14px #22d3ee}}
-.content-stack{{position:relative;z-index:2;flex:1;min-height:0;width:100%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:16px;align-items:stretch}}
-.copy-wrapper{{width:100%;text-align:left;padding-top:2px}}
-.hero-title{{max-width:920px;font-size:{min(68 if height > width else 50, round(width * .10))}px;line-height:1.04;margin:0;font-weight:950;background:linear-gradient(120deg,#fff 20%,#bae6fd 67%,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 12px 42px rgba(0,0,0,.86);letter-spacing:-.035em;text-wrap:balance}}
+.content-stack{{position:relative;z-index:2;flex:1;min-height:0;width:100%;display:grid;grid-template-rows:minmax(0,28%) minmax(0,1fr);gap:{round(16*unit)}px;align-items:stretch}}
+.copy-wrapper{{width:100%;min-height:0;text-align:left;display:flex;align-items:center}}
+.hero-title{{max-width:920px;font-size:{round(68*unit)}px;line-height:1.04;margin:0;font-weight:950;background:linear-gradient(120deg,#fff 20%,#bae6fd 67%,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 12px 42px rgba(0,0,0,.86);letter-spacing:-.035em;text-wrap:balance;overflow-wrap:anywhere}}
 .visual-wrapper{{min-height:0;width:100%;display:flex;align-items:center;justify-content:center;padding:6px 0 12px}}
-.visual-canvas-box{{transform:translate(0,0);width:100%;height:min(100%,760px);min-height:0;max-height:760px;border-radius:34px;background:linear-gradient(145deg,rgba(8,47,73,.64),rgba(3,7,18,.92));border:2px solid rgba(34,211,238,.5);box-shadow:0 24px 72px rgba(0,0,0,.58),inset 0 0 70px rgba(34,211,238,.1);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}}
+.visual-canvas-box{{transform:translate(0,0);width:100%;height:min(100%,760px);min-height:0;max-height:760px;border-radius:34px;background:#171e29;border:1px solid #334155;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}}
 .visual-canvas-box>div:not(.visual-label),.visual-canvas-box>svg{{max-width:88%;max-height:84%}}
-.visual-canvas-box:before{{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,rgba(34,211,238,.14),transparent 42%);animation:panelPulse 2.4s ease-in-out infinite alternate}}@keyframes panelPulse{{to{{opacity:.35;transform:scale(1.08)}}}}
-.subtitle-capsule{{position:absolute;z-index:5;left:0;right:0;bottom:54px;width:100%;min-height:104px;padding:18px 28px;border-radius:22px;background:rgba(8,15,32,.96);border:1px solid rgba(34,211,238,.42);backdrop-filter:blur(18px);display:flex;align-items:center;gap:18px;font-size:{30 if height > width else 23}px;line-height:1.34;color:#f8fafc;box-shadow:0 16px 42px rgba(0,0,0,.68)}}
+.subtitle-capsule{{position:relative;flex:none;z-index:5;width:100%;max-height:24%;padding:{round(18*unit)}px {round(28*unit)}px;border-radius:{round(22*unit)}px;background:#080f20;border:1px solid #334155;display:flex;align-items:center;gap:{round(18*unit)}px;font-size:{round(30*unit)}px;line-height:1.34;color:#f8fafc;overflow-wrap:anywhere}}
+.subtitle-capsule>span:last-child{{min-width:0}}
 .sound-wave{{display:flex;gap:4px;align-items:center}}
-.sound-wave i{{width:4px;height:22px;background:#22d3ee;border-radius:3px;animation:swPulse 0.9s ease-in-out infinite alternate}}
-.sound-wave i:nth-child(2){{height:32px;animation-delay:0.3s}}
-.sound-wave i:nth-child(3){{height:16px;animation-delay:0.6s}}
-@keyframes swPulse{{0%{{transform:scaleY(0.4)}}100%{{transform:scaleY(1.2)}}}}
-.data-viz{{flex-direction:column;gap:30px;padding:54px}}
-.metric-counter{{position:relative;z-index:2;font-size:122px;font-weight:950;color:#22d3ee;text-shadow:0 0 45px rgba(34,211,238,.7);line-height:1}}
+.sound-wave i{{width:4px;height:22px;background:#22d3ee;border-radius:3px}}
+.sound-wave i:nth-child(2){{height:32px}}
+.sound-wave i:nth-child(3){{height:16px}}
+.data-viz{{flex-direction:column;gap:{round(30*unit)}px;padding:{round(24*unit)}px}}
+.metric-counter{{position:relative;z-index:2;font-size:{round(122*unit)}px;font-weight:950;color:#22d3ee;text-shadow:0 0 45px rgba(34,211,238,.7);line-height:1}}
 .metric-counter small{{display:block;font-size:16px;color:#94a3b8;letter-spacing:0.18em;margin-top:6px}}
-.bars-wrapper{{position:relative;z-index:2;display:flex;gap:48px;align-items:flex-end;height:260px;width:88%;justify-content:center}}
-.bar-col{{display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}}
-.bar-fill{{width:48px;border-radius:12px 12px 0 0;background:linear-gradient(to top,#8b5cf6,#22d3ee);box-shadow:0 0 20px rgba(34,211,238,0.4)}}
-.bar-fill.f1{{height:35%}}.bar-fill.f2{{height:60%}}.bar-fill.f3{{height:85%}}.bar-fill.f4{{height:100%;background:linear-gradient(to top,#06b6d4,#f59e0b)}}
-.trend-spline{{position:absolute;bottom:10px;width:90%;height:100px;opacity:0.85}}
-.radar-outer{{position:relative;width:580px;height:580px;display:flex;align-items:center;justify-content:center}}
-.radar-ring{{position:absolute;border-radius:50%;border:2px dashed rgba(34,211,238,0.45);box-shadow:0 0 30px rgba(34,211,238,0.15)}}
-.radar-ring.r1{{width:100%;height:100%;animation:spinSlow 20s linear infinite}}
-.radar-ring.r2{{width:70%;height:70%;animation:spinRev 15s linear infinite}}
-.radar-ring.r3{{width:40%;height:40%;border-style:solid;border-color:rgba(34,211,238,0.7)}}
-.radar-sweep{{position:absolute;width:50%;height:50%;top:0;right:0;transform-origin:bottom left;background:conic-gradient(from 180deg at 0% 100%,transparent,rgba(34,211,238,0.45));border-radius:100% 0 0 0;animation:sweep 3s linear infinite}}
-.crosshair-h,.crosshair-v{{position:absolute;background:rgba(34,211,238,0.3)}}
-.crosshair-h{{width:100%;height:1px}}.crosshair-v{{height:100%;width:1px}}
-.core-reticle{{width:90px;height:90px;z-index:2;filter:drop-shadow(0 0 18px #22d3ee)}}
-.blip{{position:absolute;width:12px;height:12px;border-radius:50%;background:#f59e0b;box-shadow:0 0 15px #f59e0b;animation:blipFlash 1.5s infinite}}
-.blip.b1{{top:22%;left:30%}}.blip.b2{{bottom:28%;right:25%;animation-delay:0.5s}}.blip.b3{{top:65%;left:25%;animation-delay:1s}}
 .process-viz{{gap:24px;padding:46px}}
 .process-node{{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:14px;flex:1}}
 .p-num{{width:118px;height:118px;border-radius:32px;background:linear-gradient(135deg,#0e7490,#0284c7 60%,#7c3aed);border:2px solid #67e8f9;display:grid;place-items:center;font-size:40px;font-weight:950;color:#fff;box-shadow:0 0 38px rgba(34,211,238,.55);transform:rotate(-5deg)}}
@@ -607,8 +574,6 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
 .prism-core{{font-size:80px;color:#fbbf24;filter:drop-shadow(0 0 35px #f59e0b)}}
 @keyframes spinSlow{{0%{{transform:rotate(0deg)}}100%{{transform:rotate(360deg)}}}}
 @keyframes spinRev{{0%{{transform:rotate(0deg)}}100%{{transform:rotate(-360deg)}}}}
-@keyframes sweep{{0%{{transform:rotate(0deg)}}100%{{transform:rotate(360deg)}}}}
-@keyframes blipFlash{{0%,100%{{opacity:0.3;transform:scale(0.8)}}50%{{opacity:1;transform:scale(1.3)}}}}
 .visual-label{{position:absolute;left:36px;bottom:28px;z-index:5;max-width:82%;padding:9px 14px;border-left:3px solid #22d3ee;background:rgba(2,6,23,.72);font-size:18px;font-weight:700;color:#bae6fd;text-transform:uppercase;letter-spacing:.08em}}
 .network-links,.constellation-viz svg,.journey-viz svg{{position:absolute;inset:5%;width:90%;height:90%;fill:none;stroke:#22d3ee;stroke-width:4;opacity:.55}}.net-node,.star{{position:absolute;width:22px;height:22px;border-radius:50%;background:#67e8f9;box-shadow:0 0 24px #22d3ee;z-index:2}}.node-1,.st1{{left:12%;top:20%}}.node-2,.st2{{left:35%;top:12%}}.node-3,.st3{{left:52%;top:35%}}.node-4,.st4{{right:13%;top:20%}}.node-5,.st5{{right:20%;bottom:20%}}.node-6{{left:40%;bottom:18%}}.node-7{{left:15%;bottom:20%}}.network-core,.constellation-core,.portal-core{{position:relative;z-index:3;padding:22px 28px;border-radius:22px;background:#06182b;border:2px solid #22d3ee;font-size:24px;font-weight:900;text-align:center;box-shadow:0 0 45px #0891b255;text-transform:uppercase}}
 .route-path{{stroke:#38bdf8;stroke-width:12;stroke-linecap:round;stroke-dasharray:1200}}.route-stop{{fill:#f59e0b;stroke:#fef3c7;stroke-width:6}}.route-subject{{position:absolute;right:12%;top:13%;max-width:60%;font-size:28px;font-weight:900;text-align:right;text-transform:uppercase}}
@@ -622,11 +587,35 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
 .balance-viz{{flex-direction:column}}.balance-beam{{position:relative;width:70%;height:16px;background:#67e8f9;border-radius:8px;transform-origin:center;box-shadow:0 0 25px #22d3ee}}.balance-hub{{position:absolute;width:76px;height:76px;border-radius:50%;background:#f59e0b;left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 25px #f59e0b}}.balance-pan{{position:absolute;width:190px;height:190px;border:8px solid #38bdf8;border-radius:50%;top:-87px;background:#0f172a}}.left-pan{{left:-45px}}.right-pan{{right:-45px;border-color:#a855f7}}.balance-base{{width:0;height:0;border-left:100px solid transparent;border-right:100px solid transparent;border-bottom:280px solid #155e75;margin-top:-5px}}.layout-full-bleed .visual-canvas-box{{border-radius:18px}}.layout-split-stage .visual-canvas-box{{background:linear-gradient(90deg,rgba(8,47,73,.8),rgba(3,7,18,.96))}}
 </style></head><body>
 <div id="stage" data-composition-id="video" data-start="0" data-duration="{duration}" data-width="{width}" data-height="{height}">
-    <div class="bg-grid"></div>
-    <div class="scanner-line"></div>
     {''.join(sections)}
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script>
+    function fitText(element, maxHeight, maxLines) {{
+        const initial = parseFloat(getComputedStyle(element).fontSize);
+        let size = initial;
+        for (; size > 1; size -= 1) {{
+            element.style.fontSize = size + 'px';
+            const lineHeight = parseFloat(getComputedStyle(element).lineHeight);
+            if (element.scrollWidth <= element.clientWidth + 1 &&
+                element.scrollHeight <= Math.min(maxHeight, lineHeight * maxLines) + 1) break;
+        }}
+        element.dataset.fittedFontSize = size;
+    }}
+    function fitSceneText() {{
+        for (const scene of document.querySelectorAll('.scene')) {{
+            const title = scene.querySelector('.hero-title');
+            fitText(title, title.parentElement.clientHeight, 3);
+            const capsule = scene.querySelector('.subtitle-capsule');
+            const style = getComputedStyle(capsule);
+            const available = scene.querySelector('.scene-inner').clientHeight * .24 -
+                parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - 2;
+            fitText(capsule.lastElementChild, available, 5);
+            const metric = scene.querySelector('.metric-counter');
+            if (metric) fitText(metric, metric.parentElement.clientHeight * .8, 1);
+        }}
+    }}
+    fitSceneText();
+    document.fonts.ready.then(fitSceneText);
     const tl = gsap.timeline({{paused: true}});
     {''.join(animation)}
     window.__timelines = window.__timelines || {{}};
@@ -689,10 +678,9 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
 .hero-title{{font-size:{min(68 if height > width else 52, round(width * .10))}px;line-height:1.1;margin:0;font-weight:900;color:#ffffff;text-shadow:0 0 35px rgba(56,189,248,0.6);letter-spacing:-0.02em}}
 .subtitle-capsule{{width:100%;max-width:920px;padding:20px 28px;border-radius:24px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.4);backdrop-filter:blur(16px);display:flex;align-items:center;gap:18px;font-size:{30 if height > width else 24}px;line-height:1.35;color:#f8fafc;box-shadow:0 15px 45px rgba(0,0,0,0.8)}}
 .sound-wave{{display:flex;gap:4px;align-items:center}}
-.sound-wave i{{width:4px;height:22px;background:#38bdf8;border-radius:3px;animation:swPulse 0.9s ease-in-out infinite alternate}}
-.sound-wave i:nth-child(2){{height:32px;animation-delay:0.3s}}
-.sound-wave i:nth-child(3){{height:16px;animation-delay:0.6s}}
-@keyframes swPulse{{0%{{transform:scaleY(0.4)}}100%{{transform:scaleY(1.2)}}}}
+.sound-wave i{{width:4px;height:22px;background:#38bdf8;border-radius:3px}}
+.sound-wave i:nth-child(2){{height:32px}}
+.sound-wave i:nth-child(3){{height:16px}}
 </style></head><body>
 <div id="stage" data-composition-id="video" data-start="0" data-duration="{duration}" data-width="{width}" data-height="{height}">
     <canvas id="webglCanvas"></canvas>
