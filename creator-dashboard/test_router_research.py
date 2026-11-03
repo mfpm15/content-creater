@@ -52,3 +52,14 @@ class RouterResearchTests(unittest.TestCase):
             self.run_search({'data':'bad'}, {})
         with patch.dict(os.environ,{'RESEARCH_PROVIDER':'invalid'},clear=True):
             with self.assertRaises(ValueError):research_service.provider()
+
+    def test_catalogue_search_id_maps_to_provider_for_search_endpoint(self):
+        result,requests=self.run_search({'data':[{'kind':'webSearch','id':'tavily/search','owned_by':'tavily'}]},
+            {'results':[{'url':'https://example.org'}]})
+        self.assertEqual(json.loads(requests[1].data)['model'],'tavily')
+        self.assertEqual(result['model'],'tavily/search')
+
+    def test_combo_name_is_not_rewritten_as_provider(self):
+        result,requests=self.run_search({'data':[{'kind':'webSearch','id':'my/search','owned_by':'combo'}]},
+            {'results':[{'url':'https://example.org'}]})
+        self.assertEqual(json.loads(requests[1].data)['model'],'my/search')

@@ -31,22 +31,29 @@ def request(scope, path, payload=None):
         raise RuntimeError('Web search 9Router gagal. Periksa alamat gateway, autentikasi, versi yang mendukung /v1/search, dan provider Search di 9Router.') from exc
 
 
-def routes(scope=''):
+def catalogue(scope=''):
     catalogue=request(scope,'/models/web')
     rows=catalogue.get('data',[])
     if not isinstance(rows,list):raise RuntimeError('Katalog web search 9Router tidak valid')
-    return list(dict.fromkeys(row['id'] for row in rows if isinstance(row,dict) and row.get('kind')=='webSearch' and isinstance(row.get('id'),str)))
+    return {row['id']: (row['id'] if row.get('owned_by')=='combo' else row.get('owned_by') or row['id'].removesuffix('/search'))
+            for row in rows if isinstance(row,dict) and row.get('kind')=='webSearch' and isinstance(row.get('id'),str)
+            and (row.get('owned_by') is None or isinstance(row.get('owned_by'),str))}
+
+
+def routes(scope=''):
+    return list(catalogue(scope))
 
 
 def research(topic, context, scope=''):
-    ids=routes(scope)
+    providers=catalogue(scope)
+    ids=list(providers)
     route=os.getenv('RESEARCH_SEARCH_MODEL','').strip()
     if route and route not in ids:raise RuntimeError('RESEARCH_SEARCH_MODEL tidak ditemukan dalam katalog webSearch 9Router')
     if not route:
         if len(ids)!=1:raise RuntimeError('Pilih provider Search di 9Router dan atur RESEARCH_SEARCH_MODEL sesuai id dari /v1/models/web; ditemukan '+str(len(ids))+' pilihan')
         route=ids[0]
     query=(str(topic)+'\n'+str(context)[:800]).strip()[:1500]
-    result=request(scope,'/search',{'model':route,'query':query,'max_results':8})
+    result=request(scope,'/search',{'model':providers[route],'query':query,'max_results':8})
     rows=result.get('results',[])
     if not isinstance(rows,list):raise RuntimeError('Hasil web search 9Router tidak valid')
     sources=[];seen=set()
