@@ -1,6 +1,8 @@
 """Reviewed video planning and rendering across independent local adapters."""
 from __future__ import annotations
 
+import research_service
+
 import html
 import copy
 import hashlib
@@ -31,7 +33,7 @@ ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
 HYPERFRAMES_APP_DIR = ROOT / "apps" / "hyperframes"
 OPUSCAR_DIR = ROOT / "apps" / "lemo-opuscar"
-PODCASTFY_PYTHON = resolve_python(ROOT / "apps" / "podcastfy")
+RESEARCH_PYTHON = resolve_python(ROOT)
 RESEARCH_WORKER = ROOT / "google_search_research.py"
 RESEARCH_MODEL = os.getenv("VIDEO_RESEARCH_MODEL", "gemini-2.5-flash")
 LLM_URL = os.getenv("VIDEO_LLM_BASE_URL", os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:20128/v1").rstrip("/")
@@ -83,8 +85,8 @@ def get_available_models() -> list[dict]:
 
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
-    research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
+    research_ready = (research_service.provider()=="9router" or bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and RESEARCH_PYTHON.is_file())
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "9Router web search" if research_service.provider()=="9router" else "Google Search grounding", "model": os.getenv("RESEARCH_SEARCH_MODEL","auto-discover") if research_service.provider()=="9router" else RESEARCH_MODEL, "connectionStatus":"not_probed", "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
@@ -352,24 +354,10 @@ Untuk engine opuscar/threejs/remotion saja, renderControls opsional mengendalika
 Pastikan jumlah scene proporsional terhadap durasi, setiap scene berbeda fungsi dan visualnya, total timing tepat {duration} detik, serta seluruh keputusan cukup detail untuk divisualkan tanpa menebak maksud sutradara."""
 
 def _research_web(topic: str, script: str) -> dict:
-    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
+    if research_service.provider()=="google" and not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
         raise RuntimeError("Web Search wajib aktif. Atur GOOGLE_API_KEY atau GEMINI_API_KEY lalu restart dashboard")
-    if not PODCASTFY_PYTHON.is_file():
-        raise RuntimeError("Environment Google Search belum tersedia")
-    payload = json.dumps({"topic": topic, "context": script, "model": RESEARCH_MODEL}, ensure_ascii=False)
-    process = subprocess.run(
-        [str(PODCASTFY_PYTHON), str(RESEARCH_WORKER)], input=payload, text=True,
-        capture_output=True, timeout=max(LLM_TIMEOUT, 120), env=os.environ.copy(),
-    )
-    try:
-        result = json.loads(process.stdout or "{}")
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("Respons Google Search tidak valid") from exc
-    if process.returncode or result.get("error"):
-        raise RuntimeError(str(result.get("error") or process.stderr or "Google Search gagal"))
-    if not result.get("sources"):
-        raise RuntimeError("Google Search tidak menghasilkan sumber yang dapat diverifikasi")
-    return result
+    from research_service import research
+    return research(topic, script, RESEARCH_MODEL, scope="video")
 
 
 def _research_context(research: dict) -> str:
@@ -1056,13 +1044,9 @@ def start_job(payload: dict) -> dict:
     if len(topic)>500 or len(script)>30000:raise ValueError('Topik maksimal 500 karakter; naskah maksimal 30.000 karakter')
     research_mode=payload.get('researchMode','planner')
     if research_mode not in {'planner','web','provided'}:raise ValueError('Mode perencanaan tidak dikenal')
-    research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    # UI baru menonaktifkan Web Search ketika provider belum siap. Untuk klien lama,
-    # permintaan web yang membawa naskah dialihkan ke mode lokal. Permintaan tanpa
-    # naskah tetap diterima agar kontrak API lama tidak rusak; thread riset akan
-    # melaporkan kegagalan konfigurasi seperti sebelumnya.
+    research_ready = (research_service.provider()=="9router" or bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and RESEARCH_PYTHON.is_file())
     if research_mode == 'web' and not research_ready:
-        research_mode = 'planner'
+        raise ValueError('Riset web belum siap. Jalankan setup-core.bat dan atur GOOGLE_API_KEY atau GEMINI_API_KEY; pilih mode lain secara eksplisit bila ingin melanjutkan tanpa riset web.')
     if research_mode=='provided' and not script:raise ValueError('Mode naskah sendiri memerlukan naskah; periksa fakta sebelum menyetujui')
     aspect = str(payload.get("aspect") or "9:16"); aspect = aspect if aspect in ASPECT_RATIOS else "9:16"
     duration = int(payload.get("duration") or 60); duration = duration if duration in DURATIONS else 60

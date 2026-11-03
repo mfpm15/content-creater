@@ -6,6 +6,7 @@ Ide dari ffmpeg-skill: jangan lapor "selesai" sebelum file hasil dibuka dan diuk
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 
@@ -52,15 +53,18 @@ def evaluate(info: dict, platform: str) -> dict:
         issues.append(_issue("warn", "resolution", f"Sisi pendek {min(w, h)}px di bawah {spec['min_height']}px; hasil bisa terlihat lembek."))
     if dur > spec["max_sec"]:
         issues.append(_issue("error", "duration", f"Durasi {dur:.0f}s melebihi batas {spec['label']} ({spec['max_sec']}s)."))
-    if dur <= 0:
+    if not math.isfinite(dur) or dur <= 0:
         issues.append(_issue("error", "duration", "Durasi nol."))
-    if float(info.get("fps") or 0) > FPS_MAX + 0.01:
+    fps = float(info.get("fps") or 0)
+    if not math.isfinite(fps) or fps <= 0:
+        issues.append(_issue("error", "fps", "FPS tidak terbaca atau tidak valid."))
+    elif fps > FPS_MAX + 0.01:
         issues.append(_issue("error", "fps", f"FPS {info.get('fps')} melebihi {FPS_MAX}; platform menurunkannya sendiri."))
     if not info.get("has_audio"):
         issues.append(_issue("error", "no-audio", "Tidak ada audio."))
     else:
         lufs = info.get("lufs")
-        if lufs is None:
+        if lufs is None or not math.isfinite(lufs):
             issues.append(_issue("warn", "loudness-unmeasured", "Loudness tidak terukur."))
         elif abs(lufs - spec["lufs"]) > LUFS_TOLERANCE:
             issues.append(_issue("warn", "loudness", f"Loudness {lufs:.1f} LUFS; target {spec['lufs']:.0f} ±{LUFS_TOLERANCE:.0f}."))

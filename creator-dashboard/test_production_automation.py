@@ -113,6 +113,9 @@ class ProductionAutomationTests(unittest.TestCase):
                 self.assertEqual(len(review['remotion']['frames']),2)
                 self.assertGreater(review['remotion']['layout']['observed_frames'],0)
                 self.assertEqual(review['remotion']['layout']['issues'],[])
+                if review['remotion']['layout'].get('dom_measurement_available') is False:
+                    self.assertEqual(review['visual_review']['status'],'unmeasured')
+                    self.assertEqual(review['status'],'needs_attention')
                 with video_bundle.build(target) as archive:self.assertGreater(archive.stat().st_size,10000)
 
 

@@ -4,14 +4,19 @@ on:
   push:
     paths:
       - "creator-dashboard/**"
-      - "clippercuan/app/requirements.txt"
+      - "clippercuan/app/**"
       - "setup-core.bat"
+      - "check-local.bat"
+      - "check-search.bat"
       - "start-dashboard.bat"
       - ".github/workflows/windows-core.yml"
   pull_request:
     paths:
+      - "clippercuan/app/**"
       - "creator-dashboard/**"
       - "setup-core.bat"
+      - "check-local.bat"
+      - "check-search.bat"
       - "start-dashboard.bat"
       - ".github/workflows/windows-core.yml"
   workflow_dispatch:
@@ -61,12 +66,26 @@ jobs:
           $python = ".\creator-dashboard\.venv\Scripts\python.exe"
           & $python -c "import sys; sys.path.insert(0,'creator-dashboard'); import remotion_adapter; missing=remotion_adapter.runtime_issues(); assert not missing, missing"
           if ($LASTEXITCODE -ne 0) { throw "Remotion runtime missing; integration test must not skip in Windows CI" }
-          foreach ($pattern in @("test_windows_runtime.py", "test_remaining_features.py", "test_video_drafter.py", "test_youtube_analytics.py", "test_video_bundle.py", "test_creative_profile.py", "test_continuous_motion.py", "test_animation_clock.py", "test_studio_controls.py", "test_production_automation.py")) {
+          foreach ($pattern in @("test_windows_runtime.py", "test_audit_regressions.py", "test_router_research.py", "test_remaining_features.py", "test_video_drafter.py", "test_youtube_analytics.py", "test_video_bundle.py", "test_creative_profile.py", "test_continuous_motion.py", "test_animation_clock.py", "test_studio_controls.py", "test_production_automation.py")) {
             & $python -m unittest discover -s creator-dashboard -p $pattern
             if ($LASTEXITCODE -ne 0) { throw "Tests failed: $pattern" }
           }
           & $python creator-dashboard/test_dashboard.py
           if ($LASTEXITCODE -ne 0) { throw "Dashboard HTTP smoke failed" }
+      - name: Verify installed runtime dependencies
+        shell: pwsh
+        run: |
+          & .\creator-dashboard\.venv\Scripts\python.exe creator-dashboard/local_check.py
+          if ($LASTEXITCODE -ne 0) { throw "Local readiness check failed" }
+      - name: Test Clipper preflight and delivery on Windows
+        shell: pwsh
+        run: |
+          uv pip install --python clippercuan/app/.venv/Scripts/python.exe pytest
+          if ($LASTEXITCODE -ne 0) { throw "pytest install failed" }
+          Push-Location clippercuan/app
+          & .\.venv\Scripts\python.exe -m pytest -q tests/test_preflight.py tests/test_delivery.py
+          if ($LASTEXITCODE -ne 0) { throw "Clipper Windows checks failed" }
+          Pop-Location
       - name: Check Remotion types and timeline safety
         shell: pwsh
         run: |

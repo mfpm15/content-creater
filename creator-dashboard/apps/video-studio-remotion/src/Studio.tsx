@@ -5,18 +5,29 @@ import type {Shot, StudioProps} from './types';
 
 // Original procedural artwork. Numbers are literal labels from narration/title,
 // never fabricated bar values or performance predictions.
-const Illustration: React.FC<{shot: Shot; progress: number; accent: string}> = ({shot, progress, accent}) => {
-  const positions = [[130,180],[400,120],[670,180]];
+const Illustration: React.FC<{shot: Shot; progress: number; accent: string; step: number}> = ({shot, progress, accent, step}) => {
+  const lines: string[] = [];
+  let line = '';
+  for(const word of shot.title.trim().split(/\s+/)) {
+    if(line && Array.from(line+' '+word).length>36) {lines.push(line);line='';}
+    const chars=Array.from(word);
+    while(chars.length>36) {lines.push(chars.splice(0,36).join(''));}
+    const tail=chars.join('');
+    if(tail)line=line?line+' '+tail:tail;
+  }
+  if(line || !lines.length)lines.push(line);
+  const labelSize = Math.min(38, 240 / lines.length);
   const numbers = literalNumbers(shot.subject).slice(0,3);
   return <svg viewBox="0 0 800 500" width="100%" height="100%" aria-hidden="true">
     <defs><radialGradient id="glow"><stop stopColor={accent} stopOpacity=".24"/><stop offset="1" stopColor={accent} stopOpacity="0"/></radialGradient></defs>
     <ellipse cx="400" cy="250" rx="380" ry="240" fill="url(#glow)"/>
     {shot.family === 'process' ? <>
-      <path d="M130 250 Q265 80 400 250 T670 250" fill="none" stroke={accent} strokeWidth="5" opacity=".4" pathLength="1" strokeDasharray="1" strokeDashoffset={1-progress}/>
-      {positions.map(([x],i)=><g key={i} opacity={interpolate(progress,[i*.22,i*.22+.2],[.18,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp'})}>
-        <rect x={x-65} y="185" width="130" height="130" rx="35" fill={accent} fillOpacity=".16" stroke={accent} strokeWidth="3"/>
-        <text x={x} y="265" textAnchor="middle" fill="currentColor" fontSize="45" fontWeight="700">{i+1}</text>
-      </g>)}
+      <rect x="75" y="65" width="650" height="370" rx="35" fill={accent} fillOpacity=".12" stroke={accent} strokeWidth="3"/>
+      <text x="115" y="125" fill={accent} fontSize="30" fontWeight="700">{String(step).padStart(2,'0')}</text>
+      <text x="400" y={240-(lines.length-1)*labelSize*.6} textAnchor="middle" fill="currentColor" fontSize={labelSize} fontWeight="700">
+        {lines.map((line,i)=><tspan data-process-label key={i} x="400" dy={i ? labelSize*1.2 : 0} textLength={Math.min(570,Array.from(line).length*labelSize*.6)} lengthAdjust="spacingAndGlyphs">{line}</tspan>)}
+      </text>
+      <rect x="115" y="385" width={570*progress} height="6" rx="3" fill={accent}/>
     </> : shot.family === 'comparison' ? <>
       {[-1,1].map((side,i)=><g key={side} transform={`translate(${400+side*165},250) rotate(${side*(1-progress)*12})`}>
         <rect x="-130" y="-140" width="260" height="280" rx="42" fill={accent} fillOpacity={i ? .2 : .05} stroke={accent} strokeWidth="3"/>
@@ -71,6 +82,10 @@ export const Studio: React.FC<StudioProps> = props => {
     if(title && art && title.bottom>art.top)issues.push('title_illustration_overlap');
     if(sub && art && sub.top<art.bottom)issues.push('caption_illustration_overlap');
     for(const box of [title,sub])if(box && (box.left<width*.05 || box.right>width*.86+1 || box.top<height*.1 || box.bottom>height*.78+1))issues.push('text_outside_common_safe_area');
+    for(const label of Array.from(artRef.current?.querySelectorAll('[data-process-label]') || [])) {
+      const box=relative(label.getBoundingClientRect());
+      if(box && art && (box.left<art.left || box.right>art.right || box.top<art.top || box.bottom>art.bottom))issues.push('process_instruction_overflow');
+    }
     console.log('STUDIO_LAYOUT:'+JSON.stringify({frame,scene:shot.id,issues:[...new Set(issues)],
       ...(local===Math.floor((length-1)/2)?{geometry:{title,art,caption:sub,viewport:[window.innerWidth,window.innerHeight]}}:{})}));
   },[frame,width,height,shot.id]);
@@ -78,9 +93,9 @@ export const Studio: React.FC<StudioProps> = props => {
     <AbsoluteFill style={{background:`radial-gradient(ellipse at 75% 20%, ${props.brand.accent}25, transparent 60%)`}}/>
     <AbsoluteFill style={{padding:`${height*.11}px ${width*.16}px ${height*.24}px ${width*.08}px`,opacity,transform:`translateX(${slide}px)`}}>
       <div style={{display:'flex',justifyContent:'space-between',fontSize:24*scaleUnit,letterSpacing:3*scaleUnit,color:props.brand.accent,fontWeight:700}}><span>{String(index+1).padStart(2,'0')} / {String(props.shots.length).padStart(2,'0')}</span><span style={{fontSize:20*scaleUnit,letterSpacing:0}}>{props.brand.wordmark}</span></div>
-      <div ref={titleRef} style={{fontSize:(portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))),lineHeight:1.12,fontWeight:800,marginTop:height*.035,maxWidth:width*.76,overflowWrap:'anywhere'}}>{shot.title}</div>
+      <div ref={titleRef} style={{fontSize:(portrait?70:60)*scaleUnit*Math.min(1,Math.sqrt(26/Math.max(26,shot.title.length))),lineHeight:1.12,fontWeight:800,marginTop:height*.035,maxWidth:width*.76,overflowWrap:'anywhere'}}>{shot.title}</div>
       <div ref={artRef} style={{position:'absolute',left:'8%',right:'16%',top:'28%',height:portrait?'35%':'30%',transform:`translateX(${x}%) scale(${scale}) rotate(${rotation}deg)`,filter}}>
-        <Illustration shot={shot} progress={progress} accent={props.brand.accent}/>
+        <Illustration shot={shot} progress={progress} accent={props.brand.accent} step={index+1}/>
       </div>
       {caption && <div ref={captionRef} style={{position:'absolute',left:'8%',right:'16%',bottom:'24%',padding:`${24*scaleUnit}px ${30*scaleUnit}px`,borderLeft:`${5*scaleUnit}px solid ${props.brand.accent}`,fontSize:40*scaleUnit,lineHeight:1.35,background:props.brand.background,overflowWrap:'anywhere'}}>{caption.text}</div>}
     </AbsoluteFill>

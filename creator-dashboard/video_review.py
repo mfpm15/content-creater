@@ -80,6 +80,9 @@ def review(path: Path, duration: float, plan: dict | None = None) -> dict:
                 'manual_required':'Review actual Remotion frames, layout and caption/audio timing'}
         layout=renderer_report.get('layout',{})
         visual['layout']=layout
+        if layout.get('dom_measurement_available') is False:
+            visual['status']='unmeasured'
+            issues.append('Remotion DOM layout unmeasured; inspect captured frames manually')
         if layout.get('issues'):
             visual['status']='needs_attention';issues.append('Remotion text layout needs review')
     elif plan and video and (path.parent/'index.html').is_file():
