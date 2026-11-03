@@ -1,0 +1,25 @@
+{
+  "method": "Targeted code/document reading; no upstream execution or code copying",
+  "references": [
+    {
+      "url": "https://github.com/AgriciDaniel/claude-shorts/blob/a369fad/scripts/snap_boundaries.py",
+      "blob_sha": "e8c1c85994c9ed340490b103cf911e9949000dec",
+      "file": "snap_boundaries.py"
+    },
+    {
+      "url": "https://github.com/kajisho5/ffmpeg-skill/blob/a2c8433/scripts/check.py",
+      "blob_sha": "2662daf60c93995acf8bb03562c19348d695fefe",
+      "file": "check.py"
+    },
+    {
+      "url": "https://github.com/kurbaitaev/ghost-editor/blob/ce17272/SKILL.md",
+      "blob_sha": "fa9c7a61ccbd9c3805e3d282b85ebca66067b65e",
+      "file": "SKILL.md"
+    },
+    {
+      "url": "https://github.com/cth9191/animate/blob/7e5eb56/plugins/animate/skills/animate/grammar/FORMATS.md",
+      "blob_sha": "f966be5250e894cefbf7315dd4256c216aa63003",
+      "file": "FORMATS.md"
+    }
+  ]
+}

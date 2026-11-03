@@ -547,7 +547,7 @@ async function pageProject(pid) {
       let readiness = '';
       try {
         const check = await api(`/api/projects/${P.id}/clips/${c.id}/preflight`);
-        readiness = `<h4>Pemeriksaan sebelum render</h4><p>${check.can_render ? 'Batas waktu valid; kualitas isi tetap perlu ditinjau.' : 'Perbaiki batas waktu sebelum render.'}</p>${[...check.errors,...check.warnings].map(text=>`<p class="warn-t">${esc(text)}</p>`).join('')}<small>${check.word_count} kata · pemeriksaan lokal, bukan prediksi performa</small>`;
+        readiness = `<h4>Pemeriksaan sebelum render</h4><p>${check.can_render ? 'Batas waktu valid; kualitas isi tetap perlu ditinjau.' : 'Perbaiki batas waktu sebelum render.'}</p>${[...check.errors,...check.warnings].map(text=>`<p class="warn-t">${esc(text)}</p>`).join('')}<small>${check.word_count} kata · pemeriksaan lokal, bukan prediksi performa</small>${check.boundary_suggestion?.requires_review ? `<p>Saran batas kata utuh: ${esc(String(check.boundary_suggestion.start))}–${esc(String(check.boundary_suggestion.end))} detik. Tinjau video lalu ubah batas secara manual bila sesuai.</p>` : ''}`;
         if(check.last_delivery?.status!=='unmeasured' && check.last_delivery){
           readiness+=`<h4>Pemeriksaan media hasil terakhir</h4><p>${check.last_delivery.status==='passed'?'Profil kerja media terpenuhi; isi tetap perlu direview.':'Ada temuan pada hasil terakhir; periksa sebelum ekspor.'}</p>${check.last_delivery.issues.map(issue=>`<p class="warn-t">${esc(issue.platform)}: ${esc(issue.message)}</p>`).join('')}`;
         }

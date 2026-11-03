@@ -2,7 +2,7 @@
 
 Reads one JSON object from stdin and writes one JSON object to stdout.
 This worker is intentionally isolated so Creator Dashboard can reuse the
-Podcastfy virtual environment where google-genai is already installed.
+dashboard virtual environment where setup-core installs google-genai.
 """
 from __future__ import annotations
 

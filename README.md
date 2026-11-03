@@ -106,3 +106,28 @@ Jangan commit API key.
 ## Lisensi
 
 Kode dashboard di `creator-dashboard/` (kecuali `apps/`) milik pemilik repo ini. Setiap tool di `creator-dashboard/apps/` memakai lisensi aslinya, lihat file `LICENSE` dan README di folder masing-masing. Source tool sudah dimodifikasi lokal (default LLM, launcher), jadi tetap hormati lisensi dan atribusi upstream.
+
+
+## Verifikasi laptop setelah setup
+
+Dari Command Prompt di folder proyek, jalankan `check-local.bat` setelah `setup-core.bat`.
+Pemeriksaan ini menguji import dependency dashboard/Clipper, Node 22+, FFmpeg/FFprobe,
+libass, encoder H.264/AAC, loudnorm, browser dan runtime Remotion tanpa memanggil provider.
+Status credential hanya menunjukkan konfigurasi, bukan keberhasilan koneksi.
+
+Riset Article dan Video Studio memakai SDK Google di venv dashboard, yang dipasang setup inti.
+Tidak perlu memasang Podcastfy untuk riset. Mode `RESEARCH_PROVIDER=google` memerlukan `GOOGLE_API_KEY` atau `GEMINI_API_KEY`. Mode `9router` memakai endpoint/key LLM aplikasi dan katalog Search gateway. Mode `auto` memilih Google bila key Google tersedia, selain itu 9Router.
+Permintaan riset web tanpa konfigurasi ditolak; pilih mode lain secara eksplisit bila ingin bekerja offline.
+Setelah pemeriksaan lulus, coba Video Studio dengan naskah sendiri + musik lokal, lalu periksa
+MP4/PNG review; coba Article dengan gateway LLM aktif; coba Clipper memakai video pendek lokal.
+Whisper dapat memerlukan unduhan model pertama kali. Pemeriksaan dependency tidak menggantikan
+pengujian suara/provider, GPU dan hasil konten di perangkat pengguna.
+
+
+Untuk 9Router lokal: jalankan `check-search.bat` untuk melihat katalog Search yang benar-benar tersedia.
+Jika ada beberapa pilihan, set `RESEARCH_SEARCH_MODEL` ke id dari katalog lalu restart dashboard.
+`check-search.bat --query "dokumentasi FFmpeg loudnorm"` menguji pencarian nyata.
+Katalog kosong berarti provider Search belum tersedia/diizinkan di gateway, walaupun model chat bisa dipakai.
+Gunakan `RESEARCH_PROVIDER=9router` untuk memilih jalur gateway secara eksplisit.
+Artikel memakai `ARTICLE_LLM_*`, video memakai `VIDEO_LLM_*`, keduanya fallback ke `LLM_*`/`OPENAI_*`.
+Jangan tempel API key di perintah atau laporan yang dibagikan.

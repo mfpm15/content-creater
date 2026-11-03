@@ -107,3 +107,19 @@ def test_delivery_endpoint_status_codes():
             assert c.get(f"{base}/nope/delivery").status_code == 404
     finally:
         project.delete(p["id"])
+
+
+@pytest.mark.parametrize('value', [float('nan'), float('inf'), 0, -1])
+def test_invalid_duration_and_fps_cannot_pass(value):
+    result = delivery.evaluate({**GOOD, 'duration': value, 'fps': value}, 'shorts')
+    assert not result['ok']
+    assert 'fps' in codes(result)
+    if value != float('inf'):
+        assert 'duration' in codes(result)
+
+
+@pytest.mark.parametrize('value', [float('nan'), float('inf'), -float('inf')])
+def test_nonfinite_loudness_is_unmeasured(value):
+    result = delivery.evaluate({**GOOD, 'lufs': value}, 'shorts')
+    assert 'loudness-unmeasured' in codes(result)
+    assert delivery.summary({'shorts': result}) == 'needs_attention'

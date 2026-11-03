@@ -5,7 +5,8 @@ import uuid
 from datetime import date
 from urllib.parse import urlsplit, parse_qsl
 
-CITATIONS = re.compile(r'\[(\d+(?:\s*[,;]\s*\d+)*)\]')
+from citations import CITATION_RE as CITATIONS, numbers as citation_numbers
+
 NUMBERS = re.compile(r'(?<!\w)[+−-]?\d+(?:[.,]\d+)*(?:\s*%)?')
 
 
@@ -36,8 +37,17 @@ def claims(article: dict) -> list:
         for text in texts:
             if not text.strip(): continue
             key=hashlib.sha256(text.encode()).hexdigest()[:24]
-            citations=[number for group in CITATIONS.findall(text) for number in re.findall(r'\d+',group)]
-            result.append({'id':key,'block':index,'text':text,'citations':citations})
+            citations=[]
+            invalid=False
+            for group in CITATIONS.findall(text):
+                if group.isdigit():
+                    citations.append(group)
+                    continue
+                try:
+                    citations.extend(str(n) for n in citation_numbers(group))
+                except ValueError:
+                    invalid=True
+            result.append({'id':key,'block':index,'text':text,'citations':citations,'invalid_citation_range':invalid})
     return result
 
 
@@ -87,6 +97,7 @@ def audit(article: dict, ledger: dict | None = None, max_age_days: int = 0) -> d
         excerpt_numbers=set().union(*(number_tokens(str(source.get('excerpt',''))) for source in linked))
         missing=sorted(numbers-excerpt_numbers)
         warnings=[]
+        if claim["invalid_citation_range"]:warnings.append("Rentang sitasi tidak valid; periksa urutan dan batas nomor")
         if unknown:warnings.append('Nomor sitasi tidak ada di daftar pustaka: '+', '.join(map(str,unknown)))
         if missing:warnings.append('Angka belum ditemukan secara literal dalam kutipan sumber tertaut: '+', '.join(missing))
         report.append({**claim,'source_ids':[s['id'] for s in linked], 'status':'user_supported' if acceptable else 'needs_review',

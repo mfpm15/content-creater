@@ -106,3 +106,31 @@ def test_preflight_http_report_does_not_start_workers(monkeypatch,isolated_proje
     assert response.status_code==200
     assert response.json()['can_render']
     assert client.get(f'/api/projects/{p["id"]}/clips/missing/preflight',headers={'Host':'127.0.0.1:8765'}).status_code==404
+
+
+@pytest.mark.parametrize('start,end', [(1.01,3),(0,1.99)])
+def test_cut_near_word_edges_is_still_reported(start,end):
+    result=preflight.analyze({'start':start,'end':end},10,[{'w':'penting','s':1,'e':2}])
+    assert any('memotong kata' in w for w in result['warnings'])
+
+
+def test_exact_word_edges_do_not_warn_about_cut_words():
+    result=preflight.analyze({'start':1,'end':2},10,[{'w':'utuh','s':1,'e':2}])
+    assert not any('memotong kata' in w for w in result['warnings'])
+
+
+def test_boundary_suggestion_preserves_words_without_mutation():
+    clip={'start':1.1,'end':3.9}
+    words=[{'w':'awal','s':1,'e':1.4},{'w':'akhir','s':3.7,'e':4.2}]
+    before=copy.deepcopy((clip,words))
+    result=preflight.analyze(clip,10,words)
+    assert result['boundary_suggestion']=={'start':1.0,'end':4.2,'requires_review':True,'reason':'Preserve complete boundary words'}
+    assert (clip,words)==before
+
+
+def test_out_of_order_and_overlapping_captions_are_reported():
+    words=[{'w':'dua','s':2,'e':3},{'w':'satu','s':1,'e':2.2}]
+    result=preflight.analyze({'start':0,'end':4},10,words)
+    assert any('tidak meningkat' in w for w in result['warnings'])
+    assert any('tumpang tindih' in w for w in result['warnings'])
+    assert result['can_render']

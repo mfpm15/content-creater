@@ -25,7 +25,7 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertEqual(opts["defaultEngine"], "opuscar")
         self.assertFalse(next(item for item in opts["engines"] if item["id"] == "threejs").get("disabled", False))
         self.assertEqual(opts["workflow"], ["brief", "research", "scene_plan", "storyboard", "render"])
-        self.assertEqual(opts["research"]["provider"], "Google Search grounding")
+        self.assertIn(opts["research"]["provider"], {"Google Search grounding", "9Router web search"})
         self.assertFalse(opts["research"]["required"])
         self.assertEqual(opts["research"]["requiredForModes"], ["web"])
         self.assertEqual(opts["models"][0]["provider"], "Gemini")
@@ -238,7 +238,7 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertEqual(job["scenePlan"]["scenes"][0]["composition"], "subjek kecil dengan ruang teks luas")
 
     def test_research_web_fails_closed_without_api_key(self):
-        with patch.dict(video_drafter.os.environ, {}, clear=True):
+        with patch.dict(video_drafter.os.environ, {"RESEARCH_PROVIDER":"google"}, clear=True):
             with self.assertRaisesRegex(RuntimeError, "Web Search wajib aktif"):
                 video_drafter._research_web("Topik", "Konteks")
 

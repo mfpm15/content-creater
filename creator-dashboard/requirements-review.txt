@@ -2,3 +2,6 @@
 # Install in the dashboard's own environment; Chromium is a separate prerequisite.
 Pillow>=10.4,<13
 playwright>=1.48,<2
+
+# Shared isolated Google Search worker for Article and Video Studio.
+google-genai>=1,<2

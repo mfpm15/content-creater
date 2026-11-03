@@ -16,7 +16,7 @@ import evidence
 import humanizer
 
 LOCK=threading.RLock()
-PROTECTED=re.compile(r'\[\d+(?:[,;\s]+\d+)*\]|(?:Rp\s*|\$)?\d+(?:[.,]\d+)*(?:\s*%)?|\b[A-Z]{2,}\b|\b(?:tidak|bukan|belum|jangan|not|never)\b|[“"]([^”"\n]+)[”"]')
+PROTECTED=re.compile(r'\[\d+(?:\s*[-–,;]\s*\d+)*\]|(?:Rp\s*|\$)?[+−-]?\d+(?:[.,]\d+)*(?:\s*%)?|\b[A-Z]{2,}\b|\b(?:tidak|bukan|belum|jangan|not|never)\b|[“"]([^”"\n]+)[”"]')
 
 
 def digest(article):

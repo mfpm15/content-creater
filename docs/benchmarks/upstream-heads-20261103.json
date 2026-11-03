@@ -1,0 +1,59 @@
+{
+  "method": "GitHub default branch heads fetched on 2026-11-03; a HEAD check is not a full code audit",
+  "repositories": [
+    {
+      "repository": "mfpm15/content-creater",
+      "sha": "665d640ab613cca7d8d11184a09c2466f547aa77",
+      "committed_at": "2026-11-03T07:39:57Z",
+      "subject": "docs: add Opuscar renderer audit handoff"
+    },
+    {
+      "repository": "kajisho5/ffmpeg-skill",
+      "sha": "1ce2c186bf1dba96132d87274eee46df4f537e0e",
+      "committed_at": "2026-10-31T22:51:23Z",
+      "subject": "docs: SKILL.md restructured, no behavior change (#392)"
+    },
+    {
+      "repository": "agricidaniel/claude-shorts",
+      "sha": "a369fad9d84287edbb8fa3ab515f268e770f683b",
+      "committed_at": "2026-04-10T17:12:52Z",
+      "subject": "Add author section, community links, and backlinks"
+    },
+    {
+      "repository": "kurbaitaev/ghost-editor",
+      "sha": "ce172726c36293722b08eb57b5b307d4f06389e8",
+      "committed_at": "2026-10-30T08:45:21Z",
+      "subject": "v0.3.0: 13 new styles (Face RESULT, Whiteboard, Kinetic doc, Step Deck, Product page, Tactile paper + 7 lemo-opuscar ports)"
+    },
+    {
+      "repository": "cth9191/animate",
+      "sha": "7e5eb56feb2dd573f890e1b7b34748af43d58263",
+      "committed_at": "2026-10-05T20:31:47Z",
+      "subject": "Animate 0.4.0: voice-overs timed to the words"
+    },
+    {
+      "repository": "calesthio/openmontage",
+      "sha": "195eab24478dc9363326aec437aefc3701635ddf",
+      "committed_at": "2026-10-28T21:45:26Z",
+      "subject": "Merge pull request #867 from calesthio/fix/subtitle-style-security-test"
+    },
+    {
+      "repository": "cjpais/handy",
+      "sha": "82dfab9fda18c4bc24e1f6e56d36474d38eca0bc",
+      "committed_at": "2026-11-02T12:40:42Z",
+      "subject": "Merge branch 'main' of github.com:cjpais/Handy"
+    },
+    {
+      "repository": "Panniantong/agent-reach",
+      "sha": "7a38047acf26a729cbb27851e3cb81639da86b29",
+      "committed_at": "2026-11-01T07:23:03Z",
+      "subject": "Merge pull request #897 from Panniantong/release/1.6.1"
+    },
+    {
+      "repository": "darkzOGx/youtube-automation-agent",
+      "sha": "e973d515aef90c467da2289144df737a3bd03859",
+      "committed_at": "2026-10-27T00:49:51Z",
+      "subject": "docs: lead the README with dashboard screenshots and move reference tables to docs/ (#86)"
+    }
+  ]
+}
