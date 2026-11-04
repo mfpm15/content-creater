@@ -144,6 +144,10 @@ function draw(seconds){
  const scale=Math.min(innerWidth/W,innerHeight/H);
  byId('headline').style.fontSize=Math.max(8,Math.min(W*.065,H*.065)*scale)+'px';
  byId('caption').style.fontSize=Math.max(8,Math.min(W*.032,H*.035)*scale)+'px';
+ for(const [id,budget] of [['headline',.18],['caption',.18]]) {
+   const el=byId(id);let fs=parseFloat(el.style.fontSize);
+   while((el.scrollHeight>innerHeight*budget || el.scrollWidth>el.clientWidth+1) && fs>14*scale){fs-=scale;el.style.fontSize=fs+'px';}
+ }
  byId('mark').style.fontSize=Math.max(8,Math.min(W*.024,H*.025)*scale)+'px';
  byId('seek').value=t;byId('time').textContent=t.toFixed(1)+'s';return true;
 }

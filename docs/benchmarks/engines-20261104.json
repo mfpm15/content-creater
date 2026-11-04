@@ -1,0 +1,184 @@
+{
+  "threejs": {
+    "codec": "h264",
+    "pixel_format": "yuv420p",
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "frames": "90",
+    "duration": 3.0,
+    "sample_variation": [
+      {
+        "time": 0,
+        "channel_std_max": 19.92
+      },
+      {
+        "time": 0.5,
+        "channel_std_max": 35.31
+      },
+      {
+        "time": 0.99,
+        "channel_std_max": 17.03
+      },
+      {
+        "time": 1,
+        "channel_std_max": 17.03
+      },
+      {
+        "time": 1.01,
+        "channel_std_max": 15.16
+      },
+      {
+        "time": 2.95,
+        "channel_std_max": 27.53
+      }
+    ]
+  },
+  "opuscar": {
+    "codec": "h264",
+    "pixel_format": "yuv420p",
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "frames": "90",
+    "duration": 3.0,
+    "sample_variation": [
+      {
+        "time": 0,
+        "channel_std_max": 57.98
+      },
+      {
+        "time": 0.5,
+        "channel_std_max": 57.13
+      },
+      {
+        "time": 0.99,
+        "channel_std_max": 56.73
+      },
+      {
+        "time": 1,
+        "channel_std_max": 56.73
+      },
+      {
+        "time": 1.01,
+        "channel_std_max": 56.74
+      },
+      {
+        "time": 2.95,
+        "channel_std_max": 47.82
+      }
+    ]
+  },
+  "remotion": {
+    "codec": "h264",
+    "pixel_format": "yuv420p",
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "frames": "60",
+    "duration": 2.0,
+    "sample_variation": [
+      {
+        "time": 0,
+        "channel_std_max": 31.84
+      },
+      {
+        "time": 0.5,
+        "channel_std_max": 34.09
+      },
+      {
+        "time": 0.99,
+        "channel_std_max": 35.87
+      },
+      {
+        "time": 1,
+        "channel_std_max": 35.87
+      },
+      {
+        "time": 1.01,
+        "channel_std_max": 35.89
+      },
+      {
+        "time": 1.95,
+        "channel_std_max": 13.72
+      }
+    ],
+    "layout": {
+      "method": "dom_layout",
+      "observed_frames": 40,
+      "sample_geometry": [
+        {
+          "frame": 29,
+          "scene": "scene-1",
+          "issues": [],
+          "geometry": {
+            "title": {
+              "left": 86.390625,
+              "right": 907.1875,
+              "top": 306.375,
+              "bottom": 503.46875
+            },
+            "art": {
+              "left": 86.390625,
+              "right": 907.203125,
+              "top": 537.59375,
+              "bottom": 1209.59375
+            },
+            "caption": {
+              "left": 86.390625,
+              "right": 907.203125,
+              "top": 1303.203125,
+              "bottom": 1459.203125
+            },
+            "viewport": [
+              1080,
+              1920
+            ]
+          }
+        }
+      ],
+      "issues": [],
+      "dom_measurement_available": true
+    }
+  },
+  "continuous": {
+    "codec": "h264",
+    "pixel_format": "yuv420p",
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "frames": "60",
+    "duration": 2.0,
+    "sample_variation": [
+      {
+        "time": 0,
+        "channel_std_max": 15.56
+      },
+      {
+        "time": 0.5,
+        "channel_std_max": 15.57
+      },
+      {
+        "time": 0.99,
+        "channel_std_max": 16.64
+      },
+      {
+        "time": 1,
+        "channel_std_max": 16.64
+      },
+      {
+        "time": 1.01,
+        "channel_std_max": 16.62
+      },
+      {
+        "time": 1.95,
+        "channel_std_max": 16.64
+      }
+    ]
+  },
+  "lottie": {
+    "player": "lottie-web 5.12.2",
+    "approved_labels_visible": true,
+    "repeat_png_identical": true
+  }
+}

@@ -326,6 +326,9 @@ function sceneEditor(scene, index) {
     ${renderControls}${field('background','Background')}${field('camera','Arahan kamera',true)}${field('lighting','Arahan lighting')}
     <div class="editor-row">${field('colorMood','Color mood')}${field('transition','Transisi')}</div>
     ${field('typography','Tipografi')}${field('continuityToken','Objek penghubung antaradegan')}${field('continuity','Kontinuitas',true)}${field('soundCue','Sound cue')}
+    ${['remotion','lottie'].includes(activeReviewEngine) ? `<details><summary>Diagram berlabel (opsional)</summary>
+      <p>Gunakan label dari naskah: proses 2–5 langkah, perbandingan 2 sisi. Kosongkan untuk visual editorial.</p>
+      <textarea data-diagram="${index}" rows="4" placeholder='{"kind":"process","labels":["Input","Hasil"]}'>${escapeHtml(scene.diagram ? JSON.stringify(scene.diagram,null,2) : '')}</textarea></details>` : ''}
     <details><summary>Timing visual per kata (opsional)</summary>
       <p>Tempel seluruh kata narasi beserta timestamp dalam detik dari awal video. Ini timing yang Anda berikan, bukan alignment audio otomatis. Angka dan negasi harus tetap lengkap.</p>
       <label>Daftar JSON [{"word":"Halo","start":0,"end":0.5}]
@@ -444,6 +447,12 @@ function collectEditedPlan() {
     const cueIndex = elements.reviewGrid.querySelector(`[data-cue-index="${index}"]`).value;
     if (cueIndex !== '') scenes[index].visualCueWord = Number(cueIndex);
     else delete scenes[index].visualCueWord;
+  });
+  elements.reviewGrid.querySelectorAll('[data-diagram]').forEach(input => {
+    const index=Number(input.dataset.diagram);
+    if(!input.value.trim()){delete scenes[index].diagram;return;}
+    try {scenes[index].diagram=JSON.parse(input.value);}
+    catch {throw new Error(`JSON diagram adegan ${index+1} tidak valid`);}
   });
   const controls = new Map();
   elements.reviewGrid.querySelectorAll('[data-render-scene]').forEach(input => {

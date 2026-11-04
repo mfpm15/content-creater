@@ -1,6 +1,7 @@
 """Video Studio → original, asset-free Remotion composition. No daemon dependency."""
 from __future__ import annotations
 
+import scene_diagram
 import html
 import json
 import math
@@ -56,6 +57,7 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
         subject=' '.join(n for n in numbers[:3] if len(n)<=30) if family=='data' else str(scene.get('subject',''))[:200]
         shots.append({'id':scene['id'],'startFrame':start,'endFrame':end,'title':scene['onScreenText'],
                       'subject':subject,'family':family,**controls})
+        if 'diagram' in scene:shots[-1]['diagram']=scene_diagram.validate(scene['diagram'])
         cues=scene.get('wordCues')
         if cues:
             groups=[cues[i:i+7] for i in range(0,len(cues),7)]

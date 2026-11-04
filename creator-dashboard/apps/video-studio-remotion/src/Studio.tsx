@@ -6,30 +6,33 @@ import type {Shot, StudioProps} from './types';
 // Original procedural artwork. Numbers are literal labels from narration/title,
 // never fabricated bar values or performance predictions.
 const Illustration: React.FC<{shot: Shot; progress: number; accent: string}> = ({shot, progress, accent}) => {
-  const positions = [[130,180],[400,120],[670,180]];
   const numbers = literalNumbers(shot.subject).slice(0,3);
+  const diagram=shot.diagram;
+  const editorial=(shot.subject || shot.title).match(/.{1,28}(?:\s|$)|.{1,28}/g) || [''];
   return <svg viewBox="0 0 800 500" width="100%" height="100%" aria-hidden="true">
-    <defs><radialGradient id="glow"><stop stopColor={accent} stopOpacity=".24"/><stop offset="1" stopColor={accent} stopOpacity="0"/></radialGradient></defs>
-    <ellipse cx="400" cy="250" rx="380" ry="240" fill="url(#glow)"/>
-    {shot.family === 'process' ? <>
-      <path d="M130 250 Q265 80 400 250 T670 250" fill="none" stroke={accent} strokeWidth="5" opacity=".4" pathLength="1" strokeDasharray="1" strokeDashoffset={1-progress}/>
-      {positions.map(([x],i)=><g key={i} opacity={interpolate(progress,[i*.22,i*.22+.2],[.18,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp'})}>
-        <rect x={x-65} y="185" width="130" height="130" rx="35" fill={accent} fillOpacity=".16" stroke={accent} strokeWidth="3"/>
-        <text x={x} y="265" textAnchor="middle" fill="currentColor" fontSize="45" fontWeight="700">{i+1}</text>
-      </g>)}
-    </> : shot.family === 'comparison' ? <>
-      {[-1,1].map((side,i)=><g key={side} transform={`translate(${400+side*165},250) rotate(${side*(1-progress)*12})`}>
-        <rect x="-130" y="-140" width="260" height="280" rx="42" fill={accent} fillOpacity={i ? .2 : .05} stroke={accent} strokeWidth="3"/>
-        <circle r={60+i*12} fill="none" stroke={accent} strokeWidth={i ? 12 : 3}/>
-      </g>)}
+    {diagram ? <>
+      {diagram.kind==='process' && <path d="M400 60 V440" fill="none" stroke={accent} strokeWidth="3" opacity=".4" pathLength="1" strokeDasharray="1" strokeDashoffset={1-progress}/>}
+      {diagram.labels.map((label,i)=>{
+        const process=diagram.kind==='process';
+        const x=process?400:210+i*380;
+        const y=process?70+i*360/(diagram.labels.length-1):250;
+        const w=process?650:330;
+        const words=label.match(/.{1,18}(?:\s|$)|.{1,18}/g) || [label];
+        return <g key={i} transform={`translate(${x},${y})`} opacity={interpolate(progress,[i*.12,i*.12+.18],[.25,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp'})}>
+          <rect x={-w/2} y={process?-34:-120} width={w} height={process?68:240} rx="16" fill="#152131" stroke={accent} strokeWidth="2"/>
+          <text textAnchor="middle" fill="currentColor" fontSize={process?Math.min(25,560/(label.length*.65)):25} fontWeight="600">
+            {(process?[label]:words).map((line,j)=><tspan key={j} x="0" dy={j===0?(process?8:-(words.length-1)*18):36}>{line}</tspan>)}
+          </text>
+        </g>;
+      })}
     </> : shot.family === 'data' && numbers.length ? <>
       {numbers.map((number,i)=><g key={i} transform={`translate(${400+(i-(numbers.length-1)/2)*235},250)`}>
         <circle r="100" fill={accent} fillOpacity=".1" stroke={accent} strokeWidth="2"/>
         <text textAnchor="middle" dy=".35em" fill="currentColor" fontSize={Math.min(52,300/number.length)} fontWeight="700">{number}</text>
       </g>)}
     </> : <>
-      {[0,1,2].map(i=><ellipse key={i} cx="400" cy="250" rx={105+i*60} ry={160-i*20} transform={`rotate(${i*60+progress*20},400,250)`} fill="none" stroke={accent} strokeWidth={i===0 ? 5 : 2} opacity={1-i*.25}/>)}
-      <circle cx="400" cy="250" r={35+Math.sin(progress*Math.PI)*12} fill={accent}/>
+      <path d="M100 110 H700 M100 390 H700" stroke={accent} strokeWidth="3"/>
+      <text x="400" y="260" textAnchor="middle" fill="currentColor" fontSize="38" fontWeight="600">{editorial.map((line,j)=><tspan key={j} x="400" dy={j===0?-(editorial.length-1)*22:44}>{line}</tspan>)}</text>
     </>}
   </svg>;
 };
@@ -62,7 +65,14 @@ export const Studio: React.FC<StudioProps> = props => {
     const root=rootRef.current?.getBoundingClientRect();
     // Remotion also mounts hidden calculator trees at y=-1,000,000 with zero
     // width. They are not the rendered composition and must never be measured.
-    if(!root || root.width<width*.95 || root.height<height*.95 || root.bottom<=0 || root.right<=0 || root.top>=window.innerHeight || root.left>=window.innerWidth)return;
+    if(!root || root.width<1 || root.height<1 || root.bottom<=0 || root.right<=0 || root.top>=window.innerHeight || root.left>=window.innerWidth)return;
+    if(titleRef.current)titleRef.current.style.fontSize=((portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))))+'px';
+    if(captionRef.current)captionRef.current.style.fontSize=(40*scaleUnit)+'px';
+    for(const [element,budget] of [[titleRef.current,.13],[captionRef.current,.12]] as const){
+      if(!element)continue;
+      let fs=parseFloat(getComputedStyle(element).fontSize);
+      while((element.scrollHeight>height*budget || element.scrollWidth>element.clientWidth+1) && fs>14*scaleUnit){fs-=scaleUnit;element.style.fontSize=fs+'px';}
+    }
     if(local<edge || local>=length-edge)return; // intentional entry/exit motion
     const relative=(box: DOMRect | undefined)=>box?{left:(box.left-root.left)*width/root.width,right:(box.right-root.left)*width/root.width,
       top:(box.top-root.top)*height/root.height,bottom:(box.bottom-root.top)*height/root.height}:undefined;
@@ -74,7 +84,7 @@ export const Studio: React.FC<StudioProps> = props => {
     console.log('STUDIO_LAYOUT:'+JSON.stringify({frame,scene:shot.id,issues:[...new Set(issues)],
       ...(local===Math.floor((length-1)/2)?{geometry:{title,art,caption:sub,viewport:[window.innerWidth,window.innerHeight]}}:{})}));
   },[frame,width,height,shot.id]);
-  return <AbsoluteFill ref={rootRef} style={{background:props.brand.background,color:props.brand.text,fontFamily:props.brand.font,overflow:'hidden'}}>
+  return <div ref={rootRef} style={{position:'absolute',inset:0,background:props.brand.background,color:props.brand.text,fontFamily:props.brand.font,overflow:'hidden'}}>
     <AbsoluteFill style={{background:`radial-gradient(ellipse at 75% 20%, ${props.brand.accent}25, transparent 60%)`}}/>
     <AbsoluteFill style={{padding:`${height*.11}px ${width*.16}px ${height*.24}px ${width*.08}px`,opacity,transform:`translateX(${slide}px)`}}>
       <div style={{display:'flex',justifyContent:'space-between',fontSize:24*scaleUnit,letterSpacing:3*scaleUnit,color:props.brand.accent,fontWeight:700}}><span>{String(index+1).padStart(2,'0')} / {String(props.shots.length).padStart(2,'0')}</span><span style={{fontSize:20*scaleUnit,letterSpacing:0}}>{props.brand.wordmark}</span></div>
@@ -85,7 +95,7 @@ export const Studio: React.FC<StudioProps> = props => {
       {caption && <div ref={captionRef} style={{position:'absolute',left:'8%',right:'16%',bottom:'24%',padding:`${24*scaleUnit}px ${30*scaleUnit}px`,borderLeft:`${5*scaleUnit}px solid ${props.brand.accent}`,fontSize:40*scaleUnit,lineHeight:1.35,background:props.brand.background,overflowWrap:'anywhere'}}>{caption.text}</div>}
     </AbsoluteFill>
     <div style={{position:'absolute',left:0,bottom:0,height:4*scaleUnit,width:`${(frame+1)/props.totalFrames*100}%`,background:props.brand.accent}}/>
-  </AbsoluteFill>;
+  </div>;
 };
 
 const defaults: StudioProps={version:1,width:1080,height:1920,fps:30,totalFrames:30,topic:'Video Studio',

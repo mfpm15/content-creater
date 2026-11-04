@@ -36,3 +36,11 @@ test('captions cannot overlap or exceed approved frames',()=>{
     const value=example();mutate(value);assert.throws(()=>validateManifest(value));
   }
 });
+test('approved diagram labels are preserved and invalid structures rejected',()=>{
+  const value=example();value.shots[0].diagram={kind:'process',labels:['Riset','Review','Terbit']};
+  assert.deepEqual(validateManifest(value).shots[0].diagram.labels,['Riset','Review','Terbit']);
+  for(const diagram of [{kind:'process',labels:['Only one']},{kind:'comparison',labels:['a','b','c']},
+    {kind:'process',labels:['','b']},{kind:'process',labels:['a','x'.repeat(49)]},{kind:'process',labels:['a','b'],url:'https://bad.test'}]){
+    value.shots[0].diagram=diagram;assert.throws(()=>validateManifest(value));
+  }
+});

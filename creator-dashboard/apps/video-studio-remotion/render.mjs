@@ -36,7 +36,12 @@ try {
   await renderStill({...options,composition,frame:frames[0].frame,imageFormat:'png',output:repeat});
   const digest=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   if(digest(repeat)!==digest(path.join(path.dirname(output),frames[0].file)))throw new Error('Remotion repeated frame differs');
-  process.stdout.write(JSON.stringify({frames,deterministic_repeat:true,layout:{method:layout.size?'dom_layout':'captured_frame_contract',observed_frames:layout.size||frames.length,sample_geometry:[...layout.values()].filter(row=>row.geometry).slice(0,6),issues:[...new Map([...layout.values()].flatMap(row=>row.issues.map(code=>[row.scene+':'+code,{scene:row.scene,code}]))).values()],dom_measurement_available:layout.size>0}})+'\n');
+  const rows=[...layout.values()];
+  const layoutReport={method:layout.size?'dom_layout':'unmeasured',observed_frames:layout.size,
+    sample_geometry:rows.filter(row=>row.geometry).slice(0,6),
+    issues:layout.size?[...new Map(rows.flatMap(row=>row.issues.map(code=>[row.scene+':'+code,{scene:row.scene,code}]))).values()]:[{scene:'composition',code:'dom_layout_unavailable'}],
+    dom_measurement_available:layout.size>0};
+  process.stdout.write(JSON.stringify({frames,deterministic_repeat:true,layout:layoutReport})+'\n');
 } catch(error) {
   fs.rmSync(output,{force:true});
   throw error;

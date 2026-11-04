@@ -21,12 +21,18 @@ export function validateManifest(value) {
   let end = 0;
   const ids = new Set();
   for (const shot of value.shots) {
-    if (!plain(shot) || Object.keys(shot).some(k => !['id','startFrame','endFrame','title','subject','family','camera','strength','lighting','transition'].includes(k))) fail();
+    if (!plain(shot) || Object.keys(shot).some(k => !['id','startFrame','endFrame','title','subject','family','camera','strength','lighting','transition','diagram'].includes(k))) fail();
     if (!text(shot.id,80) || ids.has(shot.id) || !integer(shot.startFrame) || !integer(shot.endFrame) || shot.startFrame !== end || shot.endFrame <= end || shot.endFrame > value.totalFrames) fail();
     if (!text(shot.title,500) || !text(shot.subject,200) || !['process','data','comparison','concept'].includes(shot.family)) fail();
     if (!['legacy','locked','push-in','pull-out','pan-left','pan-right','orbit'].includes(shot.camera) ||
         typeof shot.strength !== 'number' || !Number.isFinite(shot.strength) || shot.strength < 0 || shot.strength > 1 ||
         !['legacy','soft','dramatic'].includes(shot.lighting) || !['legacy','fade','cut','slide'].includes(shot.transition)) fail();
+    if (shot.diagram !== undefined) {
+      const d=shot.diagram;
+      if(!plain(d) || Object.keys(d).some(k=>!['kind','labels'].includes(k)) || !['process','comparison'].includes(d.kind) ||
+        !Array.isArray(d.labels) || d.labels.length<2 || d.labels.length>5 || (d.kind==='comparison' && d.labels.length!==2) ||
+        d.labels.some(s=>!text(s,48) || !s.trim() || /[\u0000-\u001f]/.test(s))) fail();
+    }
     ids.add(shot.id); end = shot.endFrame;
   }
   if (end !== value.totalFrames) fail();

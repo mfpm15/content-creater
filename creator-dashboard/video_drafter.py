@@ -1,6 +1,7 @@
 """Reviewed video planning and rendering across independent local adapters."""
 from __future__ import annotations
 
+import scene_diagram
 import html
 import copy
 import hashlib
@@ -44,8 +45,8 @@ LLM_TIMEOUT = int(os.getenv("VIDEO_LLM_TIMEOUT", "120"))
 
 STYLES = {
     "remotion_editorial": {"id":"remotion_editorial","name":"Remotion Editorial","description":"Diagram editorial dengan timeline frame, caption pendek dan warna brand."},
-    "opuscar_cinematic": {"id": "opuscar_cinematic", "name": "Opuscar Cinematic", "description": "Visual prosedural kaya ilustrasi dinamis (radar, graph, nodes, prism) tanpa teks slide mentah."},
-    "threejs_3d": {"id": "threejs_3d", "name": "Three.js 3D Cinematic", "description": "Dunia WebGL 3D dengan partikel, pencahayaan neon ganda, grid cyber, dan hero object 3D."},
+    "opuscar_cinematic": {"id": "opuscar_cinematic", "name": "Opuscar Cinematic", "description": "Motion graphics dengan objek mekanis terarah dan pemeriksaan style frames sebelum render."},
+    "threejs_3d": {"id": "threejs_3d", "name": "Three.js 3D Cinematic", "description": "Objek mekanis 3D per adegan, material logam, kamera terkontrol dan transisi objek."},
     "lottie_motion": {"id": "lottie_motion", "name": "Lottie Motion", "description": "Animasi vektor ringan dengan preview web dan ekspor lottie.json."},
     "continuous_motion": {"id":"continuous_motion","name":"Continuous Motion","description":"Diagram kontinu dengan pilihan konsep, hold dan carrier berlanjut."},
 }
@@ -300,6 +301,7 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
             cursor = end
     for scene,raw in zip(scenes,source):
         creative_profile.timing(scene,raw)
+        if 'diagram' in raw:scene['diagram']=scene_diagram.validate(raw['diagram'])
         if 'renderControls' in raw:scene['renderControls']=scene_render.validate(raw['renderControls'])
     result={"topic": topic, "duration": duration, "scenes": scenes}
     if 'audioMode' in data:
@@ -352,7 +354,7 @@ Materi pengguna:
 Balas satu objek JSON valid saja dengan:
 1. creativeDirection: logline, audiencePromise, narrativeArc, visualThesis, pacingArc, paletteLogic, typographySystem, motionLanguage, soundStrategy, continuitySystem, riskChecks.
 2. scenes: array berisi start, end, narration, onScreenText, soundCue, type, shotPurpose, visualFamily, subject, action, setting, visual, metaphor, composition, foreground, midground, background, camera, lighting, colorMood, typography, transition, continuity.
-Untuk engine opuscar/threejs/remotion saja, renderControls opsional mengendalikan gambar: camera (legacy/locked/push-in/pull-out/pan-left/pan-right/orbit), strength (angka 0–1), lighting (legacy/soft/dramatic), transition (legacy/fade/cut/slide). Kamera 2D hanya mengubah ilustrasi, bukan judul/subtitle. Arahan bebas tetap catatan produksi, bukan kode. Jangan menambahkan kontrol ini pada lottie/continuous. Remotion mendukung visualFamily process/data/comparison dan concept (keluarga lain menjadi concept), durasi ditutup tanpa gap, judul maksimal 120 karakter; jangan mengarang angka diagram.
+Untuk engine opuscar/threejs/remotion saja, renderControls opsional mengendalikan gambar: camera (legacy/locked/push-in/pull-out/pan-left/pan-right/orbit), strength (angka 0–1), lighting (legacy/soft/dramatic), transition (legacy/fade/cut/slide). Kamera 2D hanya mengubah ilustrasi, bukan judul/subtitle. Arahan bebas tetap catatan produksi, bukan kode. Jangan menambahkan kontrol ini pada lottie/continuous. Untuk Remotion/Lottie, diagram opsional {{kind: process|comparison, labels: [teks]}} memakai 2–5 label proses atau tepat 2 label perbandingan, masing-masing maksimal 48 karakter dan berdasarkan naskah. Tanpa diagram eksplisit, tidak ada langkah proses yang dikarang. Remotion mendukung visualFamily process/data/comparison dan concept (keluarga lain menjadi concept), durasi ditutup tanpa gap, judul maksimal 120 karakter; jangan mengarang angka diagram.
 
 Pastikan jumlah scene proporsional terhadap durasi, setiap scene berbeda fungsi dan visualnya, total timing tepat {duration} detik, serta seluruh keputusan cukup detail untuk divisualkan tanpa menebak maksud sutradara."""
 
@@ -672,25 +674,16 @@ def generate_threejs_composition(plan: dict, aspect_info: dict, model: str = "")
     return f'''<!doctype html><html lang="id"><head><meta charset="utf-8"><title>{title}</title><style>
 *{{box-sizing:border-box}}
 html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden}}
-#stage{{width:{width}px;height:{height}px;position:relative;background:#030712;overflow:hidden}}
+#stage{{width:{width}px;height:{height}px;position:relative;background:#101722;overflow:hidden}}
 #webglCanvas{{position:absolute;inset:0;width:100%;height:100%;z-index:1}}
 .hud-layer{{position:absolute;inset:0;z-index:2;pointer-events:none}}
-.scene-hud{{position:absolute;inset:0;display:none;flex-direction:column;justify-content:space-between;align-items:center;padding:7% 8% 8%}}
-.chapter-badge{{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:99px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.5);color:#38bdf8;font-size:18px;font-weight:800;letter-spacing:0.18em}}
-.badge-dot{{width:10px;height:10px;border-radius:50%;background:#38bdf8;box-shadow:0 0 12px #38bdf8}}
-.hud-center{{flex:1;width:100%;display:flex;align-items:center;justify-content:center}}
-.reticle-box{{position:relative;max-width:880px;padding:45px 55px;text-align:center;background:rgba(3,7,18,0.4);border:1px solid rgba(56,189,248,0.25);border-radius:24px;backdrop-filter:blur(8px)}}
-.hud-corner{{position:absolute;width:18px;height:18px;border:3px solid #38bdf8}}
-.hud-corner.tl{{top:-2px;left:-2px;border-right:0;border-bottom:0}}
-.hud-corner.tr{{top:-2px;right:-2px;border-left:0;border-bottom:0}}
-.hud-corner.bl{{bottom:-2px;left:-2px;border-right:0;border-top:0}}
-.hud-corner.br{{bottom:-2px;right:-2px;border-left:0;border-top:0}}
-.hero-title{{font-size:{min(68 if height > width else 52, round(width * .10))}px;line-height:1.1;margin:0;font-weight:900;color:#ffffff;text-shadow:0 0 35px rgba(56,189,248,0.6);letter-spacing:-0.02em}}
-.subtitle-capsule{{width:100%;max-width:920px;padding:20px 28px;border-radius:24px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.4);backdrop-filter:blur(16px);display:flex;align-items:center;gap:18px;font-size:{30 if height > width else 24}px;line-height:1.35;color:#f8fafc;box-shadow:0 15px 45px rgba(0,0,0,0.8)}}
-.sound-wave{{display:flex;gap:4px;align-items:center}}
-.sound-wave i{{width:4px;height:22px;background:#38bdf8;border-radius:3px}}
-.sound-wave i:nth-child(2){{height:32px}}
-.sound-wave i:nth-child(3){{height:16px}}
+.scene-hud{{position:absolute;inset:0;display:none;flex-direction:column;align-items:stretch;padding:{height*.10}px {width*.16}px {height*.24}px {width*.08}px}}
+.chapter-badge{{color:#fbbf24;font-size:{max(12,round(min(width,height)*.022))}px;letter-spacing:.12em}}
+.badge-dot,.hud-corner,.sound-wave{{display:none}}
+.hud-center{{width:100%;height:22%;margin-top:3%;display:flex;align-items:flex-start}}
+.reticle-box{{width:100%;text-align:left}}
+.hero-title{{font-size:{round(min(width,height)*.065)}px;line-height:1.12;margin:0;font-weight:800;overflow-wrap:anywhere}}
+.subtitle-capsule{{margin-top:auto;width:100%;font-size:{round(min(width,height)*.032)}px;line-height:1.35;color:#e2e8f0;overflow-wrap:anywhere;padding:1.5% 2%;border-left:3px solid #fbbf24;background:#101722}}
 </style></head><body>
 <div id="stage" data-composition-id="video" data-start="0" data-duration="{duration}" data-width="{width}" data-height="{height}">
     <canvas id="webglCanvas"></canvas>
@@ -711,72 +704,19 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
     camera.position.set(0, 0, 15);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0x0f172a, 2.0);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambientLight);
-    const keyLight = new THREE.DirectionalLight(0x38bdf8, 4.0);
+    const keyLight = new THREE.DirectionalLight(0xfff4df, 3.0);
     keyLight.position.set(6, 8, 10);
     scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0xa855f7, 5.0, 40);
+    const rimLight = new THREE.PointLight(0x94b6dc, 4.0, 40);
     rimLight.position.set(-6, -4, 8);
     scene.add(rimLight);
     const shotControls = {shot_controls};
     {scene_render.THREE_SCRIPT}
 
-    // 1200 Floating Star Particles
-    const pGeo = new THREE.BufferGeometry();
-    const pCount = 1200;
-    const pos = new Float32Array(pCount * 3);
-    let starSeed = {int.from_bytes(hashlib.sha256(plan['topic'].encode('utf-8')).digest()[:4], 'little') or 1};
-    function seededStar() {{
-        starSeed ^= starSeed << 13; starSeed ^= starSeed >>> 17; starSeed ^= starSeed << 5;
-        return (starSeed >>> 0) / 4294967296;
-    }}
-    for (let i = 0; i < pCount * 3; i += 3) {{
-        pos[i] = (seededStar() - 0.5) * 40;
-        pos[i+1] = (seededStar() - 0.5) * 60;
-        pos[i+2] = (seededStar() - 0.5) * 35;
-    }}
-    pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const pMat = new THREE.PointsMaterial({{ size: 0.18, color: 0x38bdf8, transparent: true, opacity: 0.75 }});
-    const particles = new THREE.Points(pGeo, pMat);
-    scene.add(particles);
-
-    // Cyber perspective floor grid
-    const grid = new THREE.GridHelper(60, 36, 0x0284c7, 0x1e293b);
-    grid.position.y = -8;
-    grid.rotation.x = 0.15;
-    scene.add(grid);
-
-    // Hero 3D Group
-    const heroGroup = new THREE.Group();
-    scene.add(heroGroup);
-
-    // Core 3D solid icosahedron
-    const icoMat = new THREE.MeshStandardMaterial({{
-        color: 0x0284c7,
-        metalness: 0.85,
-        roughness: 0.2,
-        emissive: 0x0369a1,
-        emissiveIntensity: 0.35
-    }});
-    const heroMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(3.2, 0), icoMat);
-    heroGroup.add(heroMesh);
-
-    // Outer wireframe mesh
-    const wireMat = new THREE.MeshBasicMaterial({{ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.65 }});
-    const wireMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(3.6, 1), wireMat);
-    heroGroup.add(wireMesh);
-
-    // Orbiting Data Rings
-    const ring1 = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.08, 16, 100), new THREE.MeshBasicMaterial({{ color: 0xa855f7, transparent: true, opacity: 0.85 }}));
-    ring1.rotation.x = Math.PI / 3;
-    heroGroup.add(ring1);
-
-    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(5.4, 0.06, 16, 100), new THREE.MeshBasicMaterial({{ color: 0x22d3ee, transparent: true, opacity: 0.75 }}));
-    ring2.rotation.y = Math.PI / 4;
-    heroGroup.add(ring2);
-
-    renderer.render(scene, camera);
+    {Path(__file__).with_name('three_scene.js').read_text(encoding='utf-8')}
+    const drawShot = createThreeShots({json.dumps([{'start':s['start'],'end':s['end'],'spec':opuscar_scene_spec.interpret(s),'controls':scene_render.validate(s.get('renderControls',{}))} for s in plan['scenes']],ensure_ascii=True).replace('<', chr(92)+'u003c')});
 
     // GSAP master timeline that drives both 3D WebGL clock and HTML HUD
     const tl = gsap.timeline({{ paused: true }});
@@ -787,14 +727,15 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
         ease: "none",
     }}, 0);
     function drawThreeFrame(t) {{
-            particles.rotation.y = t * 0.04;
-            grid.position.z = (t * 2.5) % 3.3 - 8;
-            heroMesh.rotation.x = t * 0.45;
-            heroMesh.rotation.y = t * 0.65;
-            wireMesh.rotation.x = -t * 0.35;
-            wireMesh.rotation.y = -t * 0.55;
-            ring1.rotation.z = t * 0.85;
-            ring2.rotation.x = t * 0.75;
+            drawShot(t);
+            document.querySelectorAll('.scene-hud').forEach(section=>{{
+                if(getComputedStyle(section).display==='none')return;
+                for(const [selector,base,budget] of [['.hero-title',.065,.15],['.subtitle-capsule',.032,.13]]){{
+                    const element=section.querySelector(selector);let fs=Math.min(width,height)*base;
+                    element.style.fontSize=fs+'px';
+                    while((element.scrollHeight>height*budget || element.scrollWidth>element.clientWidth+1) && fs>Math.min(width,height)*.014){{fs-=1;element.style.fontSize=fs+'px';}}
+                }}
+            }});
             applySceneControls(t);
             camera.lookAt(0, 0, 0);
             renderer.render(scene, camera);
@@ -978,6 +919,8 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         if raw_plan.get('motionDesign') is not None and job.get('engine')!='continuous':
             raise ValueError('Desain kontinu hanya tersedia untuk adapter Continuous Motion')
         plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
+        if job.get('engine') not in {'remotion','lottie'} and any('diagram' in scene for scene in plan['scenes']):
+            raise ValueError('Diagram berlabel hanya tersedia untuk Remotion dan Lottie')
         if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
             raise ValueError('Kontrol kamera/lighting render hanya tersedia untuk Opuscar, Three.js dan Remotion')
         if job.get('engine')=='remotion':
@@ -1197,6 +1140,7 @@ def _storyboard(plan: dict) -> list[dict]:
         "duration": scene["duration"], "type": scene["type"], "shotPurpose": scene.get("shotPurpose", "develop"),
         "narration": scene["narration"], "text": scene["onScreenText"], "visual": scene["visual"],
         "visualFamily": scene.get("visualFamily", "constellation"), "subject": scene.get("subject", ""),
+        **({"diagram": scene["diagram"]} if "diagram" in scene else {}),
         "action": scene.get("action", ""), "setting": scene.get("setting", ""),
         "composition": scene.get("composition", ""), "foreground": scene.get("foreground", ""),
         "midground": scene.get("midground", ""), "background": scene.get("background", ""),
@@ -1241,6 +1185,8 @@ def _run_job(job_id: str) -> None:
         else:data.pop('audioMode',None)
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
         if job.get('engine')=='remotion':remotion_adapter.manifest(plan,ASPECT_RATIOS[job['aspect']])
+        if job.get('engine') not in {'remotion','lottie'} and any('diagram' in scene for scene in plan['scenes']):
+            raise ValueError('Diagram berlabel hanya tersedia untuk Remotion dan Lottie')
         if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
             raise ValueError('Model mengembalikan kontrol render yang tidak didukung adapter ini')
         if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])

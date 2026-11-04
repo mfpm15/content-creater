@@ -111,6 +111,7 @@ class ProductionAutomationTests(unittest.TestCase):
                 self.assertEqual(review['video_format']['color_space'],'bt709')
                 self.assertEqual(json.loads((target/'audio-mastering.json').read_text())['method'],'two_pass_loudnorm')
                 self.assertEqual(len(review['remotion']['frames']),2)
+                self.assertTrue(review['remotion']['layout']['dom_measurement_available'])
                 self.assertGreater(review['remotion']['layout']['observed_frames'],0)
                 self.assertEqual(review['remotion']['layout']['issues'],[])
                 with video_bundle.build(target) as archive:self.assertGreater(archive.stat().st_size,10000)
