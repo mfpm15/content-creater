@@ -43,3 +43,7 @@ SFX diperbolehkan, musik latar tetap mati. Pekerjaan baru mengaktifkan flag `spe
 Regresi memeriksa kesamaan render audio ulang, nol sampel di luar cue, batas peak efek, flag/legacy/silent dan mix FFmpeg nyata memakai fixture suara sintetis. Tidak memutar media.
 
 Validasi SFX akhir: 179 tes dashboard lulus, smoke UI/HTTP lulus, pilihan SFX dapat dimatikan saat review. Mix narasi sintetis+SFX memakai FFmpeg nyata tanpa bed musik; tidak ada uji dengar/playback atau klaim sintesis Edge daring telah berhasil.
+
+## Preferensi kualitas terbaru
+
+Pengguna kemudian memperbolehkan musik, SFX dan elemen pendukung lain selama meningkatkan kualitas akhir. Pembatasan musik sebelumnya bukan lagi persyaratan pengguna. Default implementasi saat ini masih tanpa musik, dengan SFX opsional. Pemilihan audio berikutnya harus mengikuti kebutuhan cerita, menjaga kejernihan narasi dan ditinjau bersama hasil visual; izin ini bukan klaim fitur komposisi musik otomatis baru sudah tersedia.
