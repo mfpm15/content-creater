@@ -43,7 +43,7 @@ def design(raw: dict, scenes: list[dict], duration: float) -> dict:
     voice = raw.get('voiceMode', 'music')
     if type(rest) not in (int, float) or not .15 <= rest <= .7:
         raise ValueError('Porsi jeda gerak harus 0.15–0.7')
-    if voice not in {'music', 'tts'}:
+    if voice not in {'music', 'tts', 'none'}:
         raise ValueError('Audio kontinu harus music atau tts')
     if raw['concept']=='assemble' and len(scenes)>12:
         raise ValueError('Konsep Bangun hasil maksimal 12 beat; ringkas rencana atau pilih konsep lain')

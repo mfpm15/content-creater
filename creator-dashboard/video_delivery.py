@@ -25,8 +25,8 @@ def evaluate(video: dict, duration: float, audio: dict) -> dict:
         if fps<=0 or fps>60.01:issue('fps','FPS tidak terbaca atau melebihi 60')
         if video.get('codec_name') and video['codec_name']!='h264':issue('codec','Codec video bukan profil H.264 untuk ekspor umum')
         if video.get('pix_fmt') and video['pix_fmt']!='yuv420p':issue('pixel_format','Format piksel bukan YUV 4:2:0 limited-range; periksa kompatibilitas pemutar')
-        if audio.get('status')!='measured':issue('loudness_unmeasured','Audio belum berhasil diukur')
-        else:
+        if audio.get('status') not in ('measured','intentionally_silent'):issue('loudness_unmeasured','Audio belum berhasil diukur')
+        elif audio.get('status')=='measured':
             if abs(audio['integrated_lufs']-spec['lufs'])>2:issue('loudness','Loudness di luar target -14 ±2 LUFS')
             if audio['true_peak_dbfs']>-.5:issue('peak','True peak terlalu dekat clipping')
         reports[name]={'label':spec['label'],'status':'needs_attention' if issues else 'passed_working_profile',

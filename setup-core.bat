@@ -50,7 +50,7 @@ if not exist "creator-dashboard\apps\lemo-opuscar\.venv\Scripts\python.exe" (
   uv venv --python 3.12 "creator-dashboard\apps\lemo-opuscar\.venv"
   if errorlevel 1 goto :failed
 )
-uv pip install --python "creator-dashboard\apps\lemo-opuscar\.venv\Scripts\python.exe" numpy soundfile edge-tts
+uv pip install --python "creator-dashboard\apps\lemo-opuscar\.venv\Scripts\python.exe" numpy soundfile edge-tts==7.3.1
 if errorlevel 1 goto :failed
 "creator-dashboard\.venv\Scripts\python.exe" -c "import sys; sys.path.insert(0,'creator-dashboard'); from runtime_config import find_browser; print('Browser:', find_browser() or 'Install Chrome atau Edge untuk render/review')"
 if errorlevel 1 goto :failed

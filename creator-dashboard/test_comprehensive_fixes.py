@@ -211,7 +211,7 @@ class VideoReliabilityTests(unittest.TestCase):
             self.assertTrue((root/'review-frame-0.png').is_file())
     def test_narration_only_lottie_pipeline_never_calls_external_providers(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(vd,'VIDEOS_DIR',Path(tmp)/'videos'),patch.object(vd,'JOB_DIR',Path(tmp)/'jobs'),patch.object(vd,'JOBS',{}),patch.object(vd.threading,'Thread'),patch.object(vd,'_research_web',side_effect=AssertionError('No web')),patch.object(vd,'_call_9router',side_effect=AssertionError('No LLM')):
-            result=vd.start_job({'topic':'Lokal','script':'Narasi dari pengguna. Periksa fakta ini.','engine':'lottie','researchMode':'provided','duration':15})
+            result=vd.start_job({'topic':'Lokal','script':'Narasi dari pengguna. Periksa fakta ini.','engine':'lottie','voiceMode':'none','researchMode':'provided','duration':15})
             key=result['jobId'];vd._run_job(key)
             job=vd.job_status(key);self.assertEqual(job['status'],'awaiting_scene_plan');self.assertEqual(job['research']['mode'],'provided')
             vd.approve_job(key,'scene_plan',job['revision']);vd._continue_job(key,'scene_plan')

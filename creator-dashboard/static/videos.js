@@ -58,7 +58,7 @@ document.getElementById('motionConcept').addEventListener('change', describeMoti
 document.getElementById('motionExample').addEventListener('click', () => {
   elements.engineSelect.value = 'continuous';
   document.getElementById('motionConcept').value = 'trace';
-  document.getElementById('motionVoice').value = 'music';
+  document.getElementById('motionVoice').value = 'none';
   document.getElementById('researchMode').value = 'provided';
   elements.topic.value = 'Dari ide menjadi langkah';
   elements.script.value = '0-4 Narasi: Mulai dari satu ide.\nTeks layar: Satu ide\nVisual: Penanda membuka jalur.\nSFX: click\n\n4-9 Narasi: Hubungkan langkah yang bermakna.\nTeks layar: Hubungkan langkah\nVisual: Penanda menelusuri hubungan.\nSFX: chime\n\n9-15 Narasi: Bangun hasil bersama.\nTeks layar: Bangun hasil\nVisual: Jalur menjadi satu rangkaian.\nSFX: click';
@@ -182,7 +182,7 @@ function updateEngineExperience() {
   if (eng === 'continuous') {
     elements.engineNotice.textContent = 'Continuous Motion: satu dunia visual, elemen utama berlanjut, jeda gerak, dan render MP4 lokal. Pilih konsep sebelum membuat rencana.';
   } else if (eng === 'remotion') {
-    elements.engineNotice.textContent = 'Remotion Editorial: diagram process/data/comparison atau konsep abstrak, warna brand dan caption pendek. Musik lokal tersedia; TTS opsional. Tanpa cue kata, caption memakai estimasi durasi, bukan alignment audio. Pilih kontrol render pada review adegan.';
+    elements.engineNotice.textContent = 'Remotion Editorial: diagram process/data/comparison atau konsep abstrak, warna brand dan caption pendek. Narasi gratis tanpa musik otomatis. Tanpa cue kata, caption memakai estimasi durasi, bukan alignment audio. Pilih kontrol render pada review adegan.';
   } else if (eng === 'threejs') {
     elements.engineNotice.innerHTML = `<strong style="color:#38bdf8">Three.js 3D WebGL Adapter</strong><br>Objek mekanis 3D per adegan dengan kamera terkontrol. Arahan di luar grammar memakai fallback editorial; periksa storyboard sebelum render.`;
   } else if (eng === 'lottie') {
@@ -277,6 +277,8 @@ function showResult(result, aspectId) {
     elements.downloadBtn.href = result.videoUrl;
     elements.downloadBtn.textContent = 'Unduh Video MP4';
   }
+  document.getElementById('downloadVoice')?.remove();
+  if(result.voiceUrl){const link=document.createElement('a');link.id='downloadVoice';link.className='secondary-button';link.href=result.voiceUrl;link.download='narasi.wav';link.textContent='Unduh narasi WAV';elements.videoActions.append(link);}
   elements.inspectHtmlBtn.href = result.htmlUrl || '#';
   elements.videoActions.style.display = 'flex';
   let bundle=document.getElementById('downloadBundle');
@@ -402,7 +404,7 @@ function renderReview(job) {
     elements.reviewGrid.prepend(note);
   }
   if(job.engine==='remotion'){
-    const note=document.createElement('p');note.textContent=`Remotion · audio ${job.scenePlan?.audioMode==='music'?'musik lokal tanpa dubbing':'TTS'}. Caption tanpa cue kata dibagi dengan estimasi; periksa terhadap audio. Keluarga selain process/data/comparison memakai diagram konsep.`;
+    const note=document.createElement('p');note.textContent=`Remotion · audio ${job.scenePlan?.speech?.mode==='none'?'tanpa suara':job.scenePlan?.audioMode==='music'?'musik lokal tanpa dubbing':'narasi tanpa musik'}. Caption tanpa cue kata dibagi dengan estimasi; periksa terhadap audio. Keluarga selain process/data/comparison memakai diagram konsep.`;
     elements.reviewGrid.prepend(note);
   }
   const narrativeCard=document.createElement('section');narrativeCard.className='review-card';
@@ -422,6 +424,14 @@ function renderReview(job) {
     }
     elements.reviewGrid.append(prompts);
   }
+  if(job.scenePlan?.speech){
+    const audioCard=document.createElement('label');audioCard.className='review-card';audioCard.textContent='Suara gratis · tanpa musik';
+    const lang=document.createElement('select');lang.id='reviewSpeechLanguage';
+    for(const [id,name] of [['id','Bahasa Indonesia · Ardi'],['en','English · Guy']]){const option=new Option(name,id);option.selected=id===job.scenePlan.speech.language;lang.add(option);}
+    const mode=document.createElement('select');mode.id='reviewSpeechMode';
+    for(const [id,name] of [['tts','Narasi Edge-TTS'],['none','Tanpa suara']]){const option=new Option(name,id);option.selected=id===job.scenePlan.speech.mode;mode.add(option);}
+    audioCard.append(lang,mode);elements.reviewGrid.prepend(audioCard);
+  }
   const rateCard=document.createElement('label');rateCard.className='review-card';
   rateCard.textContent='Frame rate output';
   const rateSelect=document.createElement('select');rateSelect.id='reviewFps';
@@ -438,7 +448,7 @@ function renderReview(job) {
   if (job.scenePlan?.motionDesign) {
     const note = document.createElement('p');
     const cfg = job.scenePlan.motionDesign;
-    note.textContent = `Film kontinu: ${motionConcepts.find(c => c.id === cfg.concept)?.name || cfg.concept}. Carrier berlanjut; audio ${cfg.voiceMode === 'music' ? 'prosedural tanpa dubbing' : 'TTS'}. Timing tetap memerlukan review.`;
+    note.textContent = `Film kontinu: ${motionConcepts.find(c => c.id === cfg.concept)?.name || cfg.concept}. Carrier berlanjut; audio ${job.scenePlan?.speech?.mode==='none'?'tanpa suara':cfg.voiceMode === 'music' ? 'prosedural tanpa dubbing' : 'narasi tanpa musik'}. Timing tetap memerlukan review.`;
     elements.reviewGrid.prepend(note);
     const sheet=job.scenePlan.motionBeatSheet;
     if(sheet){
@@ -488,6 +498,9 @@ function collectEditedPlan() {
   const plan={ ...structuredClone(activeScenePlan), scenes };
   const rate=Number(document.getElementById("reviewFps")?.value ?? plan.fps ?? 30);
   if(plan.fps!==undefined || rate!==30)plan.fps=rate;
+  if(plan.speech){
+    plan.speech={language:document.getElementById('reviewSpeechLanguage')?.value || plan.speech.language,mode:document.getElementById('reviewSpeechMode')?.value || plan.speech.mode};
+  }
   return plan;
 }
 
@@ -560,6 +573,7 @@ elements.form.addEventListener('submit', async event => {
     brandId: document.getElementById('brandSelect').value,
     motionConcept: document.getElementById('motionConcept').value,
     voiceMode: document.getElementById('motionVoice').value,
+    speechLanguage: document.getElementById('speechLanguage').value,
   };
   if (!payload.topic) {
     elements.formStatus.textContent = 'Topik animasi wajib diisi.';

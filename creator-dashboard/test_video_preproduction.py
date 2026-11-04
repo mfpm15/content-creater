@@ -17,7 +17,7 @@ class PreproductionTests(unittest.TestCase):
         mock=patch.object(vd.threading.Thread,'start');mock.start();self.addCleanup(mock.stop)
 
     def start(self,**payload):
-        return vd.start_job({'topic':'Rantai','engine':'lottie','duration':15,**payload})['jobId']
+        return vd.start_job({'topic':'Rantai','engine':'lottie','voiceMode':'none','duration':15,**payload})['jobId']
 
     def test_title_first_generates_narration_then_binds_scene_planner(self):
         key=self.start()

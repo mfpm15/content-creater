@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import video_preproduction as preproduction
+import speech_settings
 import frame_rate
 import scene_diagram
 import html
@@ -308,11 +309,12 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
         if 'renderControls' in raw:scene['renderControls']=scene_render.validate(raw['renderControls'])
     result={"topic": topic, "duration": duration, "scenes": scenes}
     if "fps" in data:result["fps"]=frame_rate.validate(data["fps"])
+    if "speech" in data:result["speech"]=speech_settings.validate(data["speech"])
     if 'creativeBrief' in data:
         if not isinstance(data['creativeBrief'],str) or len(data['creativeBrief'])>4000:raise ValueError('Arahan produksi maksimal 4.000 karakter')
         result['creativeBrief']=data['creativeBrief']
     if 'audioMode' in data:
-        if data['audioMode'] not in ('music','tts'):raise ValueError('Audio harus music atau tts')
+        if data['audioMode'] not in ('music','tts','none'):raise ValueError('Audio harus music atau tts')
         result['audioMode']=data['audioMode']
     if data.get('brand') is not None:result['brand']=creative_profile.snapshot(data['brand'])
     if data.get('creativeDirection') is not None:
@@ -322,7 +324,9 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
         result['creativeDirection']=copy.deepcopy(direction)
     if data.get('motionDesign') is not None:
         result['motionDesign']=continuous_motion.design({**data['motionDesign'],'fps':frame_rate.get(result)},scenes,duration)
+        if result.get('speech'):result['motionDesign']['voiceMode']=result['speech']['mode']
         result['motionBeatSheet']=continuous_motion.beat_sheet(result)
+    if result.get('speech') and 'audioMode' in result:result['audioMode']=result['speech']['mode']
     return result
 
 
@@ -782,6 +786,11 @@ def audio_manifest(plan: dict) -> dict:
     if plan.get('audioMode'):
         result['voiceMode']=plan['audioMode']
         if plan['audioMode']=='music':result['voice']=[];result['music']['duckUnderVoice']=False
+    if 'speech' in plan:
+        speech=speech_settings.validate(plan['speech'])
+        result.update(speech=speech,voiceMode=speech['mode'],soundCues=[])
+        result['music']={'enabled':False,'duckUnderVoice':False,'beat_markers':[]}
+        if speech['mode']=='none':result['voice']=[]
     return result
 
 
@@ -797,6 +806,7 @@ def write_subtitles(path: Path, plan: dict) -> None:
 def _result_metadata(directory: Path, meta: dict) -> dict:
     video, lottie = directory / "video.mp4", directory / "lottie.json"
     meta.update(htmlUrl=f"/api/videos/{directory.name}/index.html")
+    if (directory/"final-audio.wav").is_file():meta["voiceUrl"]=f"/api/videos/{directory.name}/final-audio.wav"
     if (directory / "review.json").is_file():
         meta["review"] = json.loads((directory / "review.json").read_text("utf-8"))
     if video.is_file():
@@ -861,6 +871,8 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
                    "storyboard": None, "video": None, "revision": 0, "approvals": {},
                    "origin": {"slug": slug, "scene_plan_digest": hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()}}
+            if "speech" in plan:job["speech"]=plan["speech"]
+            if engine=='continuous':job['motionDesign']=plan.get('motionDesign')
             if engine=='remotion':job['audioMode']=plan.get('audioMode','music')
             save_job(JOB_DIR, job)
             JOBS[key] = job
@@ -925,13 +937,14 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
             raise ValueError("Scene plan tidak valid")
         if raw_plan.get('motionDesign') is not None and job.get('engine')!='continuous':
             raise ValueError('Desain kontinu hanya tersedia untuk adapter Continuous Motion')
+        if job.get('speech') and 'speech' not in raw_plan:raw_plan={**raw_plan,'speech':job['speech']}
         plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
         if job.get('engine') not in {'remotion','lottie'} and any('diagram' in scene for scene in plan['scenes']):
             raise ValueError('Diagram berlabel hanya tersedia untuk Remotion dan Lottie')
         if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
             raise ValueError('Kontrol kamera/lighting render hanya tersedia untuk Opuscar, Three.js dan Remotion')
         if job.get('engine')=='remotion':
-            if plan.get('audioMode')!=job.get('audioMode'):raise ValueError('Mode audio Remotion wajib dipertahankan saat mengedit')
+            if not plan.get('speech') and plan.get('audioMode')!=job.get('audioMode'):raise ValueError('Mode audio Remotion wajib dipertahankan saat mengedit')
             remotion_adapter.manifest(plan,ASPECT_RATIOS[job['aspect']])
         elif 'audioMode' in plan:raise ValueError('audioMode hanya tersedia pada adapter Remotion')
         if job.get('engine')=='continuous' and not plan.get('motionDesign'):
@@ -947,6 +960,10 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         job.pop("visualContactSheet", None)
         if stage == "storyboard":
             job["status"] = "awaiting_scene_plan"
+        if "speech" in plan:
+            job["speech"]=plan["speech"]
+            if job["engine"]=="remotion":job["audioMode"]=plan["audioMode"]
+            if job["engine"]=="continuous":job["motionDesign"]=plan["motionDesign"]
         job["fps"] = frame_rate.get(plan)
         job["scenePlan"] = plan
         job["storyboard"] = _storyboard(plan) if stage == "storyboard" else None
@@ -962,10 +979,10 @@ def read_video_file(slug: str, filename: str) -> tuple[bytes, str]:
 
 
 def video_file_path(slug: str, filename: str) -> tuple[Path, str]:
-    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "narration.json", "production-prompts.json", "research.json", "review.json", "audio-manifest.json", "contact-sheet.png"} and not re.fullmatch(r"review-frame-\d{1,3}\.png", filename): raise FileNotFoundError(filename)
+    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "final-audio.wav", "voice.wav", "narration.json", "production-prompts.json", "research.json", "review.json", "audio-manifest.json", "contact-sheet.png"} and not re.fullmatch(r"review-frame-\d{1,3}\.png", filename): raise FileNotFoundError(filename)
     path = _video_directory(slug) / filename
     if path.is_symlink() or not path.is_file(): raise FileNotFoundError(filename)
-    return path, {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png"}.get(path.suffix, "application/octet-stream")
+    return path, {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png", ".wav":"audio/wav"}.get(path.suffix, "application/octet-stream")
 
 
 def job_status(job_id: str) -> dict:
@@ -1035,11 +1052,12 @@ def start_job(payload: dict) -> dict:
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
     job = {"jobId": job_id, "pipelineVersion":2, "creativeBrief":creative_brief.strip(), "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    if payload.get('voiceMode')!='music':job['speech']=speech_settings.build(payload.get('speechLanguage','id'),payload.get('voiceMode','tts'))
     if engine=='remotion':
-        if payload.get('voiceMode','music') not in ('music','tts'):raise ValueError('Audio harus music atau tts')
-        job['audioMode']=payload.get('voiceMode','music')
+        if payload.get('voiceMode','tts') not in ('music','tts','none'):raise ValueError('Audio harus music atau tts')
+        job['audioMode']=payload.get('voiceMode','tts')
     if engine=='continuous':
-        job['motionDesign']=continuous_motion.design({'concept':payload.get('motionConcept'),'voiceMode':payload.get('voiceMode','music'),'fps':fps},
+        job['motionDesign']=continuous_motion.design({'concept':payload.get('motionConcept'),'voiceMode':payload.get('voiceMode','tts'),'fps':fps},
                 [{'start':0,'end':duration}],duration)
     if payload.get('brandId'):
         kit=next((row for row in creative_profile.catalog(VIDEOS_DIR.parent/'brand-kits.json')['kits'] if row['id']==payload['brandId']),None)
@@ -1096,7 +1114,17 @@ def _build_audio(target: Path, plan: dict) -> Path:
     ffmpeg = shutil.which("ffmpeg") or str(ROOT / "bin" / "ffmpeg.exe")
     if not Path(ffmpeg).is_file() and not shutil.which("ffmpeg"):
         raise RuntimeError("FFmpeg tidak ditemukan untuk audio mux")
-    if plan.get('audioMode')=='music' or plan.get('motionDesign',{}).get('voiceMode')=='music':
+    speech=speech_settings.validate(plan['speech']) if 'speech' in plan else None
+    if speech and speech['mode']=='none':
+        final=target/'final-audio.wav'
+        with wave.open(str(final),'wb') as out:
+            out.setparams((1,2,48000,0,'NONE','not compressed'))
+            remaining=round(plan['duration']*48000)
+            while remaining:
+                n=min(remaining,48000);out.writeframes(b'\x00\x00'*n);remaining-=n
+        (target/'audio-mastering.json').write_text(json.dumps({'method':'intentional_silence','status':'intentionally_silent'}))
+        return final
+    if not speech and (plan.get('audioMode')=='music' or plan.get('motionDesign',{}).get('voiceMode')=='music'):
         bed=target/'music-foley.wav'
         _write_procedural_audio(bed,plan)
         final=target/'final-audio.wav'
@@ -1107,15 +1135,20 @@ def _build_audio(target: Path, plan: dict) -> Path:
     tts = OPUSCAR_DIR / "core" / "tts" / "tts_zh.py"
     if not python.is_file():
         raise RuntimeError("Opuscar voice environment belum tersedia")
-    lines = [{"id": scene["id"], "text": scene["narration"], "voice": "id-ID-ArdiNeural", "rate": "+8%"} for scene in plan["scenes"]]
+    voice_name=speech['voice'] if speech else 'id-ID-ArdiNeural'
+    voice_rate=speech['rate'] if speech else '+8%'
+    voiced=[scene for scene in plan['scenes'] if scene['narration'].strip()]
+    if not voiced:raise ValueError('Narasi kosong; pilih tanpa suara atau isi narasi')
+    lines = [{"id": scene["id"], "text": scene["narration"], "voice": voice_name, "rate": voice_rate} for scene in voiced]
     lines_path = target / "voice-lines.json"
     voice_dir = target / "voice"
     lines_path.write_text(json.dumps(lines, ensure_ascii=False, indent=2), encoding="utf-8")
-    subprocess.run([str(python), str(tts), str(lines_path), str(voice_dir), "--voice", "id-ID-ArdiNeural", "--rate", "+8%"], check=True, timeout=600,env=render_environment())
+    command=[str(python),str(ROOT/'speech_worker.py'),str(lines_path),str(voice_dir)] if speech else [str(python),str(tts),str(lines_path),str(voice_dir),'--voice',voice_name,'--rate',voice_rate]
+    subprocess.run(command,check=True,timeout=600,env=render_environment())
     inputs: list[str] = []
     filters: list[str] = []
     labels: list[str] = []
-    for index, scene in enumerate(plan["scenes"]):
+    for index, scene in enumerate(voiced):
         voice_file = voice_dir / f"{scene['id']}.wav"
         with wave.open(str(voice_file), "rb") as voice:
             voice_duration = voice.getnframes() / voice.getframerate()
@@ -1129,6 +1162,11 @@ def _build_audio(target: Path, plan: dict) -> Path:
     voice_mix = target / "voice.wav"
     filters.append(f"{''.join(labels)}amix=inputs={len(labels)}:normalize=0,atrim=0:{plan['duration']}[voice]")
     subprocess.run([ffmpeg, "-y", *inputs, "-filter_complex", ";".join(filters), "-map", "[voice]", "-ar", "48000", str(voice_mix)], check=True, timeout=600)
+    if speech:
+        final=target/'final-audio.wav'
+        mastering=audio_mastering.normalize(ffmpeg,voice_mix,final)
+        (target/'audio-mastering.json').write_text(json.dumps(mastering),encoding='utf-8')
+        return final
     bed = target / "music-foley.wav"
     _write_procedural_audio(bed, plan)
     final = target / "final-audio.wav"
@@ -1197,12 +1235,13 @@ def _run_job(job_id: str) -> None:
             draft=preproduction.narration(job['script'],'provided_script')
         else:
             _update_job(job_id,{'status':'writing_narration','step':'Menulis narasi utuh sebelum pembagian scene','progress':22})
-            response=_clean_json(_call_9router(preproduction.script_prompt(job['topic'],_research_context(research)+'\nArahan produksi: '+job.get('creativeBrief',''),job['duration']),job['model']))
+            response=_clean_json(_call_9router(preproduction.script_prompt(job['topic'],_research_context(research)+'\nArahan produksi: '+job.get('creativeBrief',''),job['duration'],job.get('speech',{}).get('language','id')),job['model']))
             draft=preproduction.narration(response.get('narration'),'generated')
         _update_job(job_id,{'narrationDraft':draft,'initialNarrationDraft':draft,
             'status':'planning_scenes','step':'Membagi narasi menjadi shot dan arahan visual','progress':28})
         prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
-        prompt+='\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
+        prompt+='\nBahasa judul layar: '+job.get('speech',{}).get('language','id')+'. Pertahankan naskah pengguna; jangan menerjemahkan narasi terkunci.\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
+        if job.get('speech'):prompt+='\nAudio hanya narasi atau tanpa suara sesuai brief; jangan tambahkan musik/foley otomatis.'
         if job.get('motionDesign'):
             concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
             prompt+='\nKonsep wajib: '+concept['idea']+' '+concept['carry']+' Tutup seluruh durasi tanpa gap.'
@@ -1211,6 +1250,7 @@ def _run_job(job_id: str) -> None:
         else:data.pop('motionDesign',None)
         if job.get('engine')=='remotion':data['audioMode']=job['audioMode']
         else:data.pop('audioMode',None)
+        if "speech" in job:data["speech"]=job["speech"]
         if job.get("creativeBrief"):data["creativeBrief"]=job["creativeBrief"]
         data["fps"]=frame_rate.get(job)
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
@@ -1262,13 +1302,14 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         (target / "audio-manifest.json").write_text(json.dumps(audio_manifest(plan), ensure_ascii=False, indent=2), encoding="utf-8"); write_subtitles(target / "subtitles.srt", plan)
         (target / "index.html").write_text(generate_composition(plan, ASPECT_RATIOS[job["aspect"]], job["model"], job["engine"]), encoding="utf-8")
         if job["engine"] == "lottie":
+            if plan.get('speech',{}).get('mode')=='tts':_build_audio(target,plan)
             lottie = generate_lottie(plan, ASPECT_RATIOS[job["aspect"]])
             (target / "lottie.json").write_text(json.dumps(lottie, ensure_ascii=False), encoding="utf-8")
             from lottie_adapter import preview
             (target / "index.html").write_text(preview(lottie), encoding="utf-8")
             meta = {"slug": target.name, "topic": job["topic"], "engine": "lottie", "model": job["model"], "style": STYLES["lottie_motion"], "aspect": ASPECT_RATIOS[job["aspect"]], "duration": plan["duration"], "fps": frame_rate.get(plan), "sceneCount": len(plan["scenes"]), "research": job["research"], "createdAt": time.time(), "formattedTime": time.strftime("%Y-%m-%d %H:%M:%S")}
             (target / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-            _update_job(job_id, {"status": "succeeded", "step": "Animasi Lottie selesai", "progress": 100, "video": {"slug": target.name, "title": job["topic"], "htmlUrl": f"/api/videos/{target.name}/index.html", "lottieUrl": f"/api/videos/{target.name}/lottie.json", "duration": plan["duration"], "engine": "lottie"}})
+            _update_job(job_id, {"status": "succeeded", "step": "Animasi Lottie selesai", "progress": 100, "video": {"slug": target.name, "title": job["topic"], "htmlUrl": f"/api/videos/{target.name}/index.html", "lottieUrl": f"/api/videos/{target.name}/lottie.json", "voiceUrl":f"/api/videos/{target.name}/final-audio.wav" if (target/"final-audio.wav").is_file() else None, "duration": plan["duration"], "engine": "lottie"}})
             return
         engine_label = ENGINES[job['engine']]['name']
         _update_job(job_id, {"status": "rendering", "step": "Membuat musik/foley lokal tanpa dubbing" if plan.get('audioMode')=='music' or plan.get("motionDesign",{}).get("voiceMode")=="music" else "Membuat dubbing, musik, foley, dan subtitle sebelum render visual", "progress": 55})

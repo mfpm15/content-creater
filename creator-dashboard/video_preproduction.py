@@ -35,9 +35,10 @@ def verify_narration(draft, plan):
         raise ValueError('Pembagian scene mengubah/menghilangkan narasi. Susun ulang Scene Plan dari narasi utuh tanpa parafrasa.')
 
 
-def script_prompt(topic, context, duration):
+def script_prompt(topic, context, duration, language="id"):
     return f'''TAHAP 1 — PENULISAN NARASI. Belum membuat scene, storyboard atau kode.
 Topik: {topic}
+Bahasa narasi: {"Bahasa Indonesia" if language=="id" else "English"}.
 Target durasi: {duration} detik. Tulis narasi natural dengan hook, penjelasan dan penutup.
 Sisakan jeda; gunakan sekitar 1,5–2,2 kata/detik sebagai perkiraan awal, bukan alignment audio.
 Jangan mengarang angka, kutipan, tanggal atau fakta spesifik tanpa bahan yang mendukung.

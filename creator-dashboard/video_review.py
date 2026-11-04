@@ -42,7 +42,8 @@ def review(path: Path, duration: float, plan: dict | None = None) -> dict:
     video=next((s for s in streams if s.get('codec_type')=='video'),None)
     audio=any(s.get('codec_type')=='audio' for s in streams)
     if not video:issues.append('Missing video')
-    if not audio:issues.append('Missing audio')
+    silent=bool(plan and plan.get('speech',{}).get('mode')=='none')
+    if not audio and not silent:issues.append('Missing audio')
     frame_review={'status':'unmeasured'}
     if plan is not None:
         expected=frame_rate.get(plan)
@@ -55,8 +56,8 @@ def review(path: Path, duration: float, plan: dict | None = None) -> dict:
         if not matched:issues.append('Frame rate differs from approved plan')
 
     if abs(actual-duration)>.5:issues.append('Duration differs from approved plan')
-    measured=_audio(path,ffmpeg) if audio else {'status':'not_present'}
-    if audio:
+    measured={'status':'intentionally_silent'} if silent else _audio(path,ffmpeg) if audio else {'status':'not_present'}
+    if audio and not silent:
         if measured['status']!='measured':issues.append('Audio loudness/peak unmeasured')
         else:
             if abs(measured['integrated_lufs']+14)>2:issues.append('Loudness outside working target -14 ±2 LUFS')
