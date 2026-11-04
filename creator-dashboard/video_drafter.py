@@ -24,6 +24,9 @@ import creative_profile
 import continuous_motion
 import animation_clock
 import scene_render
+import opuscar_scene_spec
+import opuscar_primitives
+import opuscar_quality_gate
 import remotion_adapter
 import audio_mastering
 
@@ -261,6 +264,8 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
             "narration": narration, "visual": visual, "onScreenText": str(raw.get("onScreenText") or raw.get("text") or narration[:80]),
             "soundCue": str(raw.get("soundCue") or raw.get("sound") or ""), "type": scene_type,
             "visualFamily": family, "subject": subject,
+            "directionSubject": str(raw.get("directionSubject") or raw_subject),
+            "continuityToken": str(raw.get("continuityToken") or ""),
             "action": str(raw.get("action") or motion["direction"]), "setting": str(raw.get("setting") or ""),
             "metaphor": str(raw.get("metaphor") or ""), "camera": str(raw.get("camera") or motion["direction"]),
             "transition": str(raw.get("transition") or motion["transition"]), "colorMood": str(raw.get("colorMood") or "adaptive"),
@@ -395,6 +400,9 @@ def _clean_json(raw: str) -> dict:
 
 
 def _visual_markup(scene: dict, index: int) -> str:
+    directed = opuscar_scene_spec.interpret(scene)
+    if directed:
+        return opuscar_primitives.markup(directed, index)
     kind = scene["type"]
     family = scene.get("visualFamily") or _visual_family(" ".join((scene.get("visual", ""), scene.get("narration", ""))), kind, index)
     # Only an explicit subject may become an internal label. The visual field is
@@ -411,20 +419,9 @@ def _visual_markup(scene: dict, index: int) -> str:
         return f'''<div class="visual-canvas-box data-viz" data-family="data">
             <div class="metric-counter"><span class="num">{metric}</span></div>
         </div>'''
-    if family == "process":
-        return '''<div class="visual-canvas-box process-viz" data-family="process">
-            <div class="process-node n1"><div class="p-num">01</div></div>
-            <div class="p-line"><span class="p-pulse p1"></span></div>
-            <div class="process-node n2"><div class="p-num">02</div></div>
-            <div class="p-line"><span class="p-pulse p2"></span></div>
-            <div class="process-node n3"><div class="p-num">03</div></div>
-        </div>'''
-    if family == "comparison":
-        return '''<div class="visual-canvas-box compare-viz" data-family="comparison">
-            <div class="compare-side side-left"><div class="orb-core left-orb"></div></div>
-            <div class="vs-divider"><span class="vs-glow"></span><span class="vs-text">↔</span></div>
-            <div class="compare-side side-right"><div class="orb-core right-orb"></div></div>
-        </div>'''
+    if family in {"process", "comparison", "constellation", "concept"}:
+        text = html.escape(scene.get("onScreenText", ""))
+        return f'<div class="visual-canvas-box editorial-viz" data-family="editorial" data-interpretation="unsupported"><strong>{text}</strong></div>'
     if kind == "call-to-action" or family == "signal":
         return f'''<div class="visual-canvas-box cta-viz family-signal" data-family="signal">
             <div class="prism-gyro"><div class="gyro-ring gr1"></div><div class="gyro-ring gr2"></div><div class="gyro-ring gr3"></div><div class="prism-core">✦</div></div>
@@ -456,7 +453,8 @@ def _visual_markup(scene: dict, index: int) -> str:
     if family == "kinetic-type":
         words = [html.escape(x) for x in (scene.get("onScreenText") or subject).split()[:5]]
         return f'''<div class="visual-canvas-box kinetic-viz" data-family="kinetic-type">{''.join(f'<strong>{word}</strong>' for word in words)}</div>'''
-    return f'''<div class="visual-canvas-box constellation-viz" data-family="constellation"><div class="constellation-core">{subject[:20]}</div><span class="star st1"></span><span class="star st2"></span><span class="star st3"></span><span class="star st4"></span><span class="star st5"></span><svg viewBox="0 0 800 700"><path d="M100 170 L300 90 L440 260 L690 170 L610 500 L280 560 L100 170"/></svg></div>'''
+    return f'<div class="visual-canvas-box editorial-viz" data-family="editorial" data-interpretation="unsupported"><strong>{html.escape(scene.get("onScreenText", ""))}</strong></div>'
+
 
 
 def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "") -> str:
@@ -467,17 +465,25 @@ def generate_opuscar_composition(plan: dict, aspect_info: dict, model: str = "")
         kind = scene["type"]
         controls=scene_render.validate(scene.get('renderControls',{}))
         family = scene.get("visualFamily") or _visual_family(" ".join((scene.get("visual", ""), scene.get("narration", ""))), kind, index)
+        if family not in {'data','process','comparison','signal','network','journey','device','nature','people','evidence','interface','cityscape','balance','portal','kinetic-type','constellation','concept'}:
+            family='concept'
+        directed = opuscar_scene_spec.interpret(scene)
+        if directed: family = "directed"
         layout = ("full-bleed" if family in ("cityscape", "nature") else "split-stage" if family in ("comparison", "balance") else "focus-stage")
         sections.append(f'''<section class="scene clip type-{html.escape(kind)} family-{html.escape(family)} layout-{layout} transition-{html.escape(scene.get("transition", "shape-morph"))}" id="sc_{index}" data-family="{html.escape(family)}" data-start="{start}" data-duration="{length}">
             <div class="scene-inner">
                 <div class="chapter-badge"><span class="badge-dot"></span> {index + 1:02d} / {len(plan["scenes"]):02d} · {html.escape(kind.upper())}</div>
                 <div class="content-stack">
                     <div class="copy-wrapper"><h2 class="hero-title">{html.escape(scene["onScreenText"])}</h2></div>
-                    <div class="visual-wrapper" style="{scene_render.lighting_filter(scene)}">{_visual_markup(scene, index)}</div>
+                    <div class="visual-wrapper" style="{scene_render.lighting_filter(scene) if not directed else ""}">{_visual_markup(scene, index)}</div>
                 </div>
                 <div class="subtitle-capsule"><span class="sound-wave"><i></i><i></i><i></i></span><span>{html.escape(scene["narration"])}</span></div>
             </div>
         </section>''')
+        if directed:
+            # Directed props and camera are sampled from absolute time by the bridge.
+            animation.append(f'tl.to({{}}, {{duration:{length}}}, {start});')
+            continue
         entrance=scene_render.entrance(scene,f'#sc_{index} .scene-inner') if controls['transition']!='legacy' else f'tl.fromTo("#sc_{index} .scene-inner", {{opacity:0,scale:1.08,filter:"blur(14px)"}}, {{opacity:1,scale:1,filter:"blur(0px)",duration:0.55,ease:"power3.out"}}, {start});'
         drift=scene_render.camera_tween(scene,f'#sc_{index} .visual-canvas-box') if controls['camera']!='legacy' else f'tl.to("#sc_{index} .visual-canvas-box", {{y: {(-10 if family in ("nature","constellation") else 0)}, scale: {1.018 if family in ("device","portal","interface") else 1.0}, duration: Math.max(1.2, {length} * 0.48), yoyo:true, repeat:1, ease:"sine.inOut"}}, {start + 0.35});'
         animation.append(f'''
@@ -585,6 +591,8 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
 .portal-ring{{position:absolute;border-radius:50%;border:4px solid #22d3ee;box-shadow:0 0 45px #22d3ee88;animation:spinSlow 8s linear infinite}}.pr1{{width:580px;height:580px}}.pr2{{width:420px;height:420px;border-color:#a855f7;animation-direction:reverse}}.pr3{{width:260px;height:260px;border-color:#f59e0b}}.kinetic-viz{{flex-wrap:wrap;align-content:center;gap:18px;padding:70px}}.kinetic-viz strong{{font-size:72px;line-height:.92;padding:8px 16px;background:#e2e8f0;color:#020617;transform:rotate(-3deg)}}.kinetic-viz strong:nth-child(even){{background:#22d3ee;transform:rotate(4deg)}}
 .city-viz{{align-items:flex-end;background:radial-gradient(circle at 70% 20%,#0e749055,transparent 35%),linear-gradient(#020617,#082f49)}}.city-buildings{{height:72%;width:92%;display:flex;align-items:flex-end;justify-content:center;gap:16px;z-index:2}}.city-building{{position:relative;width:11%;height:var(--h,55%);background:linear-gradient(110deg,#0f172a,#155e75);border-top:2px solid #67e8f9;box-shadow:0 0 25px #22d3ee33}}.city-building:nth-child(2n){{--h:82%}}.city-building:nth-child(3n){{--h:66%}}.city-building i{{display:block;width:42%;height:5px;margin:24px auto;background:#f59e0b;box-shadow:0 0 12px #f59e0b}}.city-wave{{position:absolute;left:4%;bottom:31%;width:92%;height:14px;background:linear-gradient(90deg,#ef4444,#f59e0b,#22d3ee);clip-path:polygon(0 45%,12% 10%,24% 75%,38% 20%,52% 80%,68% 15%,82% 68%,100% 30%,100% 70%,82% 100%,68% 48%,52% 100%,38% 52%,24% 100%,12% 40%,0 75%);filter:drop-shadow(0 0 14px #ef4444)}}
 .balance-viz{{flex-direction:column}}.balance-beam{{position:relative;width:70%;height:16px;background:#67e8f9;border-radius:8px;transform-origin:center;box-shadow:0 0 25px #22d3ee}}.balance-hub{{position:absolute;width:76px;height:76px;border-radius:50%;background:#f59e0b;left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 25px #f59e0b}}.balance-pan{{position:absolute;width:190px;height:190px;border:8px solid #38bdf8;border-radius:50%;top:-87px;background:#0f172a}}.left-pan{{left:-45px}}.right-pan{{right:-45px;border-color:#a855f7}}.balance-base{{width:0;height:0;border-left:100px solid transparent;border-right:100px solid transparent;border-bottom:280px solid #155e75;margin-top:-5px}}.layout-full-bleed .visual-canvas-box{{border-radius:18px}}.layout-split-stage .visual-canvas-box{{background:linear-gradient(90deg,rgba(8,47,73,.8),rgba(3,7,18,.96))}}
+.editorial-viz{{padding:10%;font-size:{round(44*unit)}px;text-align:center;overflow-wrap:anywhere}}
+{opuscar_primitives.CSS}
 </style></head><body>
 <div id="stage" data-composition-id="video" data-start="0" data-duration="{duration}" data-width="{width}" data-height="{height}">
     {''.join(sections)}
@@ -620,8 +628,10 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
     {''.join(animation)}
     window.__timelines = window.__timelines || {{}};
     window.__timelines.video = tl;
+    {(Path(__file__).with_name('opuscar_actions.js')).read_text(encoding='utf-8')}
+    const drawDirectedScenes = createDirectedRenderer();
     {animation_clock.SCRIPT}
-    attachAnimationClock(tl, null, {duration});
+    attachAnimationClock(tl, drawDirectedScenes, {duration});
     </script>
 </div>
 </body></html>'''
@@ -980,6 +990,9 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         if plan == job.get("scenePlan"):
             return copy.deepcopy(job)
         job["approvals"] = {}
+        job.pop("visualReview", None)
+        job.pop("visualFrames", None)
+        job.pop("visualContactSheet", None)
         if stage == "storyboard":
             job["status"] = "awaiting_scene_plan"
         job["scenePlan"] = plan
@@ -996,7 +1009,7 @@ def read_video_file(slug: str, filename: str) -> tuple[bytes, str]:
 
 
 def video_file_path(slug: str, filename: str) -> tuple[Path, str]:
-    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "research.json", "review.json", "audio-manifest.json"} and not re.fullmatch(r"review-frame-\d{1,2}\.png", filename): raise FileNotFoundError(filename)
+    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "research.json", "review.json", "audio-manifest.json", "contact-sheet.png"} and not re.fullmatch(r"review-frame-\d{1,3}\.png", filename): raise FileNotFoundError(filename)
     path = _video_directory(slug) / filename
     if path.is_symlink() or not path.is_file(): raise FileNotFoundError(filename)
     return path, {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png"}.get(path.suffix, "application/octet-stream")
@@ -1016,6 +1029,9 @@ def approve_job(job_id: str, stage: str, expected_revision: int | None = None) -
         expected = {"scene_plan": "awaiting_scene_plan", "storyboard": "awaiting_storyboard"}.get(stage)
         if not expected or job["status"] != expected:
             raise ValueError(f"Tahap {stage} tidak dapat disetujui dari status {job['status']}")
+        if stage == "storyboard" and job.get('engine') == 'opuscar' and opuscar_quality_gate.required(job['scenePlan']):
+            document=generate_composition(job['scenePlan'],ASPECT_RATIOS[job['aspect']],job.get('model',''),engine='opuscar')
+            opuscar_quality_gate.verify(document,job.get('visualReview'))
         job.setdefault("approvals", {})[stage] = job.get("revision", 0)
         job["status"] = "queued"
         job["step"] = "Persetujuan diterima"
@@ -1238,9 +1254,21 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
     try:
         if approved_stage == "scene_plan":
             storyboard = _storyboard(job["scenePlan"])
+            if job['engine']=='opuscar' and opuscar_quality_gate.required(job['scenePlan']):
+                _update_job(job_id,{'step':'Membuat style frames untuk review Storyboard','progress':40})
+                preview=VIDEOS_DIR/_slugify(job['topic']+'-review')
+                preview.mkdir(parents=True)
+                document=generate_composition(job['scenePlan'],ASPECT_RATIOS[job['aspect']],job.get('model',''),engine='opuscar')
+                (preview/'index.html').write_text(document,encoding='utf-8')
+                report=opuscar_quality_gate.inspect(preview,job['scenePlan'],ASPECT_RATIOS[job['aspect']])
+                _update_job(job_id,{'visualReview':report,
+                    'visualFrames':[f'/api/videos/{preview.name}/{name}' for name in report['frames']],
+                    'visualContactSheet':f'/api/videos/{preview.name}/contact-sheet.png' if report.get('contactSheet') else None})
             _update_job(job_id, {"status": "awaiting_storyboard", "step": "Storyboard menunggu persetujuan", "progress": 45, "storyboard": storyboard})
             return
         plan = job["scenePlan"]
+        if job['engine']=='opuscar' and opuscar_quality_gate.required(plan):
+            opuscar_quality_gate.verify(generate_composition(plan,ASPECT_RATIOS[job['aspect']],job.get('model',''),engine='opuscar'),job.get('visualReview'))
         missing=runtime_issues(job['engine'])
         if missing:raise RuntimeError('Runtime render belum siap: '+', '.join(missing)+'. Siapkan runtime atau gunakan adapter Lottie.')
         target = VIDEOS_DIR / _slugify(job["topic"])

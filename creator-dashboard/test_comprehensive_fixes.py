@@ -189,6 +189,10 @@ class VideoReliabilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp,patch.object(vd,'VIDEOS_DIR',Path(tmp)/'videos'),patch.object(vd,'JOB_DIR',Path(tmp)/'jobs'),patch.object(vd,'JOBS',{}),patch.object(vd.threading,'Thread'):
             key=vd.start_job({'topic':'Test','script':'Naskah pengguna.','engine':'opuscar','researchMode':'provided'})['jobId']
             vd._run_job(key)
+            # This test starts after visual review; it isolates the subsequent voice failure.
+            job=vd.job_status(key)
+            document=vd.generate_composition(job['scenePlan'],vd.ASPECT_RATIOS[job['aspect']],engine='opuscar')
+            vd.JOBS[key]['visualReview']={'status':'sampled','issues':[],'digest':vd.opuscar_quality_gate.digest(document)}
             with patch.object(vd,'runtime_issues',return_value=[]),patch.object(vd,'_build_audio',side_effect=RuntimeError('Voice unavailable')),patch.object(vd.subprocess,'run') as renderer:
                 vd._continue_job(key,'storyboard')
             renderer.assert_not_called()

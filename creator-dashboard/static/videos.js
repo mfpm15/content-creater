@@ -312,7 +312,7 @@ function sceneEditor(scene, index) {
   const controls = scene.renderControls || {};
   const select = (name, label, choices) => `<label>${label}<select data-render-scene="${index}" data-render-field="${name}">${choices.map(value => `<option value="${value}" ${value === (controls[name] || 'legacy') ? 'selected' : ''}>${value}</option>`).join('')}</select></label>`;
   const renderControls = ['opuscar','threejs','remotion'].includes(activeReviewEngine) ? `<details><summary>Kontrol gambar yang diterapkan saat render</summary>
-    <p>2D: gerak ilustrasi dan filter lighting; 3D: kamera dan intensitas lampu. Transisi mengatur panel adegan (HUD pada 3D). Legacy mempertahankan perilaku bawaan; arahan bebas di bawah tetap catatan produksi.</p>
+    <p>2D: gerak ilustrasi dan filter lighting; 3D: kamera dan intensitas lampu. Transisi mengatur panel adegan (HUD pada 3D). Pada Opuscar mekanis, objek dan aksi yang dikenali diterjemahkan menjadi gambar; periksa hasil style frames. Arahan di luar kosakata renderer tetap membutuhkan review.</p>
     ${select('camera','Kamera render',['legacy','locked','push-in','pull-out','pan-left','pan-right','orbit'])}
     ${select('lighting','Lighting render',['legacy','soft','dramatic'])}${select('transition','Transisi render',['legacy','fade','cut','slide'])}
     <label>Kekuatan kamera (0–1)<input type="number" min="0" max="1" step="0.05" data-render-scene="${index}" data-render-field="strength" value="${escapeHtml(controls.strength ?? .5)}"></label></details>` : '';
@@ -321,11 +321,11 @@ function sceneEditor(scene, index) {
     <div class="editor-row">${field('start','Mulai')}${field('end','Selesai')}</div>
     ${field('narration','Narasi',true)}${field('onScreenText','Teks layar')}${field('visual','Visual shot',true)}
     <div class="editor-row">${field('visualFamily','Visual family')}${field('shotPurpose','Tujuan shot')}</div>
-    ${field('action','Aksi')}${field('setting','Setting')}${field('composition','Komposisi',true)}
+    ${field('directionSubject','Objek utama')}${field('action','Aksi')}${field('setting','Setting')}${field('composition','Komposisi',true)}
     <div class="editor-row">${field('foreground','Foreground')}${field('midground','Midground')}</div>
     ${renderControls}${field('background','Background')}${field('camera','Arahan kamera',true)}${field('lighting','Arahan lighting')}
     <div class="editor-row">${field('colorMood','Color mood')}${field('transition','Transisi')}</div>
-    ${field('typography','Tipografi')}${field('continuity','Kontinuitas',true)}${field('soundCue','Sound cue')}
+    ${field('typography','Tipografi')}${field('continuityToken','Objek penghubung antaradegan')}${field('continuity','Kontinuitas',true)}${field('soundCue','Sound cue')}
     <details><summary>Timing visual per kata (opsional)</summary>
       <p>Tempel seluruh kata narasi beserta timestamp dalam detik dari awal video. Ini timing yang Anda berikan, bukan alignment audio otomatis. Angka dan negasi harus tetap lengkap.</p>
       <label>Daftar JSON [{"word":"Halo","start":0,"end":0.5}]
@@ -346,6 +346,7 @@ function researchMarkup(research) {
 }
 
 function renderReview(job) {
+  elements.approveBtn.disabled = false;
   activeReviewEngine = job.engine;
   activeScenePlan = structuredClone(job.scenePlan);
   activeJobId = job.jobId;
@@ -368,6 +369,29 @@ function renderReview(job) {
     elements.reviewGrid.innerHTML = (job.scenePlan?.scenes || []).map(sceneEditor).join('');
     elements.approveBtn.textContent = 'Setujui Storyboard & Mulai Render';
     elements.reviseBtn.style.display = 'inline-flex';
+  }
+  if (job.visualReview && job.status === 'awaiting_storyboard') {
+    const card=document.createElement('section');card.className='review-card';
+    const title=document.createElement('h4');title.textContent='Review visual dari renderer';card.append(title);
+    const note=document.createElement('p');note.textContent=job.visualReview.status==='sampled'
+      ? 'Periksa gambar tiap shot sebelum menyetujui. Pemeriksaan otomatis mencakup layout dan pengulangan frame; makna, estetika, serta audio tetap perlu review.'
+      : 'Review visual belum lulus. Perbaiki arahan melalui editor, simpan, lalu setujui ulang Scene Plan untuk membuat preview baru.';
+    card.append(note);
+    elements.approveBtn.disabled=job.visualReview.status!=='sampled';
+    for(const issue of job.visualReview.issues||[]) {
+      const p=document.createElement('p');p.textContent=`${Number.isInteger(issue.scene)?'Adegan '+(issue.scene+1)+': ':''}${issue.reason}`;card.append(p);
+    }
+    if(job.visualContactSheet && /^\/api\/videos\/[a-z0-9-]+\/contact-sheet\.png$/.test(job.visualContactSheet)) {
+      const image=document.createElement('img');image.src=job.visualContactSheet;image.alt='Contact sheet storyboard';image.style.width='100%';card.append(image);
+    }
+    const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Lihat semua style frames';details.append(summary);
+    const gallery=document.createElement('div');gallery.style='display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px';
+    for(const [index,url] of (job.visualFrames||[]).entries()) {
+      if(!/^\/api\/videos\/[a-z0-9-]+\/review-frame-\d{1,3}\.png$/.test(url))continue;
+      const image=document.createElement('img');image.src=url;image.alt=`Style frame adegan ${index+1}`;image.loading='lazy';image.style.width='100%';gallery.append(image);
+    }
+    details.append(gallery);card.append(details);
+    elements.reviewGrid.prepend(card);
   }
   if (job.scenePlan?.brand) {
     const note = document.createElement('p');

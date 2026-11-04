@@ -126,7 +126,7 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertNotIn("99% Otonom", html)
         self.assertNotIn("98.7", html)
         self.assertIn('data-family="cityscape"', html)
-        self.assertIn('data-family="balance"', html)
+        self.assertIn('data-action="balance"', html)
         self.assertNotIn("Fase 1", html)
         self.assertNotIn("Puncak", html)
 
