@@ -150,17 +150,21 @@
           <div class="workflow-steps" aria-label="Tahapan produksi">
             <div class="workflow-step active" data-workflow-step="brief">Brief</div>
             <div class="workflow-step" data-workflow-step="research">Web Research</div>
+            <div class="workflow-step" data-workflow-step="narration">Narasi</div>
             <div class="workflow-step" data-workflow-step="scene_plan">Scene Plan</div>
             <div class="workflow-step" data-workflow-step="storyboard">Storyboard</div>
             <div class="workflow-step" data-workflow-step="render">Render</div>
           </div>
-          <div id="engineNotice" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Workflow Berbasis Sumber</strong><br>Brief diriset melalui Google Search grounding sebelum Scene Plan dibuat. Workflow berhenti jika sumber valid atau kredensial pencarian tidak tersedia.</div>
+          <div id="engineNotice" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Workflow Berbasis Sumber</strong><br>Brief → konteks/riset sesuai mode → narasi utuh → Scene Plan → storyboard dan prompt produksi → render. Naskah dan timecode pengguna dipertahankan; tiap tahap review dapat dikoreksi sebelum render.</div>
           <label>Topik / Judul Video <span class="req">wajib</span>
             <input name="topic" id="topicInput" maxlength="200" required placeholder="Contoh: 3 Tips Sukses Mengatur Waktu, Peluncuran Kopi Organik, AI Video Engine" />
           </label>
 
-          <label>Narasi dan Arahan Adegan (Opsional)
-            <textarea name="script" id="scriptInput" rows="9" placeholder="Input bebas, atau format eksplisit:&#10;00:00-00:08 Narasi: ...&#10;Visual: ...&#10;Teks layar: ...&#10;SFX: ..."></textarea>
+          <label>Arahan produksi (opsional)
+            <textarea id="creativeBriefInput" maxlength="4000" rows="3" placeholder="Tujuan video, audiens, gaya, pesan utama, dan hal yang harus dihindari. Bagian ini tidak dibacakan sebagai narasi."></textarea>
+          </label>
+          <label>Naskah narasi atau scene bertimecode (opsional)
+            <textarea name="script" id="scriptInput" rows="9" placeholder="Tulis narasi utuh yang ingin diucapkan, atau gunakan format scene:&#10;00:00-00:08 Narasi: ...&#10;Visual: ...&#10;Teks layar: ...&#10;SFX: ..."></textarea>
           </label>
 
           <label>Sumber rencana

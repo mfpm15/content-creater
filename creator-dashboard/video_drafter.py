@@ -1,6 +1,7 @@
 """Reviewed video planning and rendering across independent local adapters."""
 from __future__ import annotations
 
+import video_preproduction as preproduction
 import frame_rate
 import scene_diagram
 import html
@@ -89,7 +90,7 @@ def get_available_models() -> list[dict]:
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
     research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
@@ -152,7 +153,8 @@ def proportional_scenes(topic: str, script: str, duration: int) -> list[dict]:
     chunks = [item.strip() for item in re.split(r"\n\s*\n|(?<=[.!?])\s+", script) if item.strip()]
     if not chunks: chunks = [topic]
     count = min(12, max(1, len(chunks)))
-    chunks = chunks[:count]
+    if len(chunks)>count:
+        chunks=[" ".join(chunks[i*len(chunks)//count:(i+1)*len(chunks)//count]) for i in range(count)]
     weights = [max(1, len(chunk.split())) for chunk in chunks]
     total = sum(weights)
     cursor = 0.0
@@ -306,6 +308,9 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
         if 'renderControls' in raw:scene['renderControls']=scene_render.validate(raw['renderControls'])
     result={"topic": topic, "duration": duration, "scenes": scenes}
     if "fps" in data:result["fps"]=frame_rate.validate(data["fps"])
+    if 'creativeBrief' in data:
+        if not isinstance(data['creativeBrief'],str) or len(data['creativeBrief'])>4000:raise ValueError('Arahan produksi maksimal 4.000 karakter')
+        result['creativeBrief']=data['creativeBrief']
     if 'audioMode' in data:
         if data['audioMode'] not in ('music','tts'):raise ValueError('Audio harus music atau tts')
         result['audioMode']=data['audioMode']
@@ -850,7 +855,7 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
     with JOBS_LOCK:
         for aspect in dict.fromkeys(aspects):
             key = uuid.uuid4().hex
-            job = {"jobId": key, "fps": frame_rate.get(plan), "topic": plan["topic"], "script": "", "engine": engine,
+            job = {"jobId": key, "pipelineVersion":2, "fps": frame_rate.get(plan), "topic": plan["topic"], "script": "", "engine": engine,
                    "style": ENGINES[engine]["defaultStyle"], "aspect": aspect, "duration": plan["duration"],
                    "model": source.get("model", LLM_MODEL), "status": "awaiting_scene_plan", "step": "Review layout rasio baru sebelum render",
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
@@ -935,6 +940,8 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         if plan == job.get("scenePlan"):
             return copy.deepcopy(job)
         job["approvals"] = {}
+        job.pop("productionPacket",None)
+        job["narrationDraft"]=preproduction.from_plan(plan,"user_edit")
         job.pop("visualReview", None)
         job.pop("visualFrames", None)
         job.pop("visualContactSheet", None)
@@ -955,7 +962,7 @@ def read_video_file(slug: str, filename: str) -> tuple[bytes, str]:
 
 
 def video_file_path(slug: str, filename: str) -> tuple[Path, str]:
-    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "research.json", "review.json", "audio-manifest.json", "contact-sheet.png"} and not re.fullmatch(r"review-frame-\d{1,3}\.png", filename): raise FileNotFoundError(filename)
+    if filename not in {"video.mp4", "index.html", "subtitles.srt", "lottie.json", "scene-plan.json", "narration.json", "production-prompts.json", "research.json", "review.json", "audio-manifest.json", "contact-sheet.png"} and not re.fullmatch(r"review-frame-\d{1,3}\.png", filename): raise FileNotFoundError(filename)
     path = _video_directory(slug) / filename
     if path.is_symlink() or not path.is_file(): raise FileNotFoundError(filename)
     return path, {".mp4": "video/mp4", ".html": "text/html; charset=utf-8", ".srt": "text/plain; charset=utf-8", ".json": "application/json; charset=utf-8", ".png": "image/png"}.get(path.suffix, "application/octet-stream")
@@ -975,6 +982,8 @@ def approve_job(job_id: str, stage: str, expected_revision: int | None = None) -
         expected = {"scene_plan": "awaiting_scene_plan", "storyboard": "awaiting_storyboard"}.get(stage)
         if not expected or job["status"] != expected:
             raise ValueError(f"Tahap {stage} tidak dapat disetujui dari status {job['status']}")
+        if stage == 'storyboard' and job.get('pipelineVersion')==2:
+            preproduction.verify_packet(job.get('productionPacket'),job['scenePlan'],job['engine'],job['aspect'])
         if stage == "storyboard" and job.get('engine') == 'opuscar' and opuscar_quality_gate.required(job['scenePlan']):
             document=generate_composition(job['scenePlan'],ASPECT_RATIOS[job['aspect']],job.get('model',''),engine='opuscar')
             opuscar_quality_gate.verify(document,job.get('visualReview'))
@@ -1003,6 +1012,8 @@ def start_job(payload: dict) -> dict:
     topic = str(payload.get("topic") or "").strip()
     if not topic: raise ValueError("Topik video wajib diisi")
     script=str(payload.get('script') or '').strip()
+    creative_brief=payload.get('creativeBrief','')
+    if not isinstance(creative_brief,str) or len(creative_brief)>4000:raise ValueError('Arahan produksi maksimal 4.000 karakter')
     if len(topic)>500 or len(script)>30000:raise ValueError('Topik maksimal 500 karakter; naskah maksimal 30.000 karakter')
     research_mode=payload.get('researchMode','planner')
     if research_mode not in {'planner','web','provided'}:raise ValueError('Mode perencanaan tidak dikenal')
@@ -1023,7 +1034,7 @@ def start_job(payload: dict) -> dict:
     fps = frame_rate.validate(payload.get("fps", frame_rate.DEFAULT))
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
-    job = {"jobId": job_id, "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    job = {"jobId": job_id, "pipelineVersion":2, "creativeBrief":creative_brief.strip(), "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
     if engine=='remotion':
         if payload.get('voiceMode','music') not in ('music','tts'):raise ValueError('Audio harus music atau tts')
         job['audioMode']=payload.get('voiceMode','music')
@@ -1177,18 +1188,34 @@ def _run_job(job_id: str) -> None:
         # Mode provided tetap merupakan jalur lokal deterministik. Ini penting untuk
         # naskah bertimecode dan produksi offline: model tetap dapat dipilih di UI,
         # tetapi hanya dipakai oleh mode planner/web yang memang meminta generasi AI.
+        if job.get('narrationDraft'):
+            saved=job['narrationDraft']
+            draft=preproduction.narration(saved['text'],saved['source'],allow_empty=saved['source']=='provided_timecodes')
+        elif explicit:
+            draft=preproduction.narration(' '.join(s['narration'] for s in explicit),'provided_timecodes',allow_empty=True)
+        elif job['script'].strip():
+            draft=preproduction.narration(job['script'],'provided_script')
+        else:
+            _update_job(job_id,{'status':'writing_narration','step':'Menulis narasi utuh sebelum pembagian scene','progress':22})
+            response=_clean_json(_call_9router(preproduction.script_prompt(job['topic'],_research_context(research)+'\nArahan produksi: '+job.get('creativeBrief',''),job['duration']),job['model']))
+            draft=preproduction.narration(response.get('narration'),'generated')
+        _update_job(job_id,{'narrationDraft':draft,'initialNarrationDraft':draft,
+            'status':'planning_scenes','step':'Membagi narasi menjadi shot dan arahan visual','progress':28})
         prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
-        prompt+='\nAdapter yang dipilih: '+job['engine']+'.'
+        prompt+='\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
         if job.get('motionDesign'):
             concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
-            prompt+='\nKonsep yang sudah dipilih pengguna: '+concept['idea']+' '+concept['carry']+'\nRencana harus menutup seluruh durasi tanpa celah; beri ruang diam, tanpa mengganti konsep atau mengubah timecode pengguna.'
+            prompt+='\nKonsep wajib: '+concept['idea']+' '+concept['carry']+' Tutup seluruh durasi tanpa gap.'
         data = {} if explicit or provided else _clean_json(_call_9router(prompt, job["model"]))
         if job.get('motionDesign'):data['motionDesign']=job['motionDesign']
         else:data.pop('motionDesign',None)
         if job.get('engine')=='remotion':data['audioMode']=job['audioMode']
         else:data.pop('audioMode',None)
+        if job.get("creativeBrief"):data["creativeBrief"]=job["creativeBrief"]
         data["fps"]=frame_rate.get(job)
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
+        preproduction.verify_narration(draft,plan)
+        if not explicit:preproduction.verify_timing(plan,job["duration"])
         if job.get('engine')=='remotion':remotion_adapter.manifest(plan,ASPECT_RATIOS[job['aspect']])
         if job.get('engine') not in {'remotion','lottie'} and any('diagram' in scene for scene in plan['scenes']):
             raise ValueError('Diagram berlabel hanya tersedia untuk Remotion dan Lottie')
@@ -1204,7 +1231,10 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
     job = job_status(job_id)
     try:
         if approved_stage == "scene_plan":
+            packet=preproduction.compile_packet(job['scenePlan'],job['engine'],job['aspect'])
             storyboard = _storyboard(job["scenePlan"])
+            for shot,compiled in zip(storyboard,packet['shots']):shot['productionPrompt']=compiled['prompt']
+            _update_job(job_id,{'productionPacket':packet})
             if job['engine']=='opuscar' and opuscar_quality_gate.required(job['scenePlan']):
                 _update_job(job_id,{'step':'Membuat style frames untuk review Storyboard','progress':40})
                 preview=VIDEOS_DIR/_slugify(job['topic']+'-review')
@@ -1218,6 +1248,7 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
             _update_job(job_id, {"status": "awaiting_storyboard", "step": "Storyboard menunggu persetujuan", "progress": 45, "storyboard": storyboard})
             return
         plan = job["scenePlan"]
+        if job.get('pipelineVersion')==2:preproduction.verify_packet(job.get('productionPacket'),plan,job['engine'],job['aspect'])
         if job['engine']=='opuscar' and opuscar_quality_gate.required(plan):
             opuscar_quality_gate.verify(generate_composition(plan,ASPECT_RATIOS[job['aspect']],job.get('model',''),engine='opuscar'),job.get('visualReview'))
         missing=runtime_issues(job['engine'])
@@ -1225,6 +1256,8 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         target = VIDEOS_DIR / _slugify(job["topic"])
         target.mkdir(parents=True)
         (target / "research.json").write_text(json.dumps(job["research"], ensure_ascii=False, indent=2), encoding="utf-8")
+        (target/'production-prompts.json').write_text(json.dumps(preproduction.compile_packet(plan,job['engine'],job['aspect']),ensure_ascii=False,indent=2),encoding='utf-8')
+        (target/'narration.json').write_text(json.dumps(preproduction.from_plan(plan),ensure_ascii=False,indent=2),encoding='utf-8')
         (target / "scene-plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
         (target / "audio-manifest.json").write_text(json.dumps(audio_manifest(plan), ensure_ascii=False, indent=2), encoding="utf-8"); write_subtitles(target / "subtitles.srt", plan)
         (target / "index.html").write_text(generate_composition(plan, ASPECT_RATIOS[job["aspect"]], job["model"], job["engine"]), encoding="utf-8")

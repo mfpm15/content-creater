@@ -1,0 +1,24 @@
+{
+  "model_calls_mocked": 2,
+  "status": "succeeded",
+  "fps": {
+    "status": "matched",
+    "expected": 60,
+    "actual": 60.0
+  },
+  "video": {
+    "width": 320,
+    "height": 568,
+    "codec_name": "h264",
+    "pix_fmt": "yuv420p",
+    "color_range": "tv",
+    "color_space": "bt709",
+    "avg_frame_rate": "60/1"
+  },
+  "narration": "Riset lalu tinjau storyboard. Terakhir periksa hasil render.",
+  "production_shots": 2,
+  "two_approvals": {
+    "scene_plan": 0,
+    "storyboard": 0
+  }
+}

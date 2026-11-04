@@ -24,7 +24,7 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertEqual([item["id"] for item in opts["engines"]], ["opuscar", "threejs", "lottie", "continuous", "remotion"])
         self.assertEqual(opts["defaultEngine"], "opuscar")
         self.assertFalse(next(item for item in opts["engines"] if item["id"] == "threejs").get("disabled", False))
-        self.assertEqual(opts["workflow"], ["brief", "research", "scene_plan", "storyboard", "render"])
+        self.assertEqual(opts["workflow"], ["brief", "research", "narration", "scene_plan", "storyboard", "render"])
         self.assertEqual(opts["research"]["provider"], "Google Search grounding")
         self.assertFalse(opts["research"]["required"])
         self.assertEqual(opts["research"]["requiredForModes"], ["web"])
@@ -172,6 +172,8 @@ class VideoDrafterTest(unittest.TestCase):
     def test_title_only_planner_uses_selected_model_and_detailed_prompt(self):
         captured = {}
         def fake_call(prompt, model=""):
+            if 'TAHAP 1 — PENULISAN NARASI' in prompt:
+                return '{"narration":"Sebuah perubahan dimulai."}'
             captured["prompt"] = prompt
             captured["model"] = model
             return '{"creativeDirection":{"logline":"Transformasi"},"scenes":[{"start":0,"end":15,"narration":"Sebuah perubahan dimulai.","onScreenText":"MULAI BERUBAH","visual":"Satu objek berubah bentuk lalu membuka dunia baru.","type":"story","shotPurpose":"hook","camera":"macro push-in","lighting":"high contrast","transition":"shape match","continuity":"bentuk diteruskan"}]}'

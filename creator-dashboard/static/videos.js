@@ -184,7 +184,7 @@ function updateEngineExperience() {
   } else if (eng === 'remotion') {
     elements.engineNotice.textContent = 'Remotion Editorial: diagram process/data/comparison atau konsep abstrak, warna brand dan caption pendek. Musik lokal tersedia; TTS opsional. Tanpa cue kata, caption memakai estimasi durasi, bukan alignment audio. Pilih kontrol render pada review adegan.';
   } else if (eng === 'threejs') {
-    elements.engineNotice.innerHTML = `<strong style="color:#38bdf8">Three.js 3D WebGL Adapter</strong><br>Dunia 3D sinematik dengan hero mesh icosahedron, orbiting rings, grid cyber, star particles, dan kamera orbit dinamis (Output MP4).`;
+    elements.engineNotice.innerHTML = `<strong style="color:#38bdf8">Three.js 3D WebGL Adapter</strong><br>Objek mekanis 3D per adegan dengan kamera terkontrol. Arahan di luar grammar memakai fallback editorial; periksa storyboard sebelum render.`;
   } else if (eng === 'lottie') {
     elements.engineNotice.innerHTML = `<strong style="color:#22d3ee">Lottie Motion Adapter</strong><br>Animasi vektor ringan bebas build dengan preview web interaktif dan ekspor lottie.json siap pakai.`;
   } else {
@@ -359,7 +359,7 @@ function renderReview(job) {
   if (job.status === 'awaiting_scene_plan') {
     activeReviewStage = 'scene_plan';
     setWorkflowStep('scene_plan');
-    elements.reviewTitle.textContent = 'Review Research & Scene Plan';
+    elements.reviewTitle.textContent = 'Review Narasi & Scene Plan';
     elements.reviewDescription.textContent = 'Periksa strategi kreatif, sumber bila tersedia, struktur hook hingga payoff, timing, narasi, visual, kamera, pencahayaan, transisi, audio, dan continuity sebelum membuat Storyboard.';
     elements.reviewGrid.innerHTML = researchMarkup(job.research) + (job.scenePlan?.scenes || []).map(sceneEditor).join('');
     elements.approveBtn.textContent = 'Setujui Scene Plan & Buat Storyboard';
@@ -404,6 +404,23 @@ function renderReview(job) {
   if(job.engine==='remotion'){
     const note=document.createElement('p');note.textContent=`Remotion · audio ${job.scenePlan?.audioMode==='music'?'musik lokal tanpa dubbing':'TTS'}. Caption tanpa cue kata dibagi dengan estimasi; periksa terhadap audio. Keluarga selain process/data/comparison memakai diagram konsep.`;
     elements.reviewGrid.prepend(note);
+  }
+  const narrativeCard=document.createElement('section');narrativeCard.className='review-card';
+  const narrativeTitle=document.createElement('h4');narrativeTitle.textContent='Narasi utuh · sumber urutan scene';
+  const narrativeText=document.createElement('p');narrativeText.style.whiteSpace='pre-wrap';
+  narrativeText.textContent=(job.scenePlan?.scenes || []).map(scene=>scene.narration).join('\n\n');
+  narrativeCard.append(narrativeTitle,narrativeText);elements.reviewGrid.prepend(narrativeCard);
+  if(job.status==='awaiting_storyboard' && job.productionPacket){
+    const prompts=document.createElement('section');prompts.className='review-card';
+    const title=document.createElement('h4');title.textContent='Prompt produksi per shot';prompts.append(title);
+    for(const shot of job.productionPacket.shots){
+      const details=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('pre');
+      summary.textContent=`${shot.scene} · ${shot.start}–${shot.end}s`;text.style.whiteSpace='pre-wrap';text.textContent=shot.prompt;
+      details.append(summary,text);
+      for(const limitation of shot.limitations){const note=document.createElement('p');note.textContent=limitation;details.append(note);}
+      prompts.append(details);
+    }
+    elements.reviewGrid.append(prompts);
   }
   const rateCard=document.createElement('label');rateCard.className='review-card';
   rateCard.textContent='Frame rate output';
@@ -537,6 +554,7 @@ elements.form.addEventListener('submit', async event => {
     aspect: elements.aspectSelect.value,
     duration: parseInt(elements.durationSelect.value, 10),
     fps: Number(document.getElementById("fpsSelect").value),
+    creativeBrief: document.getElementById("creativeBriefInput").value.trim(),
     model: elements.modelSelect.value,
     researchMode: document.getElementById('researchMode').value,
     brandId: document.getElementById('brandSelect').value,
@@ -586,6 +604,10 @@ function startPolling(jobId, aspectId) {
       elements.progressBar.style.width = `${job.progress || 5}%`;
       if (job.status === 'researching') {
         setWorkflowStep('research');
+      } else if (job.status === 'writing_narration') {
+        setWorkflowStep('narration');
+      } else if (job.status === 'planning_scenes') {
+        setWorkflowStep('scene_plan');
       } else if (job.status === 'awaiting_scene_plan' || job.status === 'awaiting_storyboard') {
         clearInterval(pollTimer);
         renderReview(job);

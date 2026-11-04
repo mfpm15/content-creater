@@ -192,6 +192,7 @@ class VideoReliabilityTests(unittest.TestCase):
             # This test starts after visual review; it isolates the subsequent voice failure.
             job=vd.job_status(key)
             document=vd.generate_composition(job['scenePlan'],vd.ASPECT_RATIOS[job['aspect']],engine='opuscar')
+            vd.JOBS[key]['productionPacket']=vd.preproduction.compile_packet(job['scenePlan'],job['engine'],job['aspect'])
             vd.JOBS[key]['visualReview']={'status':'sampled','issues':[],'digest':vd.opuscar_quality_gate.digest(document)}
             with patch.object(vd,'runtime_issues',return_value=[]),patch.object(vd,'_build_audio',side_effect=RuntimeError('Voice unavailable')),patch.object(vd.subprocess,'run') as renderer:
                 vd._continue_job(key,'storyboard')
