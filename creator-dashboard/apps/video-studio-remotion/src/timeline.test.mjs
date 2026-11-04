@@ -44,3 +44,9 @@ test('approved diagram labels are preserved and invalid structures rejected',()=
     value.shots[0].diagram=diagram;assert.throws(()=>validateManifest(value));
   }
 });
+test('60fps supports 600 seconds and rejects frames beyond the duration bound',()=>{
+  const value=example();value.fps=60;value.totalFrames=36000;value.shots[0].endFrame=36000;
+  assert.equal(validateManifest(value).fps,60);
+  value.totalFrames=36001;value.shots[0].endFrame=36001;assert.throws(()=>validateManifest(value));
+  value.fps=30;value.totalFrames=18001;value.shots[0].endFrame=18001;assert.throws(()=>validateManifest(value));
+});

@@ -1,4 +1,5 @@
 """Self-contained Lottie subset: exported data is also the preview's only source."""
+import frame_rate
 import scene_diagram
 import json
 import textwrap
@@ -6,7 +7,7 @@ import creative_profile
 
 
 def build(plan: dict, aspect: dict) -> dict:
-    width, height, fps = aspect['width'], aspect['height'], 30
+    width, height, fps = aspect['width'], aspect['height'], frame_rate.get(plan)
     layers = []
     colors = [[.13,.83,.93,1], [.55,.36,.96,1], [.98,.75,.14,1]]
     kit=creative_profile.brand(plan['brand']) if plan.get('brand') else None
@@ -16,10 +17,10 @@ def build(plan: dict, aspect: dict) -> dict:
     for index, scene in enumerate(plan['scenes']):
         end = round(scene['end']*fps)
         start = min(end-1, round(creative_profile.reveal(scene)*fps))
-        ramp = min(6, (end-start)/3)
+        ramp = min(.2*fps, (end-start)/3)
         opacity = {'a':1, 'k':[{'t':start,'s':[0]},{'t':start+ramp,'s':[100]}, {'t':end-ramp,'s':[100]},{'t':end,'s':[0]}]}
         transform = {'o':opacity, 'r':{'a':0,'k':0}, 'p':{'a':0,'k':[width*.5,height*.4,0]},
-                     'a':{'a':0,'k':[0,0,0]}, 's':{'a':1,'k':[{'t':start,'s':[85,85,100]},{'t':min(start+15,end),'s':[100,100,100]}]}}
+                     'a':{'a':0,'k':[0,0,0]}, 's':{'a':1,'k':[{'t':start,'s':[85,85,100]},{'t':min(start+.5*fps,end),'s':[100,100,100]}]}}
         shape = {'ty':'rc' if scene.get('type') in {'data','compare','steps'} else 'el',
                  'p':{'a':0,'k':[0,0]}, 's':{'a':0,'k':[width*.45,min(width,height)*.35]}, 'r':{'a':0,'k':24}}
         layers.append({'ddd':0,'ind':len(layers)+1,'ty':4,'nm':scene['id'],'ip':start,'op':end,'st':0,

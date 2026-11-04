@@ -244,3 +244,5 @@ Audit lintas engine 4 November: baca `docs/ENGINE-QUALITY-2026-11-04.md`. Three.
 
 
 Lanjutan Three.js: jumlah 1–12 pada grammar tidak boleh dipotong tujuh; `visualCueWord` menunda awal fase aksi objek melalui `cueOffset`, sementara transisi memakai waktu scene. Slide menggerakkan objek dan overlay; origin objek wajib di-reset tiap seek. Regresi `test_three_scenes.py` menguji jumlah 12, pose sebelum/sesudah cue, slide dan repeat. Detail/bukti di `docs/ENGINE-QUALITY-2026-11-04.md`.
+
+Video Studio 60 fps: baca `docs/VIDEO-STUDIO-60FPS.md`. `frame_rate.py` memvalidasi integer 30/60; job baru default60, plan/job lama tanpa fps fallback30. Jangan memakai FPS hardcoded pada adapter/seek/caption/keyframe atau menggandakan kecepatan animasi. Brief, normalizer, editor, varian rasio, metadata, HyperFrames, Remotion, Continuous dan Lottie wajib mempertahankan fps. Review MP4 mencocokkan fps terukur. Tes `test_frame_rate.py` mencakup legacy/default/varian, timing layer dan kesetaraan cache60; tidak merender ulang proyek lama.

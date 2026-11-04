@@ -2,6 +2,7 @@
 
 OneTake was studied for workflow ideas only; no upstream code, fonts or assets are used.
 """
+import frame_rate
 import hashlib
 import importlib.util
 import json
@@ -54,11 +55,11 @@ def design(raw: dict, scenes: list[dict], duration: float) -> dict:
     if abs(previous-duration) > .005:
         raise ValueError('Adegan film kontinu harus mencakup seluruh durasi rencana')
     return {'concept': raw['concept'], 'restFraction': float(rest), 'voiceMode': voice,
-            'fps': 30, 'quality': 'draft', 'carrier': 'motion-hero'}
+            'fps': frame_rate.validate(raw.get('fps',30)), 'quality': 'draft', 'carrier': 'motion-hero'}
 
 
 def beat_sheet(plan: dict) -> dict:
-    cfg = design(plan['motionDesign'], plan['scenes'], plan['duration'])
+    cfg = design({**plan['motionDesign'],'fps':frame_rate.get(plan)}, plan['scenes'], plan['duration'])
     transitions = []
     scenes = plan['scenes']
     for a, b in zip(scenes, scenes[1:]):
@@ -80,7 +81,7 @@ def beat_sheet(plan: dict) -> dict:
 
 
 def composition(plan: dict, aspect: dict) -> str:
-    cfg = design(plan['motionDesign'], plan['scenes'], plan['duration'])
+    cfg = design({**plan['motionDesign'],'fps':frame_rate.get(plan)}, plan['scenes'], plan['duration'])
     concept = next(row for row in CONCEPTS if row['id'] == cfg['concept'])
     palette = brand(plan.get('brand') or {'name': concept['name'], **{k: concept[k] for k in ('accent', 'background', 'text')}})
     sheet = beat_sheet(plan)
@@ -153,7 +154,7 @@ function draw(seconds){
 }
 window.__seek=t=>{playing=false;byId('play').textContent='Putar';return draw(t)};
 window.__timelines={video:{seek:window.__seek,pause(){playing=false},duration(){return D.duration}}};
-window.__meta={duration:D.duration,fps:30,concept,carrier:'motion-hero',motionBlur:false};
+window.__meta={duration:D.duration,fps:D.design.fps,concept,carrier:'motion-hero',motionBlur:false};
 window.__track=()=>{const b=hero.getBoundingClientRect();return {id:'motion-hero',x:b.x,y:b.y,width:b.width,height:b.height,opacity:1,viewportWidth:innerWidth,viewportHeight:innerHeight}};
 window.__events=()=>scenes.filter(s=>s.soundCue).map(s=>({time:s.start,cue:s.soundCue}));
 window.__ready=document.fonts.ready.then(()=>draw(0));
@@ -268,11 +269,12 @@ def render(directory: Path, plan: dict, aspect: dict, progress=None, timeout: fl
     if type(width) is not int or type(height) is not int or not (16<=width<=3840 and 16<=height<=3840) or width%2 or height%2:
         raise ValueError('Render dimensions must be even and bounded')
     if not 0<float(plan['duration'])<=600: raise ValueError('Render duration out of bounds')
-    frames = math.ceil(plan['duration']*30)
+    fps=frame_rate.get(plan)
+    frames = math.ceil(plan['duration']*fps)
     target = directory/'silent.mp4'
     temporary = directory/'silent.part.mp4'
     env = render_environment()
-    command = [shutil.which('ffmpeg'),'-hide_banner','-loglevel','error','-nostdin','-y','-f','image2pipe','-vcodec','png','-r','30',
+    command = [shutil.which('ffmpeg'),'-hide_banner','-loglevel','error','-nostdin','-y','-f','image2pipe','-vcodec','png','-r',str(fps),
                '-i','pipe:0','-an','-c:v','libx264','-threads','2','-preset','fast','-pix_fmt','yuv420p','-frames:v',str(frames),
                '-map_metadata','-1','-movflags','+faststart',str(temporary)]
     started = time.monotonic()
@@ -296,13 +298,13 @@ def render(directory: Path, plan: dict, aspect: dict, progress=None, timeout: fl
                 try:
                     for frame in range(frames):
                         if time.monotonic()-started>timeout:raise TimeoutError('Continuous render timed out')
-                        key=page.evaluate('(t)=>{window.__seek(t);return window.__renderKey}',frame/30)
+                        key=page.evaluate('(t)=>{window.__seek(t);return window.__renderKey}',frame/fps)
                         if not reuse_static_frames or not isinstance(key,str) or not key or last_png is None or key!=last_key:
                             last_png=page.locator('#stage').screenshot(timeout=15000,animations='disabled')
                             captured+=1
                         last_key=key
                         process.stdin.write(last_png)
-                        if progress and frame%30==0:progress(frame/frames)
+                        if progress and frame%fps==0:progress(frame/frames)
                     process.stdin.close()
                     if process.wait(timeout=30):raise RuntimeError('FFmpeg encode failed')
                 finally:
@@ -312,7 +314,7 @@ def render(directory: Path, plan: dict, aspect: dict, progress=None, timeout: fl
                     if process.stdin and not process.stdin.closed:process.stdin.close()
                 if page_errors:raise RuntimeError('Composition raised a browser error')
                 temporary.replace(target)
-                report.update(frames=frames,fps=30,captured_frames=captured,reused_static_frames=frames-captured,
+                report.update(frames=frames,fps=fps,captured_frames=captured,reused_static_frames=frames-captured,
                               capture_optimization='consecutive_identical_authored_visual_state' if reuse_static_frames else 'disabled',
                               wall_seconds=round(time.monotonic()-started,3),
                               composition_sha256=hashlib.sha256(source.read_bytes()).hexdigest())

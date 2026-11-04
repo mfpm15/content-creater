@@ -1,6 +1,7 @@
 """Video Studio → original, asset-free Remotion composition. No daemon dependency."""
 from __future__ import annotations
 
+import frame_rate
 import scene_diagram
 import html
 import json
@@ -31,20 +32,22 @@ def runtime_issues() -> list[str]:
     return missing
 
 
-def _frame(seconds: float) -> int:
-    return math.floor(float(seconds)*FPS+.5)
+def _frame(seconds: float, fps: int = FPS) -> int:
+    return math.floor(float(seconds)*fps+.5)
 
 
 def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
     """Keep approved timings. Reject gaps rather than silently retiming a film."""
-    total=_frame(plan['duration'])
-    if not 1<=total<=18000:raise ValueError('Durasi Remotion harus 1 frame–600 detik')
+    fps=frame_rate.get(plan)
+    frame=lambda seconds:_frame(seconds,fps)
+    total=frame(plan['duration'])
+    if not 1<=total<=600*fps:raise ValueError('Durasi Remotion harus 1 frame–600 detik')
     width,height=aspect['width'],aspect['height']
     if any(type(n) is not int or not 128<=n<=3840 or n%2 for n in (width,height)):raise ValueError('Kanvas Remotion tidak valid')
     shots,captions,methods=[],[],[]
     cursor=0
     for scene in plan['scenes']:
-        start,end=_frame(scene['start']),_frame(scene['end'])
+        start,end=frame(scene['start']),frame(scene['end'])
         if start!=cursor or end<=start or end>total:raise ValueError('Adegan Remotion wajib menutup durasi tanpa gap/overlap, minimal satu frame per adegan')
         controls=scene_render.validate(scene.get('renderControls',{}))
         family=scene.get('visualFamily')
@@ -62,8 +65,8 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
         if cues:
             groups=[cues[i:i+7] for i in range(0,len(cues),7)]
             for group in groups:
-                a=min(end-1,max(start,_frame(group[0]['start'])))
-                b=min(end,max(a+1,_frame(group[-1]['end'])))
+                a=min(end-1,max(start,frame(group[0]['start'])))
+                b=min(end,max(a+1,frame(group[-1]['end'])))
                 if captions and a<captions[-1]['endFrame']:a=captions[-1]['endFrame']
                 if b>a:captions.append({'startFrame':a,'endFrame':b,'text':' '.join(cue['word'] for cue in group)})
             methods.append({'scene':scene['id'],'method':'supplied_word_cues_rounded_to_frames'})
@@ -84,7 +87,7 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
     if not shots or cursor!=total:raise ValueError('Adegan Remotion harus mencakup seluruh durasi')
     if any(len(shot['title'])>500 for shot in shots) or any(len(c['text'])>500 for c in captions):raise ValueError('Teks Remotion terlalu panjang; ringkas judul atau token narasi')
     brand=creative_profile.brand(plan.get('brand') or creative_profile.DEFAULT)
-    props={'version':1,'width':width,'height':height,'fps':FPS,'totalFrames':total,'topic':plan['topic'],
+    props={'version':1,'width':width,'height':height,'fps':fps,'totalFrames':total,'topic':plan['topic'],
            'brand':{key:brand[key] for key in ('background','accent','text','wordmark','font')},'shots':shots,'captions':captions}
     return props,{'adapter':'remotion','version':'4.0.540','caption_timing':methods,
                   'visual_families':['process','data','comparison','concept'],

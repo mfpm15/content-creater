@@ -405,6 +405,11 @@ function renderReview(job) {
     const note=document.createElement('p');note.textContent=`Remotion · audio ${job.scenePlan?.audioMode==='music'?'musik lokal tanpa dubbing':'TTS'}. Caption tanpa cue kata dibagi dengan estimasi; periksa terhadap audio. Keluarga selain process/data/comparison memakai diagram konsep.`;
     elements.reviewGrid.prepend(note);
   }
+  const rateCard=document.createElement('label');rateCard.className='review-card';
+  rateCard.textContent='Frame rate output';
+  const rateSelect=document.createElement('select');rateSelect.id='reviewFps';
+  for(const rate of [30,60]){const option=new Option(`${rate} fps`,String(rate));option.selected=rate===(job.scenePlan?.fps ?? 30);rateSelect.add(option);}
+  rateCard.append(rateSelect);elements.reviewGrid.prepend(rateCard);
   if (job.scenePlan?.creativeDirection) {
     const section = document.createElement('section');section.className = 'review-card';
     const title = document.createElement('h4');title.textContent = 'Arahan kreatif';section.append(title);
@@ -463,7 +468,10 @@ function collectEditedPlan() {
   for (const [index, value] of controls) {
     if (scenes[index].renderControls || ['camera','lighting','transition'].some(key => value[key] !== 'legacy')) scenes[index].renderControls = value;
   }
-  return { ...structuredClone(activeScenePlan), scenes };
+  const plan={ ...structuredClone(activeScenePlan), scenes };
+  const rate=Number(document.getElementById("reviewFps")?.value ?? plan.fps ?? 30);
+  if(plan.fps!==undefined || rate!==30)plan.fps=rate;
+  return plan;
 }
 
 async function saveEditedPlan() {
@@ -528,6 +536,7 @@ elements.form.addEventListener('submit', async event => {
     style: elements.styleSelect.value,
     aspect: elements.aspectSelect.value,
     duration: parseInt(elements.durationSelect.value, 10),
+    fps: Number(document.getElementById("fpsSelect").value),
     model: elements.modelSelect.value,
     researchMode: document.getElementById('researchMode').value,
     brandId: document.getElementById('brandSelect').value,

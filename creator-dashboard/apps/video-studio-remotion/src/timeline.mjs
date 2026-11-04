@@ -12,7 +12,7 @@ export function validateManifest(value) {
   if (!plain(value)) fail();
   const keys = ['version','width','height','fps','totalFrames','topic','brand','shots','captions'];
   if (Object.keys(value).some(key => !keys.includes(key))) fail();
-  if (value.version !== 1 || value.fps !== 30 || !integer(value.totalFrames) || value.totalFrames < 1 || value.totalFrames > 18000) fail();
+  if (value.version !== 1 || ![30,60].includes(value.fps) || !integer(value.totalFrames) || value.totalFrames < 1 || value.totalFrames > 600*value.fps) fail();
   if (![value.width,value.height].every(n => integer(n) && n >= 128 && n <= 3840 && n % 2 === 0) || !text(value.topic,500)) fail();
   const brand = value.brand;
   if (!plain(brand) || Object.keys(brand).some(k => !['background','accent','text','wordmark','font'].includes(k)) ||

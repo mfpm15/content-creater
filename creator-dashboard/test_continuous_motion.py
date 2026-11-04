@@ -73,7 +73,7 @@ class ContinuousMotionTests(unittest.TestCase):
 
     def test_edit_preserves_creative_direction_and_invalidates_changed_storyboard(self):
         plan=example();key='a'*32
-        vd.JOBS[key]={'jobId':key,'engine':'continuous','duration':2,'topic':'Test','status':'awaiting_storyboard',
+        vd.JOBS[key]={'jobId':key,'engine':'continuous','fps':30,'duration':2,'topic':'Test','status':'awaiting_storyboard',
                       'scenePlan':plan,'revision':2,'approvals':{'scene_plan':2}}
         raw=copy.deepcopy(plan)
         unchanged=vd.update_job_plan(key,{'stage':'storyboard','revision':2,'scenePlan':raw})
@@ -123,7 +123,7 @@ class ContinuousMotionTests(unittest.TestCase):
         aspect={'id':'9:16','width':160,'height':288,'label':'Small test'}
         with patch.dict(os.environ,{'VIDEO_REVIEW_ALLOW_NO_SANDBOX':'1'}),patch.dict(vd.ASPECT_RATIOS,{'9:16':aspect}),patch.object(vd,'_call_9router',side_effect=AssertionError('No LLM')),patch.object(vd,'_research_web',side_effect=AssertionError('No web')):
             with patch.object(vd.threading.Thread,'start'):
-                result=vd.start_job({'topic':'Offline pipeline','engine':'continuous','motionConcept':'trace','voiceMode':'music',
+                result=vd.start_job({'topic':'Offline pipeline','engine':'continuous','fps':30,'motionConcept':'trace','voiceMode':'music',
                     'researchMode':'provided','script':'0-1 Narasi: Ide.\nTeks layar: Ide\nSFX: click\n\n1-2 Narasi: Hasil.\nTeks layar: Hasil\nSFX: chime'})
             key=result['jobId'];vd._run_job(key)
             job=vd.job_status(key);self.assertEqual(job['status'],'awaiting_scene_plan',job.get('error'))

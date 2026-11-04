@@ -231,13 +231,16 @@
             </label>
           </div>
 
+          <label>Frame rate
+            <select id="fpsSelect" name="fps"><option value="60" selected>60 fps — gerak lebih halus</option><option value="30">30 fps — render lebih ringan</option></select>
+          </label>
           <section id="continuousControls" hidden>
             <div id="continuousConceptFields">
             <h3>Pilih konsep film kontinu</h3>
             <label>Ide visual utama<select id="motionConcept"><option value="">Pilih satu konsep terlebih dahulu</option></select></label>
             <div id="motionConceptDetails"></div>
             <button id="motionExample" type="button" class="secondary-button">Coba contoh lokal 15 detik</button>
-            <p>Diagram vektor dengan elemen berlanjut dan jeda gerak. Output draf 30 fps. Pada mode musik, naskah tampil sebagai teks tanpa dibacakan.</p>
+            <p>Diagram vektor dengan elemen berlanjut dan jeda gerak. Output mengikuti pilihan 30/60 fps. Pada mode musik, naskah tampil sebagai teks tanpa dibacakan.</p>
             </div>
             <label>Audio<select id="motionVoice"><option value="music">Musik/foley prosedural, tanpa dubbing — lokal</option><option value="tts">Narasi TTS + musik — memerlukan layanan suara</option></select></label>
           </section>

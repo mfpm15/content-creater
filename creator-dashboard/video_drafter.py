@@ -1,6 +1,7 @@
 """Reviewed video planning and rendering across independent local adapters."""
 from __future__ import annotations
 
+import frame_rate
 import scene_diagram
 import html
 import copy
@@ -88,7 +89,7 @@ def get_available_models() -> list[dict]:
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
     research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
@@ -304,6 +305,7 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
         if 'diagram' in raw:scene['diagram']=scene_diagram.validate(raw['diagram'])
         if 'renderControls' in raw:scene['renderControls']=scene_render.validate(raw['renderControls'])
     result={"topic": topic, "duration": duration, "scenes": scenes}
+    if "fps" in data:result["fps"]=frame_rate.validate(data["fps"])
     if 'audioMode' in data:
         if data['audioMode'] not in ('music','tts'):raise ValueError('Audio harus music atau tts')
         result['audioMode']=data['audioMode']
@@ -314,7 +316,7 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
             raise ValueError('Creative direction harus objek JSON maksimal 16 KB')
         result['creativeDirection']=copy.deepcopy(direction)
     if data.get('motionDesign') is not None:
-        result['motionDesign']=continuous_motion.design(data['motionDesign'],scenes,duration)
+        result['motionDesign']=continuous_motion.design({**data['motionDesign'],'fps':frame_rate.get(result)},scenes,duration)
         result['motionBeatSheet']=continuous_motion.beat_sheet(result)
     return result
 
@@ -596,7 +598,7 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
 .editorial-viz{{padding:10%;font-size:{round(44*unit)}px;text-align:center;overflow-wrap:anywhere}}
 {opuscar_primitives.CSS}
 </style></head><body>
-<div id="stage" data-composition-id="video" data-start="0" data-duration="{duration}" data-width="{width}" data-height="{height}">
+<div id="stage" data-composition-id="video" data-fps="{frame_rate.get(plan)}" data-start="0" data-duration="{duration}" data-width="{width}" data-height="{height}">
     {''.join(sections)}
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
     <script>
@@ -685,7 +687,7 @@ html,body{{margin:0;background:#020617;color:#fff;font-family:-apple-system,Blin
 .hero-title{{font-size:{round(min(width,height)*.065)}px;line-height:1.12;margin:0;font-weight:800;overflow-wrap:anywhere}}
 .subtitle-capsule{{margin-top:auto;width:100%;font-size:{round(min(width,height)*.032)}px;line-height:1.35;color:#e2e8f0;overflow-wrap:anywhere;padding:1.5% 2%;border-left:3px solid #fbbf24;background:#101722}}
 </style></head><body>
-<div id="stage" data-composition-id="video" data-start="0" data-duration="{duration}" data-width="{width}" data-height="{height}">
+<div id="stage" data-composition-id="video" data-fps="{frame_rate.get(plan)}" data-start="0" data-duration="{duration}" data-width="{width}" data-height="{height}">
     <canvas id="webglCanvas"></canvas>
     <div class="hud-layer">
         {''.join(sections)}
@@ -848,7 +850,7 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
     with JOBS_LOCK:
         for aspect in dict.fromkeys(aspects):
             key = uuid.uuid4().hex
-            job = {"jobId": key, "topic": plan["topic"], "script": "", "engine": engine,
+            job = {"jobId": key, "fps": frame_rate.get(plan), "topic": plan["topic"], "script": "", "engine": engine,
                    "style": ENGINES[engine]["defaultStyle"], "aspect": aspect, "duration": plan["duration"],
                    "model": source.get("model", LLM_MODEL), "status": "awaiting_scene_plan", "step": "Review layout rasio baru sebelum render",
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
@@ -938,6 +940,7 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         job.pop("visualContactSheet", None)
         if stage == "storyboard":
             job["status"] = "awaiting_scene_plan"
+        job["fps"] = frame_rate.get(plan)
         job["scenePlan"] = plan
         job["storyboard"] = _storyboard(plan) if stage == "storyboard" else None
         job["step"] = "Perubahan editor tersimpan"
@@ -1017,14 +1020,15 @@ def start_job(payload: dict) -> dict:
     model = str(payload.get("model") or fallback_model); model = model if model in ALLOWED_MODEL_IDS else fallback_model
     engine = str(payload.get("engine") or "opuscar")
     if engine not in ENGINES or ENGINES[engine].get("disabled"): raise ValueError("Render Adapter belum tersedia")
+    fps = frame_rate.validate(payload.get("fps", frame_rate.DEFAULT))
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
-    job = {"jobId": job_id, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    job = {"jobId": job_id, "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
     if engine=='remotion':
         if payload.get('voiceMode','music') not in ('music','tts'):raise ValueError('Audio harus music atau tts')
         job['audioMode']=payload.get('voiceMode','music')
     if engine=='continuous':
-        job['motionDesign']=continuous_motion.design({'concept':payload.get('motionConcept'),'voiceMode':payload.get('voiceMode','music')},
+        job['motionDesign']=continuous_motion.design({'concept':payload.get('motionConcept'),'voiceMode':payload.get('voiceMode','music'),'fps':fps},
                 [{'start':0,'end':duration}],duration)
     if payload.get('brandId'):
         kit=next((row for row in creative_profile.catalog(VIDEOS_DIR.parent/'brand-kits.json')['kits'] if row['id']==payload['brandId']),None)
@@ -1183,6 +1187,7 @@ def _run_job(job_id: str) -> None:
         else:data.pop('motionDesign',None)
         if job.get('engine')=='remotion':data['audioMode']=job['audioMode']
         else:data.pop('audioMode',None)
+        data["fps"]=frame_rate.get(job)
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
         if job.get('engine')=='remotion':remotion_adapter.manifest(plan,ASPECT_RATIOS[job['aspect']])
         if job.get('engine') not in {'remotion','lottie'} and any('diagram' in scene for scene in plan['scenes']):
@@ -1228,7 +1233,7 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
             (target / "lottie.json").write_text(json.dumps(lottie, ensure_ascii=False), encoding="utf-8")
             from lottie_adapter import preview
             (target / "index.html").write_text(preview(lottie), encoding="utf-8")
-            meta = {"slug": target.name, "topic": job["topic"], "engine": "lottie", "model": job["model"], "style": STYLES["lottie_motion"], "aspect": ASPECT_RATIOS[job["aspect"]], "duration": plan["duration"], "sceneCount": len(plan["scenes"]), "research": job["research"], "createdAt": time.time(), "formattedTime": time.strftime("%Y-%m-%d %H:%M:%S")}
+            meta = {"slug": target.name, "topic": job["topic"], "engine": "lottie", "model": job["model"], "style": STYLES["lottie_motion"], "aspect": ASPECT_RATIOS[job["aspect"]], "duration": plan["duration"], "fps": frame_rate.get(plan), "sceneCount": len(plan["scenes"]), "research": job["research"], "createdAt": time.time(), "formattedTime": time.strftime("%Y-%m-%d %H:%M:%S")}
             (target / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
             _update_job(job_id, {"status": "succeeded", "step": "Animasi Lottie selesai", "progress": 100, "video": {"slug": target.name, "title": job["topic"], "htmlUrl": f"/api/videos/{target.name}/index.html", "lottieUrl": f"/api/videos/{target.name}/lottie.json", "duration": plan["duration"], "engine": "lottie"}})
             return
@@ -1246,7 +1251,7 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         elif job['engine']=='remotion':
             silent,remotion_report=remotion_adapter.render(target,plan,ASPECT_RATIOS[job['aspect']])
         else:
-            subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", "30", "--workers", "1"], cwd=target, check=True, timeout=600,env=render_environment())
+            subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", str(frame_rate.get(plan)), "--workers", "1"], cwd=target, check=True, timeout=600,env=render_environment())
         _update_job(job_id, {"step": "Melakukan mux audio dan video", "progress": 90})
         output = _mux_video(target, silent, final_audio, plan["duration"])
         from video_review import review
@@ -1265,7 +1270,7 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         _update_job(job_id, {"review": review_result})
         silent.unlink(missing_ok=True)
         chosen_style = STYLES.get(job.get("style")) or STYLES["threejs_3d" if job["engine"] == "threejs" else "opuscar_cinematic"]
-        meta = {"slug": target.name, "topic": job["topic"], "engine": job["engine"], "model": job["model"], "style": chosen_style, "aspect": ASPECT_RATIOS[job["aspect"]], "duration": plan["duration"], "sceneCount": len(plan["scenes"]), "scenePlan": plan, "research": job["research"], "audioManifest": audio_manifest(plan), "videoBytes": output.stat().st_size, "createdAt": time.time(), "formattedTime": time.strftime("%Y-%m-%d %H:%M:%S")}
+        meta = {"slug": target.name, "topic": job["topic"], "engine": job["engine"], "model": job["model"], "style": chosen_style, "aspect": ASPECT_RATIOS[job["aspect"]], "duration": plan["duration"], "fps": frame_rate.get(plan), "sceneCount": len(plan["scenes"]), "scenePlan": plan, "research": job["research"], "audioManifest": audio_manifest(plan), "videoBytes": output.stat().st_size, "createdAt": time.time(), "formattedTime": time.strftime("%Y-%m-%d %H:%M:%S")}
         (target / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         _update_job(job_id, {"status": "succeeded", "step": f"Video {engine_label} selesai", "progress": 100, "video": {"slug": target.name, "title": job["topic"], "videoUrl": f"/api/videos/{target.name}/video.mp4", "htmlUrl": f"/api/videos/{target.name}/index.html", "duration": plan["duration"], "engine": job["engine"]}})
     except Exception as exc:

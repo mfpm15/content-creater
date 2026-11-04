@@ -1,0 +1,55 @@
+{
+  "opuscar": {
+    "width": 1080,
+    "height": 1920,
+    "codec_name": "h264",
+    "pix_fmt": "yuv420p",
+    "avg_frame_rate": "60/1",
+    "nb_frames": "120",
+    "audio_codec": "aac",
+    "duration": "2.000000"
+  },
+  "threejs": {
+    "width": 1080,
+    "height": 1920,
+    "codec_name": "h264",
+    "pix_fmt": "yuv420p",
+    "avg_frame_rate": "60/1",
+    "nb_frames": "120",
+    "audio_codec": "aac",
+    "duration": "2.000000"
+  },
+  "remotion": {
+    "width": 1080,
+    "height": 1920,
+    "codec_name": "h264",
+    "pix_fmt": "yuv420p",
+    "avg_frame_rate": "60/1",
+    "nb_frames": "120",
+    "audio_codec": "aac",
+    "duration": "2.000000"
+  },
+  "continuous": {
+    "width": 1080,
+    "height": 1920,
+    "codec_name": "h264",
+    "pix_fmt": "yuv420p",
+    "avg_frame_rate": "60/1",
+    "nb_frames": "120",
+    "audio_codec": "aac",
+    "duration": "2.000000"
+  },
+  "lottie": {
+    "fr": 60,
+    "frames": 120,
+    "duration_seconds": 2,
+    "official_player": "5.12.2",
+    "equal_time_pixels_match_30fps": true,
+    "equal_time_samples_seconds": [
+      0.1,
+      0.3,
+      0.75,
+      1.5
+    ]
+  }
+}

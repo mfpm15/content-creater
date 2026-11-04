@@ -6,7 +6,7 @@ export type Shot = {
   strength: number; lighting: 'legacy' | 'soft' | 'dramatic'; transition: 'legacy' | 'fade' | 'cut' | 'slide';
 };
 export type StudioProps = {
-  version: 1; width: number; height: number; fps: 30; totalFrames: number;
+  version: 1; width: number; height: number; fps: 30 | 60; totalFrames: number;
   topic: string; brand: {background: string; accent: string; text: string; wordmark: string; font: string};
   shots: Shot[]; captions: {startFrame: number; endFrame: number; text: string}[];
 };

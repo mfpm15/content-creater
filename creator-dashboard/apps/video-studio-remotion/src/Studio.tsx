@@ -43,7 +43,7 @@ export const Studio: React.FC<StudioProps> = props => {
   const titleRef=React.useRef<HTMLDivElement>(null);
   const artRef=React.useRef<HTMLDivElement>(null);
   const captionRef=React.useRef<HTMLDivElement>(null);
-  const {width,height} = useVideoConfig();
+  const {width,height,fps} = useVideoConfig();
   const shot = props.shots.find(s=>frame>=s.startFrame && frame<s.endFrame) || props.shots[props.shots.length-1];
   const index = props.shots.indexOf(shot);
   const local = frame-shot.startFrame;
@@ -56,7 +56,7 @@ export const Studio: React.FC<StudioProps> = props => {
   const scale = camera==='push-in' ? 1+progress*.12*a : camera==='pull-out' ? 1+(1-progress)*.12*a : 1;
   const x = camera==='pan-left' ? (1-2*progress)*3*a : camera==='pan-right' ? (2*progress-1)*3*a : 0;
   const rotation = camera==='orbit' ? (progress-.5)*6*a : 0;
-  const edge = Math.min(10,Math.max(1,Math.floor(length/3)));
+  const edge = Math.min(Math.round(fps/3),Math.max(1,Math.floor(length/3)));
   const opacity = shot.transition==='cut' ? 1 : Math.min(index===0?1:(local+1)/edge,1,(length-local)/edge);
   const slide = shot.transition==='slide' ? (1-Math.min(1,local/edge))*width*.06 : 0;
   const caption = props.captions.find(c=>frame>=c.startFrame && frame<c.endFrame);

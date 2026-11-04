@@ -1,4 +1,5 @@
 """Measured media review. Optional tools can be unavailable without losing a render."""
+import frame_rate
 import json
 import math
 import re
@@ -42,6 +43,17 @@ def review(path: Path, duration: float, plan: dict | None = None) -> dict:
     audio=any(s.get('codec_type')=='audio' for s in streams)
     if not video:issues.append('Missing video')
     if not audio:issues.append('Missing audio')
+    frame_review={'status':'unmeasured'}
+    if plan is not None:
+        expected=frame_rate.get(plan)
+        try:
+            numerator,denominator=str((video or {}).get('avg_frame_rate','0/0')).split('/')
+            rate=float(numerator)/float(denominator)
+            matched=math.isfinite(rate) and abs(rate-expected)<.01
+        except (ValueError,ZeroDivisionError):rate=None;matched=False
+        frame_review={'status':'matched' if matched else 'mismatch','expected':expected,'actual':rate}
+        if not matched:issues.append('Frame rate differs from approved plan')
+
     if abs(actual-duration)>.5:issues.append('Duration differs from approved plan')
     measured=_audio(path,ffmpeg) if audio else {'status':'not_present'}
     if audio:
@@ -93,4 +105,4 @@ def review(path: Path, duration: float, plan: dict | None = None) -> dict:
     delivery=evaluate(video,actual,measured) if video else {}
     video_format={key:video.get(key) for key in ('width','height','codec_name','pix_fmt','color_range','color_space','avg_frame_rate')} if video else {}
     return {'status':'needs_attention' if issues else 'passed_media_checks','issues':issues,'duration':actual,'delivery':delivery,'video_format':video_format,
-            'audio':measured,'pacing':pacing,'beat_review':beat_review,'visual_review':visual,'manual_required':True}
+            'frame_rate':frame_review,'audio':measured,'pacing':pacing,'beat_review':beat_review,'visual_review':visual,'manual_required':True}
