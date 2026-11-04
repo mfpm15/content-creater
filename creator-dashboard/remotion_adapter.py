@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import frame_rate
+import renderer_contract
 import scene_diagram
 import html
 import json
 import math
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -53,10 +53,8 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
         family=scene.get('visualFamily')
         family=family if family in {'process','data','comparison'} else 'concept'
         # Never turn an invented decorative bar into a factual data chart.
-        numeric=re.compile(r'(?<![\w.,+−-])[+−-]?\d+(?:[.,]\d+)*(?:\s*%)?')
-        # The approved headline is the primary visible metric. Do not combine
-        # its 25% with the narration's "25 persen" as two different statistics.
-        numbers=list(dict.fromkeys(numeric.findall(scene['onScreenText']) or numeric.findall(scene['narration'])))
+        # Keep approved signs/decimals; prefer the headline to duplicate narration.
+        numbers=renderer_contract.literal_numbers(scene)
         subject=' '.join(n for n in numbers[:3] if len(n)<=30) if family=='data' else str(scene.get('subject',''))[:200]
         shots.append({'id':scene['id'],'startFrame':start,'endFrame':end,'title':scene['onScreenText'],
                       'subject':subject,'family':family,**controls})

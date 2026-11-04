@@ -1,6 +1,7 @@
 """Reviewed video planning and rendering across independent local adapters."""
 from __future__ import annotations
 
+import renderer_contract
 import video_preproduction as preproduction
 import sound_effects
 import speech_settings
@@ -419,6 +420,7 @@ def _visual_markup(scene: dict, index: int) -> str:
         return opuscar_primitives.markup(directed, index)
     kind = scene["type"]
     family = scene.get("visualFamily") or _visual_family(" ".join((scene.get("visual", ""), scene.get("narration", ""))), kind, index)
+    family=renderer_contract.opuscar_family(scene,family)
     # Only an explicit subject may become an internal label. The visual field is
     # production direction and must never be copied or truncated onto the frame.
     explicit_subject = str(scene.get("subject") or "").strip()
@@ -427,13 +429,12 @@ def _visual_markup(scene: dict, index: int) -> str:
     if family == "data":
         # A decorative chart is not evidence. Display only an approved literal
         # metric, preserving its sign, decimal separators and percent suffix.
-        numeric = re.compile(r"(?<![\w.,+−-])[+−-]?\d+(?:[.,]\d+)*(?:\s*%)?")
-        number_match = numeric.search(scene.get("onScreenText", "")) or numeric.search(scene.get("narration", ""))
-        metric = html.escape(number_match.group(0)) if number_match else ""
+        metrics=renderer_contract.literal_numbers(scene)
+        metric=html.escape(metrics[0]) if metrics else ""
         return f'''<div class="visual-canvas-box data-viz" data-family="data">
             <div class="metric-counter"><span class="num">{metric}</span></div>
         </div>'''
-    if family in {"process", "comparison", "constellation", "concept"}:
+    if family == "unsupported":
         text = html.escape(scene.get("onScreenText", ""))
         return f'<div class="visual-canvas-box editorial-viz" data-family="editorial" data-interpretation="unsupported"><strong>{text}</strong></div>'
     if kind == "call-to-action" or family == "signal":
@@ -875,7 +876,7 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
                    "model": source.get("model", LLM_MODEL), "status": "awaiting_scene_plan", "step": "Review layout rasio baru sebelum render",
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
                    "storyboard": None, "video": None, "revision": 0, "approvals": {},
-                   "origin": {"slug": slug, "scene_plan_digest": hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()}}
+                   "rendererReview":renderer_contract.inspect(plan,engine), "origin": {"slug": slug, "scene_plan_digest": hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()}}
             if "speech" in plan:job["speech"]=plan["speech"]
             if engine=='continuous':job['motionDesign']=plan.get('motionDesign')
             if engine=='remotion':job['audioMode']=plan.get('audioMode','music')
@@ -970,6 +971,7 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
             if job["engine"]=="remotion":job["audioMode"]=plan["audioMode"]
             if job["engine"]=="continuous":job["motionDesign"]=plan["motionDesign"]
         job["fps"] = frame_rate.get(plan)
+        job["rendererReview"]=renderer_contract.inspect(plan,job.get("engine","opuscar"))
         job["scenePlan"] = plan
         job["storyboard"] = _storyboard(plan) if stage == "storyboard" else None
         job["step"] = "Perubahan editor tersimpan"
@@ -1004,6 +1006,7 @@ def approve_job(job_id: str, stage: str, expected_revision: int | None = None) -
         expected = {"scene_plan": "awaiting_scene_plan", "storyboard": "awaiting_storyboard"}.get(stage)
         if not expected or job["status"] != expected:
             raise ValueError(f"Tahap {stage} tidak dapat disetujui dari status {job['status']}")
+        if job.get('pipelineVersion')==2:renderer_contract.verify(job['scenePlan'],job['engine'])
         if stage == 'storyboard' and job.get('pipelineVersion')==2:
             preproduction.verify_packet(job.get('productionPacket'),job['scenePlan'],job['engine'],job['aspect'])
         if stage == "storyboard" and job.get('engine') == 'opuscar' and opuscar_quality_gate.required(job['scenePlan']):
@@ -1257,7 +1260,8 @@ def _run_job(job_id: str) -> None:
             'status':'planning_scenes','step':'Membagi narasi menjadi shot dan arahan visual','progress':28})
         prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
         prompt+='\nBahasa judul layar: '+job.get('speech',{}).get('language','id')+'. Pertahankan naskah pengguna; jangan menerjemahkan narasi terkunci.\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
-        if job.get('speech'):prompt+='\nAudio hanya narasi atau tanpa suara sesuai brief; jangan tambahkan musik latar. SFX pendek boleh jika diaktifkan pada brief; gunakan cue singkat yang mendukung aksi.'
+        prompt+=renderer_contract.planner_instruction(job['engine'])
+        if job.get('speech'):prompt+='\nAudio ikuti konfigurasi aktual: '+json.dumps(job['speech'])+'. Hanya elemen yang diaktifkan yang akan dibuat; SFX singkat harus mendukung aksi.'
         if job.get('motionDesign'):
             concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
             prompt+='\nKonsep wajib: '+concept['idea']+' '+concept['carry']+' Tutup seluruh durasi tanpa gap.'
@@ -1278,7 +1282,7 @@ def _run_job(job_id: str) -> None:
         if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
             raise ValueError('Model mengembalikan kontrol render yang tidak didukung adapter ini')
         if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])
-        _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan})
+        _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan,"rendererReview":renderer_contract.inspect(plan,job["engine"])})
     except Exception as exc:
         _update_job(job_id, {"status": "failed", "step": f"Gagal: {exc}", "progress": 100, "error": str(exc)})
 
@@ -1286,6 +1290,7 @@ def _run_job(job_id: str) -> None:
 def _continue_job(job_id: str, approved_stage: str) -> None:
     job = job_status(job_id)
     try:
+        if job.get("pipelineVersion")==2:renderer_contract.verify(job["scenePlan"],job["engine"])
         if approved_stage == "scene_plan":
             packet=preproduction.compile_packet(job['scenePlan'],job['engine'],job['aspect'])
             storyboard = _storyboard(job["scenePlan"])

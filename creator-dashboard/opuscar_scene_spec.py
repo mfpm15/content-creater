@@ -80,7 +80,8 @@ def interpret(scene: dict) -> dict | None:
         return None
     obj, _, default_action = found
     action_text = _text(scene.get('action'))
-    action = next((name for name, pattern in ACTIONS if re.search(pattern, action_text)), default_action)
+    exact_action=action_text in {name for name,_ in ACTIONS}
+    action = action_text if exact_action else next((name for name, pattern in ACTIONS if re.search(pattern, action_text)), default_action)
     if obj == 'seal' and action == 'stamp': action = 'stamp-seal'
     if obj == 'registry' and action == 'insert': action = 'register'
     issues = []
@@ -90,7 +91,7 @@ def interpret(scene: dict) -> dict | None:
     generic = {'target-lock push-in','lateral route follow','three-quarter orbit','locked accumulation',
                'split converge','iris pull-back','drifting parallax','tunnel push-through','planar whip',
                'establish-focus-reveal','locked symmetrical reveal'}
-    if action_text and action_text not in generic and not any(re.search(p, action_text) for _, p in ACTIONS):
+    if action_text and not exact_action and action_text not in generic and not any(re.search(p, action_text) for _, p in ACTIONS):
         issues.append('Action direction is not supported by the bounded interpreter')
     camera_text = _text(scene.get('camera'))
     camera = 'locked'

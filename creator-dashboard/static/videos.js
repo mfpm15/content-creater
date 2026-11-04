@@ -407,6 +407,15 @@ function renderReview(job) {
     const note=document.createElement('p');note.textContent=`Remotion · audio ${job.scenePlan?.speech?.mode==='none'?'tanpa suara':job.scenePlan?.audioMode==='music'?'musik lokal tanpa dubbing':'narasi tanpa musik'}. Caption tanpa cue kata dibagi dengan estimasi; periksa terhadap audio. Keluarga selain process/data/comparison memakai diagram konsep.`;
     elements.reviewGrid.prepend(note);
   }
+  const coverage=job.rendererReview || job.productionPacket?.rendererReview;
+  if(coverage){
+    const card=document.createElement('section');card.className='review-card';
+    const title=document.createElement('h4');title.textContent='Kecocokan scene dengan engine';card.append(title);
+    const note=document.createElement('p');note.textContent=coverage.errors.length?'Ada arahan yang belum bisa dirender. Perbaiki lalu simpan perubahan untuk memeriksa ulang.':coverage.warnings.length?'Ada fallback yang perlu Anda tinjau sebelum menyetujui.':'Scene memakai kemampuan yang tersedia; kualitas cerita dan hasil visual tetap perlu diperiksa.';card.append(note);
+    for(const item of [...coverage.errors,...coverage.warnings]){const line=document.createElement('p');line.textContent=`${item.scene}: ${item.message}`;card.append(line);}
+    elements.reviewGrid.prepend(card);
+    if(coverage.errors.length)elements.approveBtn.disabled=true;
+  }
   const narrativeCard=document.createElement('section');narrativeCard.className='review-card';
   const narrativeTitle=document.createElement('h4');narrativeTitle.textContent='Narasi utuh · sumber urutan scene';
   const narrativeText=document.createElement('p');narrativeText.style.whiteSpace='pre-wrap';

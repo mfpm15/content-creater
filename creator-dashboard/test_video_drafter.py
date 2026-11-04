@@ -184,12 +184,13 @@ class VideoDrafterTest(unittest.TestCase):
         job = video_drafter.job_status(result["jobId"])
         self.assertEqual(captured["model"], "ms/GPT-5.6-Think-Deeper")
         self.assertIn("creative director", captured["prompt"])
+        self.assertIn("KONTRAK ENGINE: opuscar", captured["prompt"])
         self.assertIn("foreground, midground, background", captured["prompt"])
         self.assertEqual(job["status"], "awaiting_scene_plan")
         self.assertEqual(job["scenePlan"]["creativeDirection"]["logline"], "Transformasi")
 
     def test_workflow_requires_ordered_approvals(self):
-        plan = video_drafter.normalize_scene_plan({}, "Tes", "Adegan pembuka.", 15)
+        plan = video_drafter.normalize_scene_plan({"scenes":[{"start":0,"end":15,"narration":"Adegan pembuka.","visualFamily":"kinetic-type"}]}, "Tes", "", 15)
         with patch.object(video_drafter.threading, "Thread"):
             result = video_drafter.start_job({"topic": "Tes"})
             job_id = result["jobId"]

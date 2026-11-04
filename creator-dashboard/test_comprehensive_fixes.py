@@ -187,7 +187,7 @@ class OriginUnitTests(unittest.TestCase):
 class VideoReliabilityTests(unittest.TestCase):
     def test_voice_failure_does_not_start_expensive_visual_render(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(vd,'VIDEOS_DIR',Path(tmp)/'videos'),patch.object(vd,'JOB_DIR',Path(tmp)/'jobs'),patch.object(vd,'JOBS',{}),patch.object(vd.threading,'Thread'):
-            key=vd.start_job({'topic':'Test','script':'Naskah pengguna.','engine':'opuscar','researchMode':'provided'})['jobId']
+            key=vd.start_job({'topic':'Test','script':'0-5 Narasi: Naskah pengguna.\nVisual: chain link','engine':'opuscar','researchMode':'provided'})['jobId']
             vd._run_job(key)
             # This test starts after visual review; it isolates the subsequent voice failure.
             job=vd.job_status(key)

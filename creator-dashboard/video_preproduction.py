@@ -6,6 +6,7 @@ prose is never evaluated as code or advertised as arbitrary text-to-video.
 import hashlib
 import json
 
+import renderer_contract
 import frame_rate
 import opuscar_scene_spec
 import scene_render
@@ -53,6 +54,7 @@ def scene_instruction(draft):
 
 def compile_packet(plan, engine, aspect):
     shots=[]
+    report=renderer_contract.inspect(plan,engine)
     for s in plan['scenes']:
         controls=scene_render.validate(s.get('renderControls',{}))
         spec=opuscar_scene_spec.interpret(s) if engine in ('opuscar','threejs') else None
@@ -65,10 +67,9 @@ def compile_packet(plan, engine, aspect):
             'onScreenText':s['onScreenText'],'prompt':prompt,
             'native':{'controls':controls if engine in ('opuscar','threejs','remotion') else None,
                       'mechanical':spec,'diagram':s.get('diagram') if engine in ('remotion','lottie') else None},
-            'limitations':(spec.get('issues',[]) if spec else [])+(
-                ['Subjek di luar grammar mekanis; renderer menggunakan fallback/editorial.'] if engine in ('opuscar','threejs') and spec is None else [])})
+            'limitations':[item['message'] for item in report['errors']+report['warnings'] if item['scene']==s['id']]})
     return {'version':1,'creativeBrief':plan.get('creativeBrief',''),'engine':engine,'aspect':aspect,'fps':frame_rate.get(plan),'planDigest':digest(plan),
-            'narration':from_plan(plan),'shots':shots,'timing':'approved_seconds; supplied word cues or estimated captions, not forced alignment',
+            'rendererReview':report,'narration':from_plan(plan),'shots':shots,'timing':'approved_seconds; supplied word cues or estimated captions, not forced alignment',
             'execution':'Native renderer consumes structured Scene Plan. Prompt prose is production direction, not executable code.'}
 
 
