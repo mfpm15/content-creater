@@ -18,8 +18,8 @@ function createThreeShots(specs) {
     const kind=shot.spec?.object || 'editorial';
     const count=shot.spec?.count || 1;
     if(kind==='chain') {
-      for(let i=0;i<Math.min(count,7);i++) {
-        const link=ring(moving,(i-(Math.min(count,7)-1)/2)*.7,0,.5);
+      for(let i=0;i<count;i++) {
+        const link=ring(moving,(i-(count-1)/2)*.7,0,.5);
         link.rotation.y=i%2*Math.PI/3;link.scale.y=1.4;
       }
     } else if(kind==='lock' || kind==='vault') {
@@ -37,7 +37,7 @@ function createThreeShots(specs) {
         box(moving,side*1.65,-.65,.06,1.3,.06);
         box(moving,side*1.65,-1.3,1.2,.12,.8);
       }
-      for(let i=0;i<Math.min(count,7);i++)box(moving,-1.95+(i%3)*.3,-1.1+Math.floor(i/3)*.28,.24,.24,.4);
+      for(let i=0;i<count;i++)box(moving,-1.95+(i%3)*.3,-1.1+Math.floor(i/3)*.28,.24,.24,.4);
       box(moving,1.65,-.9,.75,.7,.6,accent);
     } else if(kind==='barrier' || kind==='wall' || kind==='bridge') {
       for(let i=0;i<5;i++)box(moving,(i-2)*.72,0,.65,kind==='bridge'?.4:2.6,.7,i===2?accent:steel);
@@ -67,9 +67,9 @@ function createThreeShots(specs) {
     group.scale.setScalar(fit);
     group.position.copy(bounds.getCenter(new THREE.Vector3()).multiplyScalar(-fit));
     group.traverse(o=>{if(o.isMesh)o.material=o.material.clone();});
-    const baseline=moving.position.clone();
+    const baseline=moving.position.clone(),origin=group.position.clone();
     group.userData={kind,action:shot.spec?.action || 'hold'};
-    return {...shot,index,group,moving,baseline,tail:Math.min(.45,((specs[index+1]?.end || shot.end)-(specs[index+1]?.start || shot.end))*.12)};
+    return {...shot,index,group,moving,baseline,origin,tail:Math.min(.45,((specs[index+1]?.end || shot.end)-(specs[index+1]?.start || shot.end))*.12)};
   });
   window.__threeShots=shots.map(s=>s.group);
   const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
@@ -78,7 +78,11 @@ function createThreeShots(specs) {
       const active=t>=shot.start && t<shot.end+(specs[shot.index+1]?.controls.transition==='cut'?0:shot.tail);
       shot.group.visible=active;
       if(!active)continue;
-      const u=Math.min(1,(t-shot.start)/(shot.end-shot.start)),p=smooth((u-.18)/.5);
+      const cue=Math.max(0,shot.spec?.cueOffset || 0);
+      const remaining=shot.end-shot.start-cue;
+      const u=remaining>0?Math.max(0,Math.min(1,(t-shot.start-cue)/remaining)):0;
+      const p=smooth((u-.18)/.5);
+      shot.group.position.copy(shot.origin);
       const m=shot.moving;m.position.copy(shot.baseline);m.rotation.set(0,0,0);m.scale.setScalar(1);
       const action=shot.spec?.action;
       if(action==='balance')m.rotation.z=.18-.42*p;
@@ -95,6 +99,10 @@ function createThreeShots(specs) {
       // Transition affects the native object too, not only the HTML overlay.
       const cut=shot.controls.transition==='cut';
       const envelope=t>=shot.end?smooth(1-(t-shot.end)/Math.max(.001,shot.tail)):(cut || shot.index===0?1:smooth((t-shot.start)/Math.min(.45,(shot.end-shot.start)*.12)));
+      if(shot.controls.transition==='slide') {
+        const direction=t>=shot.end?-1:1;
+        shot.group.position.x+=direction*(1-envelope)*1.2;
+      }
       shot.group.traverse(o=>{if(o.isMesh){o.material.transparent=true;o.material.opacity=envelope;}});
     }
   };

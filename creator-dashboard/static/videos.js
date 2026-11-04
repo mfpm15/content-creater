@@ -337,7 +337,7 @@ function sceneEditor(scene, index) {
       <label>Indeks kata pemicu visual (mulai 0; kosong = bawaan)
         <input data-cue-index="${index}" type="number" min="0" step="1" value="${escapeHtml(scene.visualCueWord ?? '')}">
       </label>
-      <small>Lottie: bentuk dan judul; Opuscar: judul dan panel visual; Three.js: panel reticle. Efek lain dan waktu narasi tidak diubah. Timing perlu dibandingkan dengan audio hasil render.</small>
+      <small>Lottie: bentuk dan judul; Opuscar: judul dan panel visual; Three.js: judul dan awal aksi objek mekanis. Efek lain dan waktu narasi tidak diubah. Timing perlu dibandingkan dengan audio hasil render.</small>
     </details>
   </article>`;
 }

@@ -62,3 +62,41 @@ class ThreeScenesTests(unittest.TestCase):
                             self.assertTrue(page.evaluate('window.__threeShots.some(s=>s.visible && s.children.some(o=>o.isMesh?o.material.opacity>0:o.children.some(m=>m.material?.opacity>0)))'))
                         self.assertFalse(errors,errors);page.close()
             finally:browser.close()
+
+    def test_quantities_word_cues_and_object_slide_on_real_sdk(self):
+        gsap=Path(os.environ.get('GSAP_TEST_SCRIPT','/nonexistent'))
+        three=Path(os.environ.get('THREE_TEST_SCRIPT','/nonexistent'))
+        if not gsap.is_file() or not three.is_file() or not find_browser():self.skipTest('Requires pinned SDKs and Chromium')
+        from playwright.sync_api import sync_playwright
+        raw={'scenes':[
+          {'start':0,'end':2,'subject':'12 chain links','narration':'Satu aksi dimulai.',
+           'wordCues':[{'word':'Satu','start':0,'end':.2},{'word':'aksi','start':.3,'end':.5},{'word':'dimulai.','start':1.2,'end':1.8}],
+           'visualCueWord':2,'renderControls':{'camera':'locked'}},
+          {'start':2,'end':4,'subject':'12 weights balance scale','narration':'Dua belas beban ditimbang.',
+           'renderControls':{'camera':'locked','transition':'slide'}}]}
+        p=vd.normalize_scene_plan(raw,'Cue test','',4)
+        with sync_playwright() as manager:
+            browser=manager.chromium.launch(executable_path=find_browser(),chromium_sandbox=False,
+                args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
+            try:
+                page=browser.new_page(viewport={'width':1080,'height':1920})
+                page.route('**/*',lambda r:r.fulfill(body=(gsap if 'gsap@' in r.request.url else three).read_text(),content_type='text/javascript'))
+                page.set_content(vd.generate_composition(p,{'width':1080,'height':1920},engine='threejs'))
+                page.evaluate('async()=>{await window.__ready}')
+                self.assertEqual(page.evaluate('window.__threeShots[0].children[0].children.length'),12)
+                # Beam + two hangers + two trays + twelve weights + counterweight.
+                self.assertEqual(page.evaluate('window.__threeShots[1].children[0].children.length'),18)
+                poses=[]
+                for t in (.3,1.1,1.8):
+                    page.evaluate('(t)=>window.__seek(t)',t)
+                    poses.append(page.evaluate('window.__threeShots[0].children[0].scale.x'))
+                self.assertEqual(poses[0],poses[1]);self.assertGreater(poses[2],poses[1])
+                positions=[]
+                for t in (2.01,2.5,3.95,2.01):
+                    page.evaluate('(t)=>window.__seek(t)',t)
+                    positions.append(page.evaluate('window.__threeShots[1].position.x'))
+                self.assertGreater(positions[0],positions[1]+.5)
+                self.assertEqual(positions[0],positions[-1])
+                at_cue=page.evaluate('()=>{window.__seek(1.8);return window.__threeShots[0].children[0].scale.x}')
+                self.assertEqual(at_cue,poses[2])
+            finally:browser.close()

@@ -38,3 +38,13 @@ Ini perbaikan implementasi dan verifikasi fixture, **bukan jaminan setiap naskah
 Lottie tetap subset rectangle/ellipse/text/linear transforms, belum mencakup seluruh spesifikasi Lottie. Continuous tetap tiga konsep trace/focus/assemble. Sound cue prosedural bukan desain foley semantik lengkap; caption tanpa timestamp bukan forced alignment. Tidak ada klaim motion blur, 4K60, lip-sync, GPU Windows, atau penilaian manusia melalui playback. Gate style-frame wajib saat ini khusus Opuscar; renderer lainnya tetap memerlukan review storyboard dan hasil.
 
 Rencana produksi asli 109 detik belum tersedia pada checkout ini. Fixture pendek tidak menggantikannya, dan narasi asli tidak diubah.
+
+
+## Lanjutan: jumlah objek dan cue Three.js
+
+Audit berikutnya menemukan jumlah rantai/beban masih dipotong tujuh meskipun grammar menyetujui hingga 12, cue kata belum menunda aksi objek 3D, dan transisi slide hanya menggeser teks. `three_scene.js` kini mempertahankan seluruh jumlah 1–12, menghitung fase aksi dari timestamp cue hingga akhir adegan, serta menggeser objek masuk/keluar bersama transisinya. Posisi objek dikembalikan ke origin pada setiap seek agar tidak menumpuk transformasi.
+
+Regresi SDK nyata memeriksa 12 mata rantai, 12 beban beserta counterweight terpisah, pose diam sebelum cue 1,2 detik, perubahan sesudah cue, slide objek dan kesamaan seek ulang. Pemeriksaan layout pada empat ukuran dari audit sebelumnya tetap dijalankan. CI Windows belum terverifikasi: connector tidak mengembalikan status check dan akses CLI Actions ditolak; itu bukan bukti berhasil ataupun gagal.
+
+
+Validasi lanjutan: 157 tes dashboard lulus (Linux), smoke HTTP lulus, syntax JavaScript/diff bersih. HyperFrames menghasilkan MP4 H.264/yuv420p 1080×1920, 30 fps, 120 frame/4 detik untuk fixture 12 rantai + cue 1,2 detik + slide menuju 12 beban. Still hasil dekode diperiksa langsung tanpa playback. Media uji berada di luar repo; proyek produksi lama tidak disentuh.
