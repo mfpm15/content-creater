@@ -278,7 +278,7 @@ function showResult(result, aspectId) {
     elements.downloadBtn.textContent = 'Unduh Video MP4';
   }
   document.getElementById('downloadVoice')?.remove();
-  if(result.voiceUrl){const link=document.createElement('a');link.id='downloadVoice';link.className='secondary-button';link.href=result.voiceUrl;link.download='narasi.wav';link.textContent='Unduh narasi WAV';elements.videoActions.append(link);}
+  if(result.voiceUrl){const link=document.createElement('a');link.id='downloadVoice';link.className='secondary-button';link.href=result.voiceUrl;link.download='narasi.wav';link.textContent='Unduh audio WAV';elements.videoActions.append(link);}
   elements.inspectHtmlBtn.href = result.htmlUrl || '#';
   elements.videoActions.style.display = 'flex';
   let bundle=document.getElementById('downloadBundle');
@@ -430,7 +430,9 @@ function renderReview(job) {
     for(const [id,name] of [['id','Bahasa Indonesia · Ardi'],['en','English · Guy']]){const option=new Option(name,id);option.selected=id===job.scenePlan.speech.language;lang.add(option);}
     const mode=document.createElement('select');mode.id='reviewSpeechMode';
     for(const [id,name] of [['tts','Narasi Edge-TTS'],['none','Tanpa suara']]){const option=new Option(name,id);option.selected=id===job.scenePlan.speech.mode;mode.add(option);}
-    audioCard.append(lang,mode);elements.reviewGrid.prepend(audioCard);
+    const fx=document.createElement('input');fx.type='checkbox';fx.id='reviewSfx';fx.checked=job.scenePlan.speech.sfx ?? false;
+    const fxLabel=document.createElement('label');fxLabel.textContent='SFX singkat sesuai cue';fxLabel.prepend(fx);
+    audioCard.append(lang,mode,fxLabel);elements.reviewGrid.prepend(audioCard);
   }
   const rateCard=document.createElement('label');rateCard.className='review-card';
   rateCard.textContent='Frame rate output';
@@ -499,7 +501,7 @@ function collectEditedPlan() {
   const rate=Number(document.getElementById("reviewFps")?.value ?? plan.fps ?? 30);
   if(plan.fps!==undefined || rate!==30)plan.fps=rate;
   if(plan.speech){
-    plan.speech={language:document.getElementById('reviewSpeechLanguage')?.value || plan.speech.language,mode:document.getElementById('reviewSpeechMode')?.value || plan.speech.mode};
+    plan.speech={language:document.getElementById('reviewSpeechLanguage')?.value || plan.speech.language,mode:document.getElementById('reviewSpeechMode')?.value || plan.speech.mode,sfx:document.getElementById('reviewSfx')?.checked ?? plan.speech.sfx ?? false};
   }
   return plan;
 }
@@ -574,6 +576,7 @@ elements.form.addEventListener('submit', async event => {
     motionConcept: document.getElementById('motionConcept').value,
     voiceMode: document.getElementById('motionVoice').value,
     speechLanguage: document.getElementById('speechLanguage').value,
+    sfx: document.getElementById('sfxEnabled').checked,
   };
   if (!payload.topic) {
     elements.formStatus.textContent = 'Topik animasi wajib diisi.';

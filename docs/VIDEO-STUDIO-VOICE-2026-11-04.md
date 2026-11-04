@@ -7,7 +7,7 @@ Video Studio menggunakan klien **Edge-TTS 7.3.1**, bukan model TTS berbayar. Ver
 - Default narasi Bahasa Indonesia: `id-ID-ArdiNeural`, rate natural `+0%`.
 - Pilihan Inggris: `en-US-GuyNeural`, rate `+0%`.
 - Pilihan tanpa suara disediakan agar produksi visual dapat berjalan tanpa TTS.
-- Musik dan foley tidak dibuat/dicampur otomatis. Sound cue pada arahan scene tetap dapat menjadi catatan produksi, tetapi audio manifest pekerjaan baru mematikan musik dan cue tersebut.
+- Musik latar tidak dibuat/dicampur otomatis. Sesuai klarifikasi pengguna, SFX singkat boleh mengikuti cue scene, dengan opsi aktif/nonaktif; level efek diperkecil dan diduck saat ada narasi.
 - Bahasa pilihan masuk prompt narasi baru dan pemilihan suara. Naskah pengguna yang telah diberikan tetap utuh, tidak diterjemahkan diam-diam.
 - MP4 membawa narasi saja. JSON Lottie tidak menyematkan audio; tersedia WAV narasi terpisah melalui hasil dan bundle ketika TTS dipilih.
 - Suara disintesis per scene, diperiksa durasinya dan diposisikan berdasarkan detik scene. Suara yang melebihi slot tetap ditolak sebelum render visual; tidak dipotong atau dipercepat diam-diam.
@@ -32,3 +32,14 @@ Narasi disejajarkan dan dimaster melalui jalur FFmpeg yang sama tanpa memanggil 
 - UI/HTTP dan suite dashboard diuji terpisah. Native Windows dan kualitas dengar belum diverifikasi; tidak memutar media sesuai instruksi pengguna.
 
 Validasi akhir: 177 tes dashboard lulus, smoke UI/HTTP lulus. Uji penerimaan pipeline dua approval menghasilkan MP4 Remotion 320×568/60 fps, audio sengaja senyap sesuai pilihan none, tanpa file musik. Bukti: `docs/benchmarks/speech-20261104.json`. Sintesis neural langsung tetap belum terverifikasi.
+
+
+## Klarifikasi SFX
+
+SFX diperbolehkan, musik latar tetap mati. Pekerjaan baru mengaktifkan flag `speech.sfx=true`; setting lama tanpa flag ini mempertahankan perilaku sebelumnya (false), sehingga efek tidak ditambahkan pada plan yang sudah disetujui. Mode none tetap benar-benar senyap.
+
+`sound_effects.py` membuat efek lokal singkat whoosh/chime/hit/click, tanpa aset atau layanan berbayar. Cue eksplisit mengikuti timestamp kata pemicu jika tersedia, selain itu awal scene. Cue bebas di luar jenis tersebut memakai click lembut; ini efek prosedural terbatas, bukan desain foley semantik lengkap. Sinyal nol di luar jendela efek. FFmpeg mengecilkan level dan memakai sidechain compression dari narasi sebelum mastering. `sound-effects.wav` disertakan pada bundle; audio WAV final dapat memuat narasi+SFX. Status sintesis Edge daring di atas belum berubah.
+
+Regresi memeriksa kesamaan render audio ulang, nol sampel di luar cue, batas peak efek, flag/legacy/silent dan mix FFmpeg nyata memakai fixture suara sintetis. Tidak memutar media.
+
+Validasi SFX akhir: 179 tes dashboard lulus, smoke UI/HTTP lulus, pilihan SFX dapat dimatikan saat review. Mix narasi sintetis+SFX memakai FFmpeg nyata tanpa bed musik; tidak ada uji dengar/playback atau klaim sintesis Edge daring telah berhasil.

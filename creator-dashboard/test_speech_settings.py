@@ -52,7 +52,7 @@ class SpeechTests(unittest.TestCase):
         if not shutil.which('ffmpeg'):self.skipTest('FFmpeg unavailable')
         original_run=vd.subprocess.run
         for language in ('id','en'):
-            plan=vd.normalize_scene_plan({'speech':speech.build(language)},'Test','Narasi yang disetujui.',3)
+            plan=vd.normalize_scene_plan({'speech':speech.build(language),'scenes':[{'start':0,'end':3,'narration':'Narasi yang disetujui.','soundCue':'soft chime'}]},'Test','',3)
             with tempfile.TemporaryDirectory() as temp,patch.object(vd,'_write_procedural_audio',side_effect=AssertionError('Music forbidden')):
                 def run(command,*args,**kwargs):
                     if len(command)>1 and str(command[1]).endswith('speech_worker.py'):
@@ -65,6 +65,7 @@ class SpeechTests(unittest.TestCase):
                     return original_run(command,*args,**kwargs)
                 with patch.object(vd.subprocess,'run',side_effect=run):audio=vd._build_audio(Path(temp),plan)
                 self.assertFalse((Path(temp)/'music-foley.wav').exists())
+                self.assertTrue((Path(temp)/'sound-effects.wav').is_file())
                 with wave.open(str(audio)) as wav:self.assertAlmostEqual(wav.getnframes()/wav.getframerate(),3,places=2)
 
     def test_worker_rejects_path_ids_before_network_or_file_creation(self):

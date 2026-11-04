@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import video_preproduction as preproduction
+import sound_effects
 import speech_settings
 import frame_rate
 import scene_diagram
@@ -788,7 +789,11 @@ def audio_manifest(plan: dict) -> dict:
         if plan['audioMode']=='music':result['voice']=[];result['music']['duckUnderVoice']=False
     if 'speech' in plan:
         speech=speech_settings.validate(plan['speech'])
-        result.update(speech=speech,voiceMode=speech['mode'],soundCues=[])
+        result.update(speech=speech,voiceMode=speech['mode'])
+        if not speech['sfx'] or speech['mode']=='none':result['soundCues']=[]
+        else:
+            for cue,scene in zip(result['soundCues'],[s for s in plan['scenes'] if s['soundCue']]):cue['at']=creative_profile.reveal(scene,0)
+        result['sfx']={'enabled':speech['sfx'] and speech['mode']!='none','source':'short_local_procedural_cues'}
         result['music']={'enabled':False,'duckUnderVoice':False,'beat_markers':[]}
         if speech['mode']=='none':result['voice']=[]
     return result
@@ -1052,7 +1057,7 @@ def start_job(payload: dict) -> dict:
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
     job = {"jobId": job_id, "pipelineVersion":2, "creativeBrief":creative_brief.strip(), "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
-    if payload.get('voiceMode')!='music':job['speech']=speech_settings.build(payload.get('speechLanguage','id'),payload.get('voiceMode','tts'))
+    if payload.get('voiceMode')!='music':job['speech']=speech_settings.build(payload.get('speechLanguage','id'),payload.get('voiceMode','tts'),payload.get('sfx',True))
     if engine=='remotion':
         if payload.get('voiceMode','tts') not in ('music','tts','none'):raise ValueError('Audio harus music atau tts')
         job['audioMode']=payload.get('voiceMode','tts')
@@ -1164,7 +1169,18 @@ def _build_audio(target: Path, plan: dict) -> Path:
     subprocess.run([ffmpeg, "-y", *inputs, "-filter_complex", ";".join(filters), "-map", "[voice]", "-ar", "48000", str(voice_mix)], check=True, timeout=600)
     if speech:
         final=target/'final-audio.wav'
-        mastering=audio_mastering.normalize(ffmpeg,voice_mix,final)
+        cues=audio_manifest(plan)['soundCues']
+        premaster=target/'voice-sfx-premaster.wav'
+        source=voice_mix
+        try:
+            if speech['sfx'] and cues:
+                effects=target/'sound-effects.wav'
+                sound_effects.write(effects,plan['duration'],cues)
+                mix='[0:a]asplit=2[voice][detector];[1:a]volume=.32[fx];[fx][detector]sidechaincompress=threshold=.02:ratio=6:attack=4:release=120[ducked];[voice][ducked]amix=inputs=2:duration=first:normalize=0[a]'
+                subprocess.run([ffmpeg,'-v','error','-nostdin','-y','-i',str(voice_mix),'-i',str(effects),'-filter_complex',mix,'-map','[a]','-t',str(plan['duration']),str(premaster)],check=True,timeout=600,env=render_environment())
+                source=premaster
+            mastering=audio_mastering.normalize(ffmpeg,source,final)
+        finally:premaster.unlink(missing_ok=True)
         (target/'audio-mastering.json').write_text(json.dumps(mastering),encoding='utf-8')
         return final
     bed = target / "music-foley.wav"
@@ -1241,7 +1257,7 @@ def _run_job(job_id: str) -> None:
             'status':'planning_scenes','step':'Membagi narasi menjadi shot dan arahan visual','progress':28})
         prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
         prompt+='\nBahasa judul layar: '+job.get('speech',{}).get('language','id')+'. Pertahankan naskah pengguna; jangan menerjemahkan narasi terkunci.\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
-        if job.get('speech'):prompt+='\nAudio hanya narasi atau tanpa suara sesuai brief; jangan tambahkan musik/foley otomatis.'
+        if job.get('speech'):prompt+='\nAudio hanya narasi atau tanpa suara sesuai brief; jangan tambahkan musik latar. SFX pendek boleh jika diaktifkan pada brief; gunakan cue singkat yang mendukung aksi.'
         if job.get('motionDesign'):
             concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
             prompt+='\nKonsep wajib: '+concept['idea']+' '+concept['carry']+' Tutup seluruh durasi tanpa gap.'

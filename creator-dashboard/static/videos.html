@@ -250,10 +250,11 @@
           </section>
 
           <div class="row2">
-            <label>Suara narasi<select id="motionVoice"><option value="tts" selected>Edge-TTS gratis · narasi tanpa musik</option><option value="none">Tanpa suara</option></select></label>
+            <label>Suara narasi<select id="motionVoice"><option value="tts" selected>Edge-TTS gratis · narasi tanpa musik latar</option><option value="none">Tanpa suara</option></select></label>
             <label>Bahasa narasi<select id="speechLanguage"><option value="id" selected>Bahasa Indonesia · Ardi</option><option value="en">English · Guy</option></select></label>
           </div>
-          <p>Musik tidak ditambahkan otomatis. TTS memerlukan internet, tanpa API key berbayar. Bahasa mengatur narasi baru dan suara; naskah sendiri tetap dipertahankan. Lottie mengekspor audio narasi sebagai WAV terpisah.</p>
+          <label><input type="checkbox" id="sfxEnabled" checked> Efek SFX singkat sesuai scene</label>
+          <p>Musik latar tidak ditambahkan otomatis. SFX singkat mengikuti cue scene dan dibuat lebih pelan dari narasi. TTS memerlukan internet, tanpa API key berbayar. Bahasa mengatur narasi baru dan suara; naskah sendiri tetap dipertahankan. Lottie mengekspor audio narasi sebagai WAV terpisah.</p>
           <select name="style" id="styleSelect" hidden><option value="opuscar_cinematic" selected>Opuscar Cinematic</option></select>
           <button id="generateBtn" class="primary-button" type="submit" style="width: 100%; margin-top: 18px; padding: 14px; font-size: 14px;">
             Buat Scene Plan
