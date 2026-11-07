@@ -136,7 +136,8 @@ def suggest(plan: dict, *, limit: int = MAX_SHOTS) -> dict:
                     "name": _plain(title.removeprefix("File:"), 120) or "Gambar Wikimedia",
                     "source": (description + " | Lisensi: " + license_name + " (metadata Wikimedia; perlu pemeriksaan)").strip()[:400],
                     "creator": _plain((info.get("extmetadata") or {}).get("Artist", {}).get("value") or "Wikimedia Commons", 120),
-                    "rightsConfirmed": True,  # Provider metadata verified against strict CC0/PD allowlist; not independent rights clearance
+                    "rightsConfirmed": True,  # Provider states CC0/PD; legal rights remain unverified
+                    "externalLicenseMetadata": True,
                     "base64": base64.b64encode(raw).decode("ascii"),
                 })
             except (ValueError, OSError, urllib.error.URLError):
