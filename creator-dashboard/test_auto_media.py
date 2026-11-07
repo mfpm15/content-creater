@@ -83,6 +83,10 @@ class AutoMediaTests(unittest.TestCase):
             self.assertEqual(job["autoMediaReport"]["assets"],[])
             suggest.assert_called_once()
             approve.assert_called_once_with(job_id,"scene_plan")
+            approve.reset_mock()
+            vd._continue_job(job_id, "scene_plan")
+            self.assertEqual(vd.job_status(job_id)["status"],"awaiting_storyboard")
+            approve.assert_called_once_with(job_id, "storyboard")
             props,_=remotion_adapter.manifest(job["scenePlan"],vd.ASPECT_RATIOS["9:16"])
             self.assertEqual(props["captionStyle"],"pop")
 
