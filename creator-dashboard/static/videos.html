@@ -10,7 +10,32 @@
     #brandEditor input[type="color"] { height:44px; padding:4px; cursor:pointer; }
     #styleSelect[hidden] { display:none; }
     
-    .voice-preview-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+
+    .quick-studio{padding:18px;background:linear-gradient(135deg,rgba(33,54,92,.65),rgba(9,20,41,.92));border:1px solid #345273;border-radius:15px;margin:14px 0 18px}
+    .quick-top{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px}
+    .quick-top h3{margin:0;color:#f8fafc;font-size:18px}
+    .quick-top p{color:#bccde5;font-size:12px;max-width:580px;line-height:1.55;margin:7px 0 12px}
+    .quick-top small{color:#9ac4ed;font-size:11px}
+    .quick-spark{font-size:10px;letter-spacing:.13em;font-weight:800;color:#a5b4fc;background:#172554;padding:8px 10px;border-radius:20px}
+    .quick-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
+    .quick-choice-grid label{font-size:12px;color:#d6e7ff}
+    .quick-choice-grid select{width:100%;margin-top:6px}
+    .quick-checks{display:grid;gap:10px;padding:12px 0}
+    .quick-checks label{font-size:12px;color:#d6e7ff;display:flex;align-items:flex-start;gap:9px}
+    .quick-checks input{margin-top:3px}
+    .quick-legal{font-size:11px;color:#9fb3ca;line-height:1.5;display:block}
+    .quick-style-panel{padding:14px 0;margin:6px 0 16px}
+    .quick-style-buttons{display:flex;gap:8px;overflow-x:auto;padding:12px 2px 6px}
+    .quick-style-button{border:1px solid #3d5273;border-radius:11px;background:#132038;color:#e5e7eb;padding:12px 14px;min-width:104px;cursor:pointer;font-size:12px;text-align:left}
+    .quick-style-button[aria-pressed="true"]{border-color:#93c5fd;background:#1f3455;box-shadow:inset 0 0 0 1px #60a5fa}
+    .quick-style-button:focus-visible{outline:3px solid #a5b4fc}
+    .studio-drawer{border:1px solid #30455f;border-radius:12px;padding:14px;margin:10px 0;background:#0c1627}
+    .studio-drawer summary{cursor:pointer;color:#c5d7ee;font-size:13px;font-weight:700}
+    .studio-drawer[open] summary{margin-bottom:15px}
+    .studio-engine-note{font-size:12px!important;padding:9px!important}
+    @media(max-width:620px){.quick-choice-grid{grid-template-columns:1fr 1fr}.quick-studio{padding:12px}.quick-choice-grid label:last-child{grid-column:1/-1}}
+
+        .voice-preview-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
     .voice-preview-row audio{max-width:240px;width:100%}
     .voice-preview-row span{color:#bfd5e9}
         .media-upload-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
@@ -185,7 +210,7 @@
 
       <section class="section-block drafter-grid">
         <form id="videoForm" class="panel" autocomplete="off">
-          <h2 id="formEngineTitle">1. Buat Brief Video</h2>
+          <h2 id="formEngineTitle">Studio Otomatis · Buat video faceless</h2>
           <div class="workflow-steps" aria-label="Tahapan produksi">
             <div class="workflow-step active" data-workflow-step="brief">Brief</div>
             <div class="workflow-step" data-workflow-step="research">Web Research</div>
@@ -194,9 +219,54 @@
             <div class="workflow-step" data-workflow-step="storyboard">Storyboard</div>
             <div class="workflow-step" data-workflow-step="render">Render</div>
           </div>
-          <div id="engineNotice" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Workflow Berbasis Sumber</strong><br>Brief → konteks/riset sesuai mode → narasi utuh → Scene Plan → storyboard dan prompt produksi → render. Naskah dan timecode pengguna dipertahankan; tiap tahap review dapat dikoreksi sebelum render.</div>
+          <div id="engineNotice" class="studio-engine-note" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Workflow Berbasis Sumber</strong><br>Brief → konteks/riset sesuai mode → narasi utuh → Scene Plan → storyboard dan prompt produksi → render. Naskah dan timecode pengguna dipertahankan; tiap tahap review dapat dikoreksi sebelum render.</div>
 
 
+          <label>Judul video <span class="req">wajib</span>
+            <input name="topic" id="topicInput" maxlength="200" required placeholder="Contoh: 3 Tips Sukses Mengatur Waktu, Peluncuran Kopi Organik, AI Video Engine" />
+          </label>
+
+          <label>Deskripsi / konteks video (opsional)
+            <textarea id="creativeBriefInput" maxlength="4000" rows="3" placeholder="Tujuan video, audiens, gaya, pesan utama, dan hal yang harus dihindari. Bagian ini tidak dibacakan sebagai narasi."></textarea>
+          </label
+          <section id="quickStudio" class="quick-studio">
+            <div class="quick-top"><div><h3>Produksi otomatis</h3><p>Masukkan judul. Sistem menyusun naskah, memilih gaya visual, mencari gambar yang boleh digunakan, membuat dubbing, subtitle, lalu merender MP4.</p></div><span class="quick-spark">AUTODIRECTOR</span></div>
+            <div class="quick-choice-grid">
+              <label>Durasi
+                <select id="quickDuration"><option value="30">30 detik</option><option value="45">45 detik</option><option value="60" selected>60 detik</option><option value="90">90 detik</option><option value="15">15 detik</option></select>
+              </label>
+              <label>Format
+                <select id="quickAspect"><option value="9:16" selected>9:16 · Shorts / Reels</option><option value="16:9">16:9 · YouTube</option><option value="1:1">1:1 · Persegi</option><option value="4:5">4:5 · Sosial</option></select>
+              </label>
+              <label>Caption
+                <select id="captionStyleSelect"><option value="pop" selected>Kinetic Pop</option><option value="pill">Moving Pill</option><option value="highlight">Word Highlight*</option><option value="outline">Cinematic Outline</option><option value="clean">Clean Editorial</option></select>
+              </label>
+            </div>
+            <div class="quick-checks">
+              <label><input type="checkbox" id="quickAutoMedia" checked> Cari gambar otomatis (Wikimedia, CC0/domain publik)</label>
+              <label><input type="checkbox" id="quickAutoRender" checked> Otomatis lanjut sampai MP4 (tanpa publikasi)</label>
+              <label><input type="checkbox" id="quickResearch"> Riset informasi web bersumber (jika layanan tersedia)</label>
+            </div>
+            <small class="quick-legal">* Highlight kata memerlukan timestamp kata yang benar; tanpa timestamp, efek animasi hanya pada frasa. Foto otomatis tetap membutuhkan pengecekan sumber, relevansi dan hak pakai sebelum dipublikasikan.</small>
+          </section>
+          <section class="quick-style-panel" aria-label="Gaya visual otomatis">
+            <div class="quick-top"><h3>Gaya video</h3><small id="quickStyleStatus">Otomatis · tema dipilih berdasarkan judul</small></div>
+            <div id="quickStyleButtons" class="quick-style-buttons"></div>
+          </section>
+          <details id="templateGalleryDrawer" class="studio-drawer"><summary>Lihat dan pilih semua 12 template</summary>
+          <section id="templatePicker" class="template-panel" aria-label="Pilih gaya video faceless">
+            <div class="template-heading">
+              <div><h3>🎬 Pilih gaya video faceless</h3><small>12 gaya desain asli · tampilan dan layout langsung diterapkan pada render Remotion</small></div>
+              <label>Genre<select id="templateCategory" aria-label="Filter genre"><option value="">Semua genre</option></select></label>
+              <button class="secondary-button" type="button" id="clearTemplateBtn">Tanpa template</button>
+            </div>
+            <div class="template-grid" id="templateGrid" role="group" aria-label="Template visual video"></div>
+            <input type="hidden" id="templateId" value="">
+            <p class="template-hint" id="templateSelectionHint">Pilih gaya untuk menggunakan Remotion otomatis. Template merupakan desain grafis, bukan footage AI/stock. Palet tema dapat diganti melalui Brand Kit.</p>
+          </section>
+
+          </details>
+          <details id="mediaLibraryDrawer" class="studio-drawer"><summary>Media Library manual (opsional) · impor gambar sendiri</summary>
           <section id="mediaLibraryPanel" class="template-panel" aria-label="Pustaka media visual lokal">
             <div class="template-heading">
               <div><h3>🖼️ Media Library — Visual Per Adegan</h3><small>Impor gambar Anda/berlisensi, lalu pilih visualnya pada review Scene Plan</small></div>
@@ -213,23 +283,10 @@
             <div id="mediaAssetGrid" class="media-assets-grid" aria-label="Koleksi media yang sudah diimpor"></div>
             <p class="template-hint">Aset disimpan hanya di laptop ini. Tidak otomatis diunggah ke layanan pihak ketiga. Media di sini adalah gambar statis; tiap gambar memperoleh gerakan pan/zoom ringan pada hasil Remotion.</p>
           </section>
-          <section id="templatePicker" class="template-panel" aria-label="Pilih gaya video faceless">
-            <div class="template-heading">
-              <div><h3>🎬 Pilih gaya video faceless</h3><small>12 gaya desain asli · tampilan dan layout langsung diterapkan pada render Remotion</small></div>
-              <label>Genre<select id="templateCategory" aria-label="Filter genre"><option value="">Semua genre</option></select></label>
-              <button class="secondary-button" type="button" id="clearTemplateBtn">Tanpa template</button>
-            </div>
-            <div class="template-grid" id="templateGrid" role="group" aria-label="Template visual video"></div>
-            <input type="hidden" id="templateId" value="">
-            <p class="template-hint" id="templateSelectionHint">Pilih gaya untuk menggunakan Remotion otomatis. Template merupakan desain grafis, bukan footage AI/stock. Palet tema dapat diganti melalui Brand Kit.</p>
-          </section>
-          <label>Topik / Judul Video <span class="req">wajib</span>
-            <input name="topic" id="topicInput" maxlength="200" required placeholder="Contoh: 3 Tips Sukses Mengatur Waktu, Peluncuran Kopi Organik, AI Video Engine" />
-          </label>
 
-          <label>Arahan produksi (opsional)
-            <textarea id="creativeBriefInput" maxlength="4000" rows="3" placeholder="Tujuan video, audiens, gaya, pesan utama, dan hal yang harus dihindari. Bagian ini tidak dibacakan sebagai narasi."></textarea>
-          </label>
+          </details>
+          <details id="studioAdvanced" class="studio-drawer"><summary>Pengaturan lanjutan: naskah sendiri, model AI, narasi, engine, brand, FPS</summary>
+>
           <label>Naskah narasi atau scene bertimecode (opsional)
             <textarea name="script" id="scriptInput" rows="9" placeholder="Tulis narasi utuh yang ingin diucapkan, atau gunakan format scene:&#10;00:00-00:08 Narasi: ...&#10;Visual: ...&#10;Teks layar: ...&#10;SFX: ..."></textarea>
           </label>
@@ -327,7 +384,8 @@
             <span id="testVoiceStatus" role="status" aria-live="polite" style="font-size:12px"></span>
           </div>
           <p>Musik latar tidak ditambahkan otomatis. SFX singkat mengikuti cue scene dan dibuat lebih pelan dari narasi. TTS memerlukan internet, tanpa API key berbayar. Bahasa mengatur narasi baru dan suara; naskah sendiri tetap dipertahankan. Lottie mengekspor audio narasi sebagai WAV terpisah.</p>
-          <select name="style" id="styleSelect" hidden><option value="opuscar_cinematic" selected>Opuscar Cinematic</option></select>
+          <select name="style" id="styleSelect" hidden><option value="opuscar_cinematic" selected>Opuscar Cinematic</option></select          </details>
+>
           <button id="generateBtn" class="primary-button" type="submit" style="width: 100%; margin-top: 18px; padding: 14px; font-size: 14px;">
             Buat Scene Plan
           </button>
