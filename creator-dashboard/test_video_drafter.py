@@ -28,9 +28,26 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertEqual(opts["research"]["provider"], "Google Search grounding")
         self.assertFalse(opts["research"]["required"])
         self.assertEqual(opts["research"]["requiredForModes"], ["web"])
-        self.assertEqual(opts["models"][0]["provider"], "Gemini")
-        self.assertTrue(any(item["provider"] == "GPT" for item in opts["models"]))
-        self.assertTrue(any(item["provider"] == "Claude" and item["tier"] == "tambahan" for item in opts["models"]))
+        model_ids = [item["id"] for item in opts["models"]]
+        self.assertEqual(model_ids, [
+            "ms/GPT-5.6-Think-Deeper",
+            "cc/claude-sonnet-5-5",
+            "cc/claude-haiku-5-5",
+        ])
+        self.assertFalse(any("gemini" in model.lower() or "opus" in model.lower() for model in model_ids))
+        self.assertEqual(opts["defaultModel"], "ms/GPT-5.6-Think-Deeper")
+
+    def test_legacy_or_unsupported_video_model_falls_back_to_gpt(self):
+        with patch.object(video_drafter, "LLM_MODEL", "ag/gemini-3.8-flash-high"), \
+             patch.object(video_drafter.threading.Thread, "start"):
+            options = video_drafter.options()
+            self.assertEqual(options["defaultModel"], "ms/GPT-5.6-Think-Deeper")
+            result = video_drafter.start_job({
+                "topic": "Uji AI video", "engine": "remotion",
+                "model": "cc/claude-opus-5-5",
+            })
+            job = video_drafter.job_status(result["jobId"])
+            self.assertEqual(job["model"], "ms/GPT-5.6-Think-Deeper")
 
     def test_explicit_timecodes_and_fields_are_preserved(self):
         scenes = video_drafter.parse_explicit_scenes("00:00-00:07 Narasi: Pembuka asli\nVisual: Kota pagi\nTeks layar: Mulai\nSFX: whoosh\n\n00:07-00:20 Narasi: Isi asli\nVisual: Grafik data")
