@@ -18,7 +18,7 @@
     .template-card{display:flex;flex-direction:column;text-align:left;gap:6px;color:#f8fafc;background:#101b2e;border:2px solid transparent;border-radius:14px;padding:9px;cursor:pointer;min-width:0;transition:transform .15s,border-color .15s}
     .template-card:hover{border-color:#64748b;transform:translateY(-2px)}
     .template-card:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
-    .template-card[aria-checked="true"]{border-color:#818cf8;background:#182544;box-shadow:0 0 0 1px rgba(129,140,248,.3)}
+    .template-card[aria-pressed="true"]{border-color:#818cf8;background:#182544;box-shadow:0 0 0 1px rgba(129,140,248,.3)}
     .template-cover{height:94px;background:var(--template-bg);border-radius:10px;color:var(--template-text);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
     .template-cover:before{content:"";position:absolute;inset:7px;border:1px solid var(--template-accent);opacity:.27;border-radius:7px}
     .template-cover:after{content:"";position:absolute;width:110px;height:110px;border:1px dashed var(--template-accent);border-radius:50%;opacity:.35;top:8px;right:-33px;transform:rotate(20deg)}
@@ -160,14 +160,14 @@
     <main>
       <header class="topbar">
         <div>
-          <p class="eyebrow">ANIMATION PRODUCTION STUDIO</p>
-          <h1>Workflow Produksi Animasi Web</h1>
+          <p class="eyebrow">FACELESS CONTENT PRODUCTION</p>
+          <h1>Video Studio · Creator Control Center</h1>
         </div>
       </header>
 
       <section class="section-block drafter-grid">
         <form id="videoForm" class="panel" autocomplete="off">
-          <h2 id="formEngineTitle">1. Buat Brief Animasi</h2>
+          <h2 id="formEngineTitle">1. Buat Brief Video</h2>
           <div class="workflow-steps" aria-label="Tahapan produksi">
             <div class="workflow-step active" data-workflow-step="brief">Brief</div>
             <div class="workflow-step" data-workflow-step="research">Web Research</div>
@@ -186,7 +186,7 @@
             </div>
             <div class="template-grid" id="templateGrid" role="group" aria-label="Template visual video"></div>
             <input type="hidden" id="templateId" value="">
-            <p class="template-hint" id="templateSelectionHint">Pilih satu gaya untuk menggunakan Remotion otomatis. Template adalah desain grafis, bukan footage AI atau stock video. Branding pribadi dapat mengganti warnanya.</p>
+            <p class="template-hint" id="templateSelectionHint">Pilih gaya untuk menggunakan Remotion otomatis. Template merupakan desain grafis, bukan footage AI/stock. Palet tema dapat diganti melalui Brand Kit.</p>
           </section>
           <label>Topik / Judul Video <span class="req">wajib</span>
             <input name="topic" id="topicInput" maxlength="200" required placeholder="Contoh: 3 Tips Sukses Mengatur Waktu, Peluncuran Kopi Organik, AI Video Engine" />
