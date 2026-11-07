@@ -5,6 +5,7 @@ import renderer_contract
 import video_preproduction as preproduction
 import sound_effects
 import speech_settings
+import voice_quality
 import frame_rate
 import scene_diagram
 import html
@@ -1158,8 +1159,10 @@ def _build_audio(target: Path, plan: dict) -> Path:
     labels: list[str] = []
     for index, scene in enumerate(voiced):
         voice_file = voice_dir / f"{scene['id']}.wav"
-        with wave.open(str(voice_file), "rb") as voice:
-            voice_duration = voice.getnframes() / voice.getframerate()
+        # Never turn an empty/silent provider response into an apparently successful dubbed film.
+        # The gate checks signal presence; correct spoken words still require human review.
+        check = voice_quality.require_audible(voice_file)
+        voice_duration = check["duration"]
         if voice_duration > float(scene["end"]) - float(scene["start"]) + 0.05:
             raise RuntimeError(f"Narasi {scene['id']} melebihi slot adegan; revisi timing atau narasi sebelum render")
         inputs.extend(["-i", str(voice_file)])

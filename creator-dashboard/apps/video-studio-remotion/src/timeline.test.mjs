@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {literalNumbers,validateManifest} from './timeline.mjs';
+import {treatmentFor} from './visual-treatment.mjs';
 
 const example=()=>({version:1,width:320,height:568,fps:30,totalFrames:60,topic:'Studio',
   brand:{background:'#080f20',accent:'#22d3ee',text:'#ffffff',wordmark:'Studio',font:'Arial'},
@@ -49,4 +50,22 @@ test('60fps supports 600 seconds and rejects frames beyond the duration bound',(
   assert.equal(validateManifest(value).fps,60);
   value.totalFrames=36001;value.shots[0].endFrame=36001;assert.throws(()=>validateManifest(value));
   value.fps=30;value.totalFrames=18001;value.shots[0].endFrame=18001;assert.throws(()=>validateManifest(value));
+});
+
+
+test('semantic shot art uses approved headlines instead of repeating generic circles',()=>{
+  const expected=[
+    ['2 November', 'calendar'],
+    ['Penyimpanan darah', 'medical'],
+    ['Tiga fasilitas', 'facilities'],
+    ['Layanan bisa terganggu', 'warning'],
+    ['Siber sama pentingnya', 'security'],
+    ['Ikuti info resmi', 'verified'],
+  ];
+  for(const [title,kind] of expected){
+    assert.equal(treatmentFor({title,subject:'',family:'concept'}),kind,title);
+  }
+  assert.equal(treatmentFor({title:'Tiga fasilitas',subject:'Penyimpanan darah',family:'concept'}),'facilities');
+  assert.equal(treatmentFor({title:'Hasil 25%',subject:'',family:'data'}),'data');
+  assert.equal(treatmentFor({title:'Cerita umum',subject:'',family:'concept'}),'story');
 });

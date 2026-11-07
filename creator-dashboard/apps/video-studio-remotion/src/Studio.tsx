@@ -1,41 +1,8 @@
 import React from 'react';
-import {AbsoluteFill, Composition, interpolate, registerRoot, useCurrentFrame, useVideoConfig} from 'remotion';
-import {literalNumbers, validateManifest} from './timeline.mjs';
-import type {Shot, StudioProps} from './types';
-
-// Original procedural artwork. Numbers are literal labels from narration/title,
-// never fabricated bar values or performance predictions.
-const Illustration: React.FC<{shot: Shot; progress: number; accent: string}> = ({shot, progress, accent}) => {
-  const numbers = literalNumbers(shot.subject).slice(0,3);
-  const diagram=shot.diagram;
-  const editorial=(shot.subject || shot.title).match(/.{1,28}(?:\s|$)|.{1,28}/g) || [''];
-  return <svg viewBox="0 0 800 500" width="100%" height="100%" aria-hidden="true">
-    {diagram ? <>
-      {diagram.kind==='process' && <path d="M400 60 V440" fill="none" stroke={accent} strokeWidth="3" opacity=".4" pathLength="1" strokeDasharray="1" strokeDashoffset={1-progress}/>}
-      {diagram.labels.map((label,i)=>{
-        const process=diagram.kind==='process';
-        const x=process?400:210+i*380;
-        const y=process?70+i*360/(diagram.labels.length-1):250;
-        const w=process?650:330;
-        const words=label.match(/.{1,18}(?:\s|$)|.{1,18}/g) || [label];
-        return <g key={i} transform={`translate(${x},${y})`} opacity={interpolate(progress,[i*.12,i*.12+.18],[.25,1],{extrapolateLeft:'clamp',extrapolateRight:'clamp'})}>
-          <rect x={-w/2} y={process?-34:-120} width={w} height={process?68:240} rx="16" fill="#152131" stroke={accent} strokeWidth="2"/>
-          <text textAnchor="middle" fill="currentColor" fontSize={process?Math.min(25,560/(label.length*.65)):25} fontWeight="600">
-            {(process?[label]:words).map((line,j)=><tspan key={j} x="0" dy={j===0?(process?8:-(words.length-1)*18):36}>{line}</tspan>)}
-          </text>
-        </g>;
-      })}
-    </> : shot.family === 'data' && numbers.length ? <>
-      {numbers.map((number,i)=><g key={i} transform={`translate(${400+(i-(numbers.length-1)/2)*235},250)`}>
-        <circle r="100" fill={accent} fillOpacity=".1" stroke={accent} strokeWidth="2"/>
-        <text textAnchor="middle" dy=".35em" fill="currentColor" fontSize={Math.min(52,300/number.length)} fontWeight="700">{number}</text>
-      </g>)}
-    </> : <>
-      <path d="M100 110 H700 M100 390 H700" stroke={accent} strokeWidth="3"/>
-      <text x="400" y="260" textAnchor="middle" fill="currentColor" fontSize="38" fontWeight="600">{editorial.map((line,j)=><tspan key={j} x="400" dy={j===0?-(editorial.length-1)*22:44}>{line}</tspan>)}</text>
-    </>}
-  </svg>;
-};
+import {AbsoluteFill, Composition, registerRoot, useCurrentFrame, useVideoConfig} from 'remotion';
+import {validateManifest} from './timeline.mjs';
+import {Illustration} from './Visuals';
+import type {StudioProps} from './types';
 
 export const Studio: React.FC<StudioProps> = props => {
   const frame = useCurrentFrame();
@@ -58,6 +25,8 @@ export const Studio: React.FC<StudioProps> = props => {
   const rotation = camera==='orbit' ? (progress-.5)*6*a : 0;
   const edge = Math.min(Math.round(fps/3),Math.max(1,Math.floor(length/3)));
   const opacity = shot.transition==='cut' ? 1 : Math.min(index===0?1:(local+1)/edge,1,(length-local)/edge);
+  const cinematicDrift = Math.sin(frame/fps*1.35)*8*scaleUnit;
+  const glowScale = 1+Math.sin(frame/fps*.8)*.07;
   const slide = shot.transition==='slide' ? (1-Math.min(1,local/edge))*width*.06 : 0;
   const caption = props.captions.find(c=>frame>=c.startFrame && frame<c.endFrame);
   const filter = shot.lighting==='soft' ? 'brightness(1.15) contrast(.85)' : shot.lighting==='dramatic' ? 'brightness(.82) contrast(1.35)' : 'none';
@@ -85,12 +54,13 @@ export const Studio: React.FC<StudioProps> = props => {
       ...(local===Math.floor((length-1)/2)?{geometry:{title,art,caption:sub,viewport:[window.innerWidth,window.innerHeight]}}:{})}));
   },[frame,width,height,shot.id]);
   return <div ref={rootRef} style={{position:'absolute',inset:0,background:props.brand.background,color:props.brand.text,fontFamily:props.brand.font,overflow:'hidden'}}>
-    <AbsoluteFill style={{background:`radial-gradient(ellipse at 75% 20%, ${props.brand.accent}25, transparent 60%)`}}/>
+    <AbsoluteFill style={{background:`radial-gradient(ellipse at ${70+cinematicDrift}% 23%, ${props.brand.accent}2d, transparent 62%), linear-gradient(155deg, transparent 40%, ${props.brand.accent}08 100%)`}}/>
+    <AbsoluteFill style={{opacity:.22,backgroundImage:`radial-gradient(${props.brand.accent} 1px, transparent 1px)`,backgroundSize:`${Math.max(26,38*scaleUnit)}px ${Math.max(26,38*scaleUnit)}px`,transform:`translate(${cinematicDrift}px,${-cinematicDrift*.4}px) scale(${glowScale})`}}/>
     <AbsoluteFill style={{padding:`${height*.11}px ${width*.16}px ${height*.24}px ${width*.08}px`,opacity,transform:`translateX(${slide}px)`}}>
       <div style={{display:'flex',justifyContent:'space-between',fontSize:24*scaleUnit,letterSpacing:3*scaleUnit,color:props.brand.accent,fontWeight:700}}><span>{String(index+1).padStart(2,'0')} / {String(props.shots.length).padStart(2,'0')}</span><span style={{fontSize:20*scaleUnit,letterSpacing:0}}>{props.brand.wordmark}</span></div>
       <div ref={titleRef} style={{fontSize:(portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))),lineHeight:1.12,fontWeight:800,marginTop:height*.035,maxWidth:width*.76,overflowWrap:'anywhere'}}>{shot.title}</div>
-      <div ref={artRef} style={{position:'absolute',left:'8%',right:'16%',top:'28%',height:portrait?'35%':'30%',transform:`translateX(${x}%) scale(${scale}) rotate(${rotation}deg)`,filter}}>
-        <Illustration shot={shot} progress={progress} accent={props.brand.accent}/>
+      <div ref={artRef} style={{position:'absolute',left:'8%',right:'16%',top:portrait?'26%':'26%',height:portrait?'40%':'38%',transform:`translateX(${x}%) scale(${scale}) rotate(${rotation}deg)`,filter}}>
+        <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>
       </div>
       {caption && <div ref={captionRef} style={{position:'absolute',left:'8%',right:'16%',bottom:'24%',padding:`${24*scaleUnit}px ${30*scaleUnit}px`,borderLeft:`${5*scaleUnit}px solid ${props.brand.accent}`,fontSize:40*scaleUnit,lineHeight:1.35,background:props.brand.background,overflowWrap:'anywhere'}}>{caption.text}</div>}
     </AbsoluteFill>
