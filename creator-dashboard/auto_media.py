@@ -56,10 +56,15 @@ def _license(meta: dict) -> str | None:
 
 
 def _wikimedia_thumbnail(url: str) -> bool:
-    u = urllib.parse.urlsplit(url)
-    return u.scheme == "https" and u.hostname == "upload.wikimedia.org" and u.port is None and (
-        u.path.startswith("/wikipedia/commons/thumb/") or u.path.startswith("/wikipedia/commons/")
-    ) and not u.username and not u.password and not u.fragment
+    if not isinstance(url, str):
+        return False
+    try:
+        u = urllib.parse.urlsplit(url)
+        return u.scheme == "https" and u.hostname == "upload.wikimedia.org" and u.port is None and (
+            u.path.startswith("/wikipedia/commons/thumb/") or u.path.startswith("/wikipedia/commons/")
+        ) and not u.username and not u.password and not u.fragment
+    except ValueError:
+        return False
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -91,7 +96,15 @@ def _search(query: str) -> list[dict]:
         "iiurlwidth": "960", "maxlag": "5",
     })
     payload = json.loads(_download(API + "?" + params, MAX_API_BYTES))
-    return (payload.get("query") or {}).get("pages") or []
+    if not isinstance(payload, dict):
+        raise ValueError("Respons pencarian Commons bukan objek JSON")
+    query_result = payload.get("query") or {}
+    if not isinstance(query_result, dict):
+        raise ValueError("Struktur hasil pencarian Commons tidak valid")
+    pages = query_result.get("pages") or []
+    if not isinstance(pages, list):
+        raise ValueError("Daftar hasil pencarian Commons tidak valid")
+    return pages[:MAX_ITEMS]
 
 
 def suggest(plan: dict, *, limit: int = MAX_SHOTS) -> dict:
@@ -101,29 +114,45 @@ def suggest(plan: dict, *, limit: int = MAX_SHOTS) -> dict:
     if type(limit) is not int or not 1 <= limit <= MAX_SHOTS:
         raise ValueError("Batas media otomatis tidak valid")
     added, problems, used_files = [], [], set()
+    attempts = 0
     for scene in plan["scenes"]:
-        if len(added) >= limit:
+        # Cap *attempted lookups*, not successful downloads. Without this,
+        # a 200-scene film with no Commons matches could make 200 HTTP queries.
+        if attempts >= limit:
             break
+        if not isinstance(scene, dict):
+            problems.append({"scene": "", "reason": "Struktur adegan tidak valid"})
+            continue
         if scene.get("assetId"):
             continue
         query = _query(scene)
         if not query:
             continue
+        attempts += 1
         try:
             pages = _search(query)
-        except (ValueError, OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        except (ValueError, OSError, urllib.error.URLError, json.JSONDecodeError, UnicodeError) as exc:
             problems.append({"scene": scene.get("id", ""), "reason": "Pencarian media gagal atau dibatasi provider", "errorType": type(exc).__name__})
             continue
         matched = False
         keywords = {w.casefold() for w in query.split() if len(w) >= MIN_MATCH_LEN}
-        for page in pages:
-            info = (page.get("imageinfo") or [None])[0]
-            if not isinstance(info, dict):
+        for page in pages[:MAX_ITEMS]:
+            if not isinstance(page, dict):
                 continue
-            license_name = _license(info.get("extmetadata") or {})
+            details = page.get("imageinfo")
+            if not isinstance(details, list) or not details or not isinstance(details[0], dict):
+                continue
+            info = details[0]
+            metadata = info.get("extmetadata")
+            if not isinstance(metadata, dict):
+                continue
+            try:
+                license_name = _license(metadata)
+            except (ValueError, AttributeError, TypeError):
+                continue
             url = info.get("thumburl") or ""
             title = str(page.get("title") or "")
-            if not license_name or not _wikimedia_thumbnail(url) or url in used_files:
+            if not isinstance(url, str) or not license_name or not _wikimedia_thumbnail(url) or url in used_files:
                 continue
             if not any(k in title.casefold() for k in keywords):
                 continue
@@ -131,11 +160,16 @@ def suggest(plan: dict, *, limit: int = MAX_SHOTS) -> dict:
             if not (isinstance(description, str) and description.startswith("https://commons.wikimedia.org/wiki/File:")):
                 continue
             try:
+                artist = metadata.get("Artist")
+                artist_name = (artist.get("value") if isinstance(artist, dict) else None) or "Wikimedia Commons"
+            except (AttributeError, TypeError):
+                artist_name = "Wikimedia Commons"
+            try:
                 raw = _download(url, MAX_IMAGE_BYTES)
                 data = media_library.save({
                     "name": _plain(title.removeprefix("File:"), 120) or "Gambar Wikimedia",
                     "source": (description + " | Lisensi: " + license_name + " (metadata Wikimedia; perlu pemeriksaan)").strip()[:400],
-                    "creator": _plain((info.get("extmetadata") or {}).get("Artist", {}).get("value") or "Wikimedia Commons", 120),
+                    "creator": _plain(artist_name, 120),
                     "rightsConfirmed": True,  # Provider states CC0/PD; legal rights remain unverified
                     "externalLicenseMetadata": True,
                     "base64": base64.b64encode(raw).decode("ascii"),
@@ -151,5 +185,6 @@ def suggest(plan: dict, *, limit: int = MAX_SHOTS) -> dict:
         if not matched:
             problems.append({"scene": scene.get("id", ""), "reason": "Belum menemukan gambar domain publik yang cocok; visual ilustrasi tetap dipakai"})
     return {"mode": "commons_cc0_public_domain", "status": "review_required",
+            "attemptedSearches": attempts, "maxSearches": limit,
             "assets": added, "warnings": problems,
             "note": "Hasil otomatis menggunakan metadata lisensi Commons, BUKAN verifikasi hukum atau bukti foto peristiwa. Periksa kecocokan gambar dan sumber sebelum publikasi."}
