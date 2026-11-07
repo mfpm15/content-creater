@@ -78,7 +78,7 @@ def save(payload: dict, *, root: Path = ROOT) -> dict:
     name_on_disk = f"{asset_id}.{ext}"
     meta = {
         "id": asset_id, "name": name, "source": origin, "creator": author,
-        "rightsConfirmed": True, "createdAt": round(time.time(), 3),
+        "rightsConfirmed": True, "rightsBasis": "external_metadata_unverified" if payload.get("externalLicenseMetadata") is True else "user_attestation", "createdAt": round(time.time(), 3),
         "sha256": hashlib.sha256(raw).hexdigest(), "filename": name_on_disk,
         "mime": mime, "width": width, "height": height, "bytes": len(raw),
         "url": f"/api/videos/assets/{asset_id}",
