@@ -16,6 +16,7 @@ from pathlib import Path
 
 import creative_profile
 import scene_render
+import video_templates
 from runtime_config import find_browser
 from security import redact, render_environment
 
@@ -85,10 +86,12 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
     if not shots or cursor!=total:raise ValueError('Adegan Remotion harus mencakup seluruh durasi')
     if any(len(shot['title'])>500 for shot in shots) or any(len(c['text'])>500 for c in captions):raise ValueError('Teks Remotion terlalu panjang; ringkas judul atau token narasi')
     brand=creative_profile.brand(plan.get('brand') or creative_profile.DEFAULT)
-    props={'version':1,'width':width,'height':height,'fps':fps,'totalFrames':total,'topic':plan['topic'],
+    chosen=video_templates.get(plan["templateId"]) if plan.get("templateId") else None
+    props={'version':1,'width':width,'height':height,'fps':fps,'totalFrames':total,'topic':plan['topic'], 'layout':chosen['layout'] if chosen else 'editorial',
            'brand':{key:brand[key] for key in ('background','accent','text','wordmark','font')},'shots':shots,'captions':captions}
     return props,{'adapter':'remotion','version':'4.0.540','caption_timing':methods,
                   'visual_families':['process','data','comparison','concept'],
+                  'templateId':chosen['id'] if chosen else None,
                   'manual_required':'Story, semantics, readability and audio/caption timing require review'}
 
 
