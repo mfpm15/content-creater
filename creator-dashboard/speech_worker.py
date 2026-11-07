@@ -22,11 +22,18 @@ async def synthesize(lines, output):
     proxy=os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
     for line in lines:
         mp3=output/(line['id']+'.part.mp3');wav=output/(line['id']+'.part.wav')
+        temp_words=output/(line['id']+'.part.words.jsonl')
+        words=output/(line['id']+'.words.jsonl')
         try:
-            await edge_tts.Communicate(line['text'],line['voice'],rate=line['rate'],proxy=proxy,connect_timeout=15,receive_timeout=45).save(str(mp3))
+            await edge_tts.Communicate(line['text'],line['voice'],rate=line['rate'],boundary='WordBoundary',proxy=proxy,connect_timeout=15,receive_timeout=45).save(str(mp3),str(temp_words))
             subprocess.run([shutil.which('ffmpeg'),'-v','error','-nostdin','-y','-i',str(mp3),'-map_metadata','-1','-ac','1','-ar','24000','-c:a','pcm_s16le',str(wav)],check=True,timeout=60)
             wav.replace(output/(line['id']+'.wav'))
-        finally:mp3.unlink(missing_ok=True);wav.unlink(missing_ok=True)
+            # Provider word boundaries are derived from the SAME audio response,
+            # and never estimated from text lengths. The renderer checks them.
+            if temp_words.is_file() and 0<temp_words.stat().st_size<=300_000:
+                temp_words.replace(words)
+        finally:
+            mp3.unlink(missing_ok=True);wav.unlink(missing_ok=True);temp_words.unlink(missing_ok=True)
 
 
 def main():
