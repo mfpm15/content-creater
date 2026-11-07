@@ -509,6 +509,14 @@ function showResult(result, aspectId) {
     for(const row of Object.values(result.review.delivery||{})){
       const text=document.createElement('p');text.textContent=`${row.label}: ${row.status==='passed_working_profile'?'profil kerja media terpenuhi':row.issues.map(issue=>issue.message).join('; ')}. Profil referensi, bukan verifikasi ketentuan resmi platform.`;reviewBox.append(text);
     }
+    if(result.review.wordAlignment){
+      const aligned=result.review.wordAlignment;
+      const p=document.createElement('p');
+      p.textContent='Caption sinkron Edge-TTS: '+aligned.alignedScenes.length+
+        ' adegan menerima WordBoundary asli. '+aligned.warnings.length+
+        ' adegan/peringatan perlu diperiksa. Sinkronisasi berdasarkan event provider, bukan transkripsi ulang audio.';
+      reviewBox.append(p);
+    }
     if(result.review.remotion){const text=document.createElement('p');text.textContent='Remotion: frame asli tersedia di bawah. Caption tanpa cue kata memakai estimasi durasi, bukan alignment audio. Tetap periksa keterbacaan dan isi.';reviewBox.append(text)}
     if(result.review.remotion?.visual_assets?.length){
       const list=document.createElement('div');
