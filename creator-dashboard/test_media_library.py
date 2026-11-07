@@ -94,5 +94,32 @@ class MediaLibraryTests(unittest.TestCase):
                 }]},"Fasilitas","",2)
 
 
+    def test_real_remotion_renders_selected_photo_when_runtime_ready(self):
+        if remotion_adapter.runtime_issues():
+            self.skipTest("Requires optional Remotion, FFmpeg and browser")
+        # The rendering worker uses the fixed private media root. Clean our
+        # isolated UUID record afterwards rather than patching production paths.
+        asset=media_library.save(record(png()))
+        try:
+            plan=vd.normalize_scene_plan({
+                "scenes":[{"start":0,"end":1,"narration":"Inilah fasilitas yang sebenarnya.",
+                           "onScreenText":"Fasilitas","assetId":asset["id"],"visualFamily":"concept"}],
+                "fps":30,
+            },"Fasilitas","",1)
+            with tempfile.TemporaryDirectory() as folder:
+                target=Path(folder)
+                output, report=remotion_adapter.render(target,plan,{"width":320,"height":568})
+                self.assertTrue(output.exists() and output.stat().st_size>1000)
+                self.assertEqual(report["visual_assets"][0]["sha256"],asset["sha256"])
+                asset_copy=target/"public"/report["visual_assets"][0]["publicFile"]
+                self.assertTrue(asset_copy.is_file())
+                self.assertEqual(asset_copy.read_bytes(),png())
+                self.assertTrue((target / report["frames"][0]["file"]).is_file())
+                self.assertTrue(report["deterministic_repeat"])
+        finally:
+            (media_library.ROOT / asset["filename"]).unlink(missing_ok=True)
+            (media_library.ROOT / f"{asset['id']}.json").unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     unittest.main()
