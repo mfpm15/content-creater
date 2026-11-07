@@ -9,6 +9,27 @@
   <style>
     #brandEditor input[type="color"] { height:44px; padding:4px; cursor:pointer; }
     #styleSelect[hidden] { display:none; }
+    .template-panel{margin:0 0 20px;padding:17px;border:1px solid rgba(99,102,241,.3);border-radius:16px;background:linear-gradient(145deg,rgba(31,41,68,.9),rgba(11,18,38,.87))}
+    .template-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .template-heading h3{margin:0;color:#f8fafc;font-size:17px}
+    .template-heading small{color:#a3b5ce;font-size:11px}
+    .template-heading select{min-height:36px;border-radius:9px}
+    .template-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:10px;margin-top:14px;max-height:410px;overflow-y:auto;padding:2px}
+    .template-card{display:flex;flex-direction:column;text-align:left;gap:6px;color:#f8fafc;background:#101b2e;border:2px solid transparent;border-radius:14px;padding:9px;cursor:pointer;min-width:0;transition:transform .15s,border-color .15s}
+    .template-card:hover{border-color:#64748b;transform:translateY(-2px)}
+    .template-card:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+    .template-card[aria-checked="true"]{border-color:#818cf8;background:#182544;box-shadow:0 0 0 1px rgba(129,140,248,.3)}
+    .template-cover{height:94px;background:var(--template-bg);border-radius:10px;color:var(--template-text);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .template-cover:before{content:"";position:absolute;inset:7px;border:1px solid var(--template-accent);opacity:.27;border-radius:7px}
+    .template-cover:after{content:"";position:absolute;width:110px;height:110px;border:1px dashed var(--template-accent);border-radius:50%;opacity:.35;top:8px;right:-33px;transform:rotate(20deg)}
+    .template-cover-mark{width:35px;height:35px;border:3px solid var(--template-accent);border-radius:9px;transform:rotate(-10deg);box-shadow:9px -7px 0 -2px var(--template-bg),9px -7px 0 0 var(--template-accent);opacity:.85}
+    .template-cover-title{position:absolute;left:10px;bottom:10px;right:10px;z-index:2;line-height:1.05;text-shadow:0 1px 5px var(--template-bg);font-family:var(--template-font);font-size:14px;font-weight:900}
+    .template-card strong{font-size:12px;line-height:1.35}
+    .template-card small{font-size:10px;color:#a3b5ce;line-height:1.35}
+    .template-card .template-tag{font-size:9px;color:#b4d4fa;text-transform:uppercase;letter-spacing:.08em}
+    .template-hint{margin:10px 0 0;color:#aabed9;font-size:11px;line-height:1.5}
+    @media(max-width:620px){.template-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:360px}.template-panel{padding:10px}}
+
     .video-preview-box {
       width: 100%;
       border-radius: 12px;
@@ -156,6 +177,16 @@
             <div class="workflow-step" data-workflow-step="render">Render</div>
           </div>
           <div id="engineNotice" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Workflow Berbasis Sumber</strong><br>Brief → konteks/riset sesuai mode → narasi utuh → Scene Plan → storyboard dan prompt produksi → render. Naskah dan timecode pengguna dipertahankan; tiap tahap review dapat dikoreksi sebelum render.</div>
+
+          <section id="templatePicker" class="template-panel" aria-label="Pilih gaya video faceless">
+            <div class="template-heading">
+              <div><h3>🎬 Pilih gaya video faceless</h3><small>12 gaya desain asli · tampilan dan layout langsung diterapkan pada render Remotion</small></div>
+              <label>Genre<select id="templateCategory" aria-label="Filter genre"><option value="">Semua genre</option></select></label>
+            </div>
+            <div class="template-grid" id="templateGrid" role="radiogroup" aria-label="Template visual video"></div>
+            <input type="hidden" id="templateId" value="">
+            <p class="template-hint" id="templateSelectionHint">Pilih satu gaya untuk menggunakan Remotion otomatis. Template adalah desain grafis, bukan footage AI atau stock video. Branding pribadi dapat mengganti warnanya.</p>
+          </section>
           <label>Topik / Judul Video <span class="req">wajib</span>
             <input name="topic" id="topicInput" maxlength="200" required placeholder="Contoh: 3 Tips Sukses Mengatur Waktu, Peluncuran Kopi Organik, AI Video Engine" />
           </label>
