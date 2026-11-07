@@ -72,5 +72,32 @@ class VideoTemplateTests(unittest.TestCase):
         self.assertIsNone(report["templateId"])
 
 
+    def test_two_templates_produce_real_different_mp4_frames_when_runtime_ready(self):
+        if remotion_adapter.runtime_issues():
+            self.skipTest("Requires optional Node/Remotion/FFmpeg/browser")
+        frames = []
+        with tempfile.TemporaryDirectory() as temp:
+            for slug in ("cyber-news", "kelas-cerah"):
+                preset = video_templates.get(slug)
+                plan = vd.normalize_scene_plan({
+                    "scenes": [{
+                        "start": 0, "end": 1, "narration": "Tiga fasilitas memerlukan keamanan.",
+                        "onScreenText": "Tiga fasilitas", "visualFamily": "concept",
+                    }],
+                    "fps": 30, "templateId": slug, "brand": preset["brand"],
+                }, "Tiga fasilitas", "", 1)
+                target = Path(temp) / slug
+                target.mkdir()
+                output, report = remotion_adapter.render(target, plan, {"width": 320, "height": 568})
+                self.assertTrue(output.is_file() and output.stat().st_size > 1000)
+                self.assertTrue(report["deterministic_repeat"])
+                self.assertEqual(len(report["frames"]), 1)
+                self.assertTrue(report["layout"]["dom_measurement_available"])
+                frame_path = target / report["frames"][0]["file"]
+                self.assertTrue(frame_path.is_file())
+                frames.append(frame_path.read_bytes())
+        self.assertNotEqual(frames[0], frames[1], "Templates must change actual rendered pixels")
+
+
 if __name__ == "__main__":
     unittest.main()
