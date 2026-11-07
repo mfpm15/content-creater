@@ -21,14 +21,9 @@
     .quick-choice-grid label{font-size:12px;color:#d6e7ff}
     .quick-choice-grid select{width:100%;margin-top:6px}
     .quick-checks{display:grid;gap:10px;padding:12px 0}
-    .quick-checks label{font-size:12px;color:#d6e7ff;display:flex;align-items:flex-start;gap:9px}
-    .quick-checks input{margin-top:3px}
+    .panel .quick-checks label,.panel label.check{font-size:12px;color:#d6e7ff;display:flex;align-items:flex-start;gap:9px;margin:0}
+    .panel .quick-checks input[type=checkbox],.panel label.check input[type=checkbox],.panel .media-consent input[type=checkbox]{width:16px;height:16px;flex:0 0 16px;margin:2px 0 0;padding:0}
     .quick-legal{font-size:11px;color:#9fb3ca;line-height:1.5;display:block}
-    .quick-style-panel{padding:14px 0;margin:6px 0 16px}
-    .quick-style-buttons{display:flex;gap:8px;overflow-x:auto;padding:12px 2px 6px}
-    .quick-style-button{border:1px solid #3d5273;border-radius:11px;background:#132038;color:#e5e7eb;padding:12px 14px;min-width:104px;cursor:pointer;font-size:12px;text-align:left}
-    .quick-style-button[aria-pressed="true"]{border-color:#93c5fd;background:#1f3455;box-shadow:inset 0 0 0 1px #60a5fa}
-    .quick-style-button:focus-visible{outline:3px solid #a5b4fc}
     .studio-drawer{border:1px solid #30455f;border-radius:12px;padding:14px;margin:10px 0;background:#0c1627}
     .studio-drawer summary{cursor:pointer;color:#c5d7ee;font-size:13px;font-weight:700}
     .studio-drawer[open] summary{margin-bottom:15px}
@@ -57,12 +52,17 @@
     .template-heading h3{margin:0;color:#f8fafc;font-size:17px}
     .template-heading small{color:#a3b5ce;font-size:11px}
     .template-heading select{min-height:36px;border-radius:9px}
-    .template-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:10px;margin-top:14px;max-height:410px;overflow-y:auto;padding:2px}
+    .template-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:12px;margin-top:14px;padding:4px}
+    .template-filter{margin:0!important;min-width:160px}
+    .template-card.auto-card .template-cover{background:linear-gradient(135deg,#1e1b4b,#312e81 45%,#0f172a);color:#e0e7ff}
+    .panel .template-card{margin:0}
+    .template-cover svg{position:absolute;inset:0;width:100%;height:100%}
+    .template-cover:before,.template-cover:after{display:none}
     .template-card{display:flex;flex-direction:column;text-align:left;gap:6px;color:#f8fafc;background:#101b2e;border:2px solid transparent;border-radius:14px;padding:9px;cursor:pointer;min-width:0;transition:transform .15s,border-color .15s}
     .template-card:hover{border-color:#64748b;transform:translateY(-2px)}
     .template-card:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
     .template-card[aria-pressed="true"]{border-color:#818cf8;background:#182544;box-shadow:0 0 0 1px rgba(129,140,248,.3)}
-    .template-cover{height:94px;background:var(--template-bg);border-radius:10px;color:var(--template-text);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .template-cover{height:170px;width:100%;background:var(--template-bg);border-radius:10px;color:var(--template-text);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
     .template-cover:before{content:"";position:absolute;inset:7px;border:1px solid var(--template-accent);opacity:.27;border-radius:7px}
     .template-cover:after{content:"";position:absolute;width:110px;height:110px;border:1px dashed var(--template-accent);border-radius:50%;opacity:.35;top:8px;right:-33px;transform:rotate(20deg)}
     .template-cover-mark{width:35px;height:35px;border:3px solid var(--template-accent);border-radius:9px;transform:rotate(-10deg);box-shadow:9px -7px 0 -2px var(--template-bg),9px -7px 0 0 var(--template-accent);opacity:.85}
@@ -96,7 +96,7 @@
     }
     .workflow-steps {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
       gap: 8px;
       margin: 0 0 18px;
     }
@@ -228,7 +228,7 @@
 
           <label>Deskripsi / konteks video (opsional)
             <textarea id="creativeBriefInput" maxlength="4000" rows="3" placeholder="Tujuan video, audiens, gaya, pesan utama, dan hal yang harus dihindari. Bagian ini tidak dibacakan sebagai narasi."></textarea>
-          </label
+          </label>
           <section id="quickStudio" class="quick-studio">
             <div class="quick-top"><div><h3>Produksi otomatis</h3><p>Masukkan judul. Sistem menyusun naskah, memilih gaya visual, mencari gambar yang boleh digunakan, membuat dubbing, subtitle, lalu merender MP4.</p></div><span class="quick-spark">AUTODIRECTOR</span></div>
             <div class="quick-choice-grid">
@@ -249,23 +249,15 @@
             </div>
             <small class="quick-legal">* Highlight kata memerlukan timestamp kata yang benar; tanpa timestamp, efek animasi hanya pada frasa. Foto otomatis tetap membutuhkan pengecekan sumber, relevansi dan hak pakai sebelum dipublikasikan.</small>
           </section>
-          <section class="quick-style-panel" aria-label="Gaya visual otomatis">
-            <div class="quick-top"><h3>Gaya video</h3><small id="quickStyleStatus">Otomatis · tema dipilih berdasarkan judul</small></div>
-            <div id="quickStyleButtons" class="quick-style-buttons"></div>
-          </section>
-          <details id="templateGalleryDrawer" class="studio-drawer"><summary>Lihat dan pilih semua 12 template</summary>
           <section id="templatePicker" class="template-panel" aria-label="Pilih gaya video faceless">
             <div class="template-heading">
-              <div><h3>🎬 Pilih gaya video faceless</h3><small>12 gaya desain asli · tampilan dan layout langsung diterapkan pada render Remotion</small></div>
-              <label>Genre<select id="templateCategory" aria-label="Filter genre"><option value="">Semua genre</option></select></label>
-              <button class="secondary-button" type="button" id="clearTemplateBtn">Tanpa template</button>
+              <div><h3>Gaya video</h3><small id="quickStyleStatus">Otomatis · tema dipilih berdasarkan judul</small></div>
+              <label class="template-filter">Genre<select id="templateCategory" aria-label="Filter genre"><option value="">Semua genre</option></select></label>
             </div>
             <div class="template-grid" id="templateGrid" role="group" aria-label="Template visual video"></div>
             <input type="hidden" id="templateId" value="">
-            <p class="template-hint" id="templateSelectionHint">Pilih gaya untuk menggunakan Remotion otomatis. Template merupakan desain grafis, bukan footage AI/stock. Palet tema dapat diganti melalui Brand Kit.</p>
+            <p class="template-hint" id="templateSelectionHint">Pilih gaya untuk menggunakan Remotion otomatis. Pratinjau kartu menunjukkan posisi judul, gambar, dan caption serta palet warna, bukan video final. Palet dapat diganti melalui Brand Kit.</p>
           </section>
-
-          </details>
           <details id="mediaLibraryDrawer" class="studio-drawer"><summary>Media Library manual (opsional) · impor gambar sendiri</summary>
           <section id="mediaLibraryPanel" class="template-panel" aria-label="Pustaka media visual lokal">
             <div class="template-heading">
@@ -350,10 +342,8 @@
             <label>Model Sutradara & Motion Planner (9Router)
               <select name="model" id="modelSelect">
                 <option value="ms/GPT-5.6-Think-Deeper" selected>GPT-5.6 Think Deeper · utama</option>
-                <option value="ag/gemini-3.8-flash-high">Gemini 3.8 Flash High · utama</option>
-                <option value="ag/gemini-3.8-flash-medium">Gemini 3.8 Flash Medium · utama</option>
-                <option value="cc/claude-opus-5-5">Claude Opus 5.5 · tambahan</option>
                 <option value="cc/claude-sonnet-5-5">Claude Sonnet 5.5 · tambahan</option>
+                <option value="cc/claude-haiku-5-5">Claude Haiku 5.5 · cepat</option>
               </select>
             </label>
           </div>
@@ -376,7 +366,7 @@
             <label>Suara narasi<select id="motionVoice"><option value="tts" selected>Edge-TTS gratis · narasi tanpa musik latar</option><option value="none">Tanpa suara</option></select></label>
             <label>Bahasa narasi<select id="speechLanguage"><option value="id" selected>Bahasa Indonesia · Ardi</option><option value="en">English · Guy</option></select></label>
           </div>
-          <label><input type="checkbox" id="sfxEnabled" checked> Efek SFX singkat sesuai scene</label>
+          <label class="check"><input type="checkbox" id="sfxEnabled" checked> Efek SFX singkat sesuai scene</label>
           <div class="voice-preview-row">
             <button id="testVoiceBtn" class="secondary-button" type="button">🔊 Tes dubbing sebelum render</button>
             <audio id="testVoiceAudio" controls hidden preload="none" aria-label="Contoh suara Edge-TTS"></audio>
@@ -419,8 +409,7 @@
           </div>
 
           <div id="aspectVariants" hidden><label>Rasio tambahan<select id="variantAspect"><option>9:16</option><option>1:1</option><option>4:5</option><option>16:9</option></select></label><button type="button" id="createAspectBtn" class="secondary-button">Buat variasi untuk direview</button><small>Rencana sumber dipakai ulang; setiap variasi tetap membutuhkan persetujuan.</small></div>
-          <h3 style="margin-top: 28px;">Riwayat Animasi</h3>
-          <div id="pendingJobs" aria-label="Pekerjaan tersimpan"></div>
+          <h3 style="margin-top: 28px;">Video selesai</h3>
           <div id="historyList">
             <p class="empty">Memuat daftar video...</p>
           </div>

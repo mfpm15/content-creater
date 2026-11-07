@@ -206,6 +206,33 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertEqual(job["status"], "awaiting_scene_plan")
         self.assertEqual(job["scenePlan"]["creativeDirection"]["logline"], "Transformasi")
 
+    def test_llm_falls_back_to_next_model_on_503_but_not_on_client_error(self):
+        import urllib.error
+        calls = []
+
+        def down_first(prompt, model=""):
+            calls.append(model)
+            if model == "ms/GPT-5.6-Think-Deeper":
+                raise urllib.error.HTTPError("u", 503, "Service Unavailable", {}, None)
+            return '{"ok":true}'
+        with patch.object(video_drafter, "_call_9router", side_effect=down_first):
+            self.assertEqual(video_drafter._call_llm("p", "ms/GPT-5.6-Think-Deeper"), '{"ok":true}')
+        self.assertEqual(calls, ["ms/GPT-5.6-Think-Deeper", "cc/claude-sonnet-5-5"])
+
+        def bad_request(prompt, model=""):
+            raise urllib.error.HTTPError("u", 400, "Bad Request", {}, None)
+        with patch.object(video_drafter, "_call_9router", side_effect=bad_request) as call:
+            with self.assertRaises(urllib.error.HTTPError):
+                video_drafter._call_llm("p", "ms/GPT-5.6-Think-Deeper")
+            self.assertEqual(call.call_count, 1)
+
+        def all_down(prompt, model=""):
+            raise urllib.error.HTTPError("u", 503, "Service Unavailable", {}, None)
+        with patch.object(video_drafter, "_call_9router", side_effect=all_down) as call:
+            with self.assertRaises(urllib.error.HTTPError):
+                video_drafter._call_llm("p")
+            self.assertEqual(call.call_count, len(video_drafter.DEFAULT_MODELS))
+
     def test_workflow_requires_ordered_approvals(self):
         plan = video_drafter.normalize_scene_plan({"scenes":[{"start":0,"end":15,"narration":"Adegan pembuka.","visualFamily":"kinetic-type"}]}, "Tes", "", 15)
         with patch.object(video_drafter.threading, "Thread"):

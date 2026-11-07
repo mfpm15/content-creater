@@ -13,6 +13,13 @@ import video_templates
 
 
 class VideoTemplateTests(unittest.TestCase):
+    def test_catalogue_has_wide_range_and_recommend_returns_known_ids(self):
+        ids = {entry["id"] for entry in video_templates.catalogue()}
+        self.assertGreaterEqual(len(ids), 24)
+        self.assertEqual(video_templates.recommend("Penjelasan Surah Al Fil")["id"], "kajian-teduh")
+        for topic in ("Review game baru", "Resep rendang", "Hukum waris", "Eksperimen fisika", "Judul bebas"):
+            self.assertIn(video_templates.recommend(topic)["id"], ids)
+
     def test_catalogue_is_unique_curated_and_validated(self):
         entries = video_templates.catalogue()
         self.assertGreaterEqual(len(entries), 12)

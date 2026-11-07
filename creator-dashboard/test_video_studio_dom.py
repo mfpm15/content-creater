@@ -76,13 +76,19 @@ class VideoStudioDOMTests(unittest.TestCase):
         doc=_Ids();doc.feed(HTML)
         values=set(doc.ids)
         for field in ("topicInput","creativeBriefInput","quickAutoMedia","quickAutoRender",
-                      "quickResearch","captionStyleSelect","quickStyleButtons",
+                      "quickResearch","captionStyleSelect","templateGrid",
                       "templatePicker","mediaLibraryPanel","studioAdvanced",
                       "testVoiceBtn","engineSelect","scriptInput","videoForm"):
             with self.subTest(control=field):
                 self.assertIn(field,values)
         self.assertIn("autoRender: document.getElementById('quickAutoRender').checked",JS)
         self.assertIn("autoMedia: document.getElementById('quickAutoMedia').checked",JS)
+
+    def test_no_obsolete_job_history_or_stale_models(self):
+        self.assertNotIn("Riwayat Animasi",HTML)
+        self.assertNotIn("pendingJobs",HTML+JS)
+        self.assertNotIn("gemini",HTML.lower())
+        self.assertNotIn("claude-opus",HTML)
 
 
 if __name__=="__main__":

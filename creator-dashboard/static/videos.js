@@ -143,25 +143,48 @@ document.getElementById('mediaUploadBtn').addEventListener('click',async event=>
 });
 
 
-function renderQuickStyles() {
-  const host=document.getElementById('quickStyleButtons');
-  host.replaceChildren();
-  const items=[{id:'auto',label:'✨ Otomatis'}, ...['cyber-news','kelas-cerah','creator-pop','investigasi-noir'].map(id=>({id,label:templates.find(x=>x.id===id)?.name||id}))];
-  for(const item of items){
-    const b=document.createElement('button');b.type='button';b.className='quick-style-button';
-    b.textContent=item.label;b.setAttribute('aria-pressed',String(item.id==='auto'?smartTemplate:!smartTemplate&&chosenTemplateId===item.id));
-    b.addEventListener('click',()=>{
-      if(item.id==='auto'){
-        smartTemplate=true;chosenTemplateId='';
-        document.getElementById('templateId').value='';
-        elements.engineSelect.value='remotion';
-        updateEngineExperience();
-        renderTemplateGallery();
-      }else selectTemplate(item.id);
-      renderQuickStyles();
-    });
-    host.append(b);
+const SVG_NS='http://www.w3.org/2000/svg';
+function svgEl(tag,attrs){
+  const node=document.createElementNS(SVG_NS,tag);
+  for(const [key,value] of Object.entries(attrs))node.setAttribute(key,String(value));
+  return node;
+}
+// Pratinjau meniru posisi judul/gambar/caption layout Remotion (Studio.tsx); bukan frame video final.
+function templateThumbnail(t){
+  const {background:bg,accent,text}=t.brand;
+  const geometry={
+    headline:{title:[8,6,84,3.2,3],art:[8,33,84,31],caption:[8,76,70,9]},
+    poster:{title:[8,38,84,3.2,3],art:[11,12,78,24],caption:[11,76,70,9]},
+    split:{title:[8,5,84,3.2,3],art:[18,32,64,34],caption:[8,74,70,9]},
+    center:{title:[11,6,78,3.2,3],art:[11,32,78,35],caption:[14,76,72,9],center:true},
+  }[t.layout]||{title:[8,5,84,3.2,3],art:[8,26,84,40],caption:[8,72,70,9]};
+  const svg=svgEl('svg',{viewBox:'0 0 100 177',preserveAspectRatio:'xMidYMid meet','aria-hidden':'true'});
+  svg.append(svgEl('rect',{width:100,height:177,fill:bg}));
+  const [ax,ay,aw,ah]=geometry.art.map((v,i)=>i%2?v*1.77:v);
+  svg.append(svgEl('rect',{x:ax,y:ay,width:aw,height:ah,rx:3,fill:accent,opacity:.16}));
+  svg.append(svgEl('rect',{x:ax,y:ay,width:aw,height:ah,rx:3,fill:'none',stroke:accent,'stroke-width':.8,opacity:.75}));
+  const mx=ax+aw/2,my=ay+ah/2,u=Math.min(aw,ah)*.22;
+  // Ikon dipilih dari id template agar kartu mudah dibedakan.
+  const glyph=[...t.id].reduce((n,c)=>n+c.charCodeAt(0),0)%5;
+  const stroke={fill:'none',stroke:text,'stroke-width':1.5,'stroke-linecap':'round','stroke-linejoin':'round',opacity:.9};
+  if(glyph===0){svg.append(svgEl('circle',{cx:mx,cy:my,r:u,fill:'none',stroke:accent,'stroke-width':1.6}),svgEl('path',{d:`M${ax+aw*.2} ${ay+ah*.78} L${ax+aw*.42} ${ay+ah*.5} L${ax+aw*.58} ${ay+ah*.66} L${ax+aw*.8} ${ay+ah*.3}`,...stroke}));}
+  else if(glyph===1){for(let i=0;i<4;i++)svg.append(svgEl('rect',{x:ax+aw*(.16+i*.2),y:ay+ah*(.78-(i+1)*.15),width:aw*.12,height:ah*(.15*(i+1)),rx:1,fill:i%2?accent:text,opacity:.85}));}
+  else if(glyph===2){svg.append(svgEl('polygon',{points:`${mx},${my-u*1.4} ${mx+u*1.3},${my+u} ${mx-u*1.3},${my+u}`,fill:'none',stroke:accent,'stroke-width':1.6}),svgEl('circle',{cx:mx,cy:my+u*.1,r:u*.3,fill:text,opacity:.9}));}
+  else if(glyph===3){svg.append(svgEl('circle',{cx:mx,cy:my,r:u*1.3,fill:'none',stroke:accent,'stroke-width':1.4}),svgEl('circle',{cx:mx,cy:my,r:u*.7,fill:'none',stroke:text,'stroke-width':1.2,opacity:.8}),svgEl('circle',{cx:mx,cy:my,r:u*.2,fill:accent}));}
+  else{svg.append(svgEl('path',{d:`M${ax+aw*.15} ${my} Q${mx} ${ay+ah*.1} ${ax+aw*.85} ${my} Q${mx} ${ay+ah*.9} ${ax+aw*.15} ${my}Z`,fill:'none',stroke:accent,'stroke-width':1.6}),svgEl('circle',{cx:mx,cy:my,r:u*.5,fill:text,opacity:.85}));}
+  const [tx,ty,tw]=geometry.title;
+  for(let i=0;i<3;i++){
+    const width=tw*(i===2?.55:1-i*.08);
+    const x=geometry.center?tx+(tw-width)/2:tx;
+    svg.append(svgEl('rect',{x,y:(ty+i*4.6)*1.77,width,height:3.4,rx:1.2,fill:text,opacity:i?0.8:1}));
   }
+  const [cx,cy,cw,ch]=geometry.caption;
+  svg.append(svgEl('rect',{x:cx,y:cy*1.77,width:cw,height:ch*1.77,rx:t.effect==='minimal'?1:4,fill:text,opacity:.12}));
+  svg.append(svgEl('rect',{x:cx,y:cy*1.77,width:1.6,height:ch*1.77,fill:accent}));
+  for(let i=0;i<2;i++)svg.append(svgEl('rect',{x:cx+5,y:cy*1.77+6+i*7,width:cw*(i?.5:.8),height:2.4,rx:1,fill:text,opacity:.7}));
+  return svg;
+}
+function renderQuickStyles() {
   const s=document.getElementById('quickStyleStatus');
   s.textContent=smartTemplate?'Otomatis · tema dipilih berdasarkan judul':'Pilihan: '+(templates.find(x=>x.id===chosenTemplateId)?.name||'Template khusus');
 }
@@ -173,25 +196,39 @@ document.getElementById('quickAspect').addEventListener('change',event=>{
 });
 document.getElementById('quickAutoRender').addEventListener('change',updateEngineExperience);
 
+function selectAutoStyle() {
+  smartTemplate=true;chosenTemplateId='';
+  document.getElementById('templateId').value='';
+  elements.engineSelect.value='remotion';
+  updateEngineExperience();
+  renderTemplateGallery();
+  renderQuickStyles();
+}
 function renderTemplateGallery() {
   const grid=document.getElementById('templateGrid');
   const category=document.getElementById('templateCategory').value;
   const visible=templates.filter(t=>!category || t.category===category);
   grid.replaceChildren();
+  const auto=document.createElement('button');
+  auto.type='button';auto.className='template-card auto-card';
+  auto.setAttribute('aria-pressed',String(smartTemplate));
+  auto.setAttribute('aria-label','Otomatis — gaya dipilih berdasarkan judul');
+  const autoCover=document.createElement('div');autoCover.className='template-cover';
+  const autoMark=document.createElement('span');autoMark.className='template-cover-title';autoMark.style.cssText='position:static;font-size:34px;text-align:center';autoMark.textContent='✨';
+  autoCover.append(autoMark);
+  const autoName=document.createElement('strong');autoName.textContent='Otomatis';
+  const autoDesc=document.createElement('small');autoDesc.textContent='Gaya dipilih dari judul video.';
+  auto.append(autoCover,autoName,autoDesc);
+  auto.addEventListener('click',selectAutoStyle);
+  grid.append(auto);
   for(const t of visible) {
     const button=document.createElement('button');
     button.type='button';button.className='template-card';
-    button.setAttribute('aria-pressed',String(chosenTemplateId===t.id));
+    button.setAttribute('aria-pressed',String(!smartTemplate&&chosenTemplateId===t.id));
     button.setAttribute('aria-label',t.name+' — '+t.description);
     const cover=document.createElement('div');cover.className='template-cover';
-    // Palette is strictly validated by the backend before being returned.
     cover.style.setProperty('--template-bg',t.brand.background);
-    cover.style.setProperty('--template-text',t.brand.text);
-    cover.style.setProperty('--template-accent',t.brand.accent);
-    cover.style.setProperty('--template-font',t.brand.font);
-    const decoration=document.createElement('span');decoration.className='template-cover-mark';
-    const title=document.createElement('span');title.className='template-cover-title';title.textContent=t.name;
-    cover.append(decoration,title);
+    cover.append(templateThumbnail(t));
     const tag=document.createElement('span');tag.className='template-tag';tag.textContent=t.category+' · '+t.layout+' · '+t.effect;
     const name=document.createElement('strong');name.textContent=t.name;
     const description=document.createElement('small');description.textContent=t.description;
@@ -216,15 +253,6 @@ function selectTemplate(templateId) {
   renderQuickStyles();
 }
 document.getElementById('templateCategory').addEventListener('change',renderTemplateGallery);
-document.getElementById('clearTemplateBtn').addEventListener('click',()=>{
-  smartTemplate=true;
-  chosenTemplateId='';
-  document.getElementById('templateId').value='';
-  elements.engineSelect.value='remotion';
-  updateEngineExperience();
-  renderTemplateGallery();
-  renderQuickStyles();
-});
 
 function describeMotionConcept() {
   const selected = document.getElementById('motionConcept').value;
@@ -936,42 +964,7 @@ function startPolling(jobId, aspectId) {
 loadOptions();
 loadMediaAssets();
 loadBrands();
-loadPendingJobs();
 loadHistory();
-
-async function loadPendingJobs() {
-  const container = document.getElementById('pendingJobs');
-  try {
-    const response = await fetch('/api/videos/jobs');
-    if (!response.ok) throw new Error('Gagal memuat pekerjaan tersimpan');
-    const { jobs } = await response.json();
-    container.replaceChildren();
-    for (const job of jobs) {
-      if (!['interrupted', 'failed', 'awaiting_scene_plan', 'awaiting_storyboard'].includes(job.status)) continue;
-      const button = document.createElement('button');
-      button.className = 'secondary-button';
-      button.textContent = `${job.topic} — ${job.status.startsWith('awaiting_') ? 'Buka review' : 'Lanjutkan'}`;
-      button.addEventListener('click', async () => {
-        button.disabled = true;
-        try {
-          const resume = ['interrupted', 'failed'].includes(job.status);
-          const result = await fetch(`/api/videos/jobs/${encodeURIComponent(job.jobId)}${resume ? '/resume' : ''}`,
-            resume ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: job.revision || 0 }) } : {});
-          const data = await result.json();
-          if (!result.ok) throw new Error(data.error || 'Gagal membuka pekerjaan');
-          activeJobId = data.jobId; activeAspect = data.aspect;
-          elements.statusContainer.style.display = 'block';
-          if (data.status.startsWith('awaiting_')) renderReview(data);
-          else startPolling(data.jobId, data.aspect);
-          await loadPendingJobs();
-        } catch (error) {
-          elements.formStatus.textContent = error.message;
-        } finally { button.disabled = false; }
-      });
-      container.append(button);
-    }
-  } catch (error) { container.textContent = error.message; }
-}
 
 document.getElementById('createAspectBtn').addEventListener('click', async event => {
   if (!resultSlug) return;
@@ -980,8 +973,14 @@ document.getElementById('createAspectBtn').addEventListener('click', async event
     const response = await fetch(`/api/videos/${encodeURIComponent(resultSlug)}/aspects`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({aspects:[document.getElementById('variantAspect').value]})});
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Gagal membuat variasi');
-    elements.formStatus.textContent = `${result.jobs.length} variasi menunggu review pada daftar pekerjaan tersimpan.`;
-    await loadPendingJobs();
+    const created = result.jobs[0];
+    const opened = await fetch(`/api/videos/jobs/${encodeURIComponent(created.jobId)}`);
+    const job = await opened.json();
+    if (!opened.ok) throw new Error(job.error || 'Gagal membuka variasi');
+    activeJobId = job.jobId; activeAspect = job.aspect;
+    elements.statusContainer.style.display = 'block';
+    renderReview(job);
+    elements.formStatus.textContent = `${result.jobs.length} variasi dibuat; review variasi pertama dibuka.`;
   } catch(error) { elements.formStatus.textContent=error.message; }
   finally { event.target.disabled=false; }
 });

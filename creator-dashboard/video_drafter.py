@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.error
 import urllib.request
 import uuid
 import wave
@@ -418,6 +419,23 @@ def _call_9router(prompt: str, model: str = "") -> str:
     with open_authenticated(request, timeout=LLM_TIMEOUT) as response:
         data = json.loads(response.read().decode())
     return data["choices"][0]["message"]["content"]
+
+
+def _call_llm(prompt: str, model: str = "") -> str:
+    """Model terpilih dulu; bila layanan down (5xx/429/timeout/koneksi), coba model lain yang diizinkan."""
+    first = model or LLM_MODEL
+    order = [first] + [item["id"] for item in DEFAULT_MODELS if item["id"] != first]
+    last: Exception | None = None
+    for candidate in order:
+        try:
+            return _call_9router(prompt, candidate)
+        except urllib.error.HTTPError as exc:
+            if exc.code < 500 and exc.code != 429:
+                raise
+            last = exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last = exc
+    raise last  # type: ignore[misc]
 
 
 def _clean_json(raw: str) -> dict:
@@ -1313,7 +1331,7 @@ def _run_job(job_id: str) -> None:
             draft=preproduction.narration(job['script'],'provided_script')
         else:
             _update_job(job_id,{'status':'writing_narration','step':'Menulis narasi utuh sebelum pembagian scene','progress':22})
-            response=_clean_json(_call_9router(preproduction.script_prompt(job['topic'],_research_context(research)+'\nArahan produksi: '+job.get('creativeBrief',''),job['duration'],job.get('speech',{}).get('language','id')),job['model']))
+            response=_clean_json(_call_llm(preproduction.script_prompt(job['topic'],_research_context(research)+'\nArahan produksi: '+job.get('creativeBrief',''),job['duration'],job.get('speech',{}).get('language','id')),job['model']))
             draft=preproduction.narration(response.get('narration'),'generated')
         _update_job(job_id,{'narrationDraft':draft,'initialNarrationDraft':draft,
             'status':'planning_scenes','step':'Membagi narasi menjadi shot dan arahan visual','progress':28})
@@ -1339,7 +1357,7 @@ def _run_job(job_id: str) -> None:
         if job.get('motionDesign'):
             concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
             prompt+='\nKonsep wajib: '+concept['idea']+' '+concept['carry']+' Tutup seluruh durasi tanpa gap.'
-        data = {} if explicit or provided else _clean_json(_call_9router(prompt, job["model"]))
+        data = {} if explicit or provided else _clean_json(_call_llm(prompt, job["model"]))
         if job.get('motionDesign'):data['motionDesign']=job['motionDesign']
         else:data.pop('motionDesign',None)
         if job.get('engine')=='remotion':data['audioMode']=job['audioMode']
