@@ -22,6 +22,7 @@ class VideoTemplateTests(unittest.TestCase):
             self.assertEqual(row["engine"], "remotion")
             self.assertEqual(row["brand"], creative_profile.brand(row["brand"]))
             self.assertLessEqual(len(row["direction"]), 500)
+            self.assertIn(row["effect"], video_templates.EFFECT_MODES)
 
     def test_unknown_template_never_creates_a_job(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(vd, "JOBS", {}), patch.object(vd, "JOB_DIR", Path(folder)):
@@ -55,6 +56,7 @@ class VideoTemplateTests(unittest.TestCase):
             self.assertEqual(plan["brand"]["background"], video_templates.get("cyber-news")["brand"]["background"])
             props, report = remotion_adapter.manifest(plan, vd.ASPECT_RATIOS["9:16"])
             self.assertEqual(props["layout"], "headline")
+            self.assertEqual(props["effect"], "technical")
             self.assertEqual(report["templateId"], "cyber-news")
             self.assertEqual(props["brand"]["accent"], video_templates.get("cyber-news")["brand"]["accent"])
 
