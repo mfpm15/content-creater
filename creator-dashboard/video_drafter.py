@@ -623,7 +623,10 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
         for (; size > 1; size -= 1) {{
             element.style.fontSize = size + 'px';
             const lineHeight = parseFloat(getComputedStyle(element).lineHeight);
+            // The parent's budget is NOT enough: flex items can shrink and clip
+            // their own contents. Check the element's actual client dimensions too.
             if (element.scrollWidth <= element.clientWidth + 1 &&
+                element.scrollHeight <= element.clientHeight + 1 &&
                 element.scrollHeight <= Math.min(maxHeight, lineHeight * maxLines) + 1) break;
         }}
         element.dataset.fittedFontSize = size;
