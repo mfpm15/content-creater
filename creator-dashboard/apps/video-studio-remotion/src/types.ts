@@ -7,6 +7,6 @@ export type Shot = {
 };
 export type StudioProps = {
   version: 1; width: number; height: number; fps: 30 | 60; totalFrames: number;
-  topic: string; brand: {background: string; accent: string; text: string; wordmark: string; font: string};
+  topic: string; layout?: 'editorial' | 'headline' | 'split' | 'poster' | 'center'; effect?: 'minimal' | 'cinematic' | 'technical' | 'kinetic' | 'calm' | 'urgent'; brand: {background: string; accent: string; text: string; wordmark: string; font: string};
   shots: Shot[]; captions: {startFrame: number; endFrame: number; text: string}[];
 };

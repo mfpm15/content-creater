@@ -30,6 +30,24 @@ export const Studio: React.FC<StudioProps> = props => {
   const slide = shot.transition==='slide' ? (1-Math.min(1,local/edge))*width*.06 : 0;
   const caption = props.captions.find(c=>frame>=c.startFrame && frame<c.endFrame);
   const filter = shot.lighting==='soft' ? 'brightness(1.15) contrast(.85)' : shot.lighting==='dramatic' ? 'brightness(.82) contrast(1.35)' : 'none';
+  const effect=props.effect||'minimal';
+  const enterProgress=Math.min(1,Math.max(0,local/(fps*.42)));
+  const easedEntrance=1-Math.pow(1-enterProgress,3);
+  const kineticOffset=effect==='kinetic'?(1-easedEntrance)*height*.025:0;
+  const artBreath=effect==='calm'?1+Math.sin(frame/fps*.6)*.014:
+    effect==='cinematic'?1+progress*.025:effect==='kinetic'?1+progress*.065:1;
+  const ambientOpacity=effect === 'minimal' ? 0.08 : effect === 'calm' ? 0.12 : effect === 'urgent' ? 0.23 : 0.2;
+  const scanTop=(progress*116-9);
+  const layout=props.layout||'editorial';
+  const showPoster=layout==='poster';
+  const centered=layout==='center';
+  const headline=layout==='headline';
+  const split=layout==='split';
+  const titleMargin=showPoster?height*.39:headline?height*.055:split?height*.04:height*.035;
+  const artTop=showPoster?'12%':headline?'33%':centered?'32%':split?'32%':'26%';
+  const artHeight=showPoster?'34%':headline?'31%':centered?'35%':split?'34%':'40%';
+  const captionBottom=showPoster?'14%':headline?'13%':centered?'13%':split?'15%':'24%';
+  const artSide=split?'18%':showPoster?'11%':centered?'11%':'8%';
   React.useLayoutEffect(()=>{
     const root=rootRef.current?.getBoundingClientRect();
     // Remotion also mounts hidden calculator trees at y=-1,000,000 with zero
@@ -55,20 +73,28 @@ export const Studio: React.FC<StudioProps> = props => {
   },[frame,width,height,shot.id]);
   return <div ref={rootRef} style={{position:'absolute',inset:0,background:props.brand.background,color:props.brand.text,fontFamily:props.brand.font,overflow:'hidden'}}>
     <AbsoluteFill style={{background:`radial-gradient(ellipse at ${70+cinematicDrift}% 23%, ${props.brand.accent}2d, transparent 62%), linear-gradient(155deg, transparent 40%, ${props.brand.accent}08 100%)`}}/>
-    <AbsoluteFill style={{opacity:.22,backgroundImage:`radial-gradient(${props.brand.accent} 1px, transparent 1px)`,backgroundSize:`${Math.max(26,38*scaleUnit)}px ${Math.max(26,38*scaleUnit)}px`,transform:`translate(${cinematicDrift}px,${-cinematicDrift*.4}px) scale(${glowScale})`}}/>
-    <AbsoluteFill style={{padding:`${height*.11}px ${width*.16}px ${height*.24}px ${width*.08}px`,opacity,transform:`translateX(${slide}px)`}}>
+    <AbsoluteFill style={{opacity:ambientOpacity,backgroundImage:`radial-gradient(${props.brand.accent} 1px, transparent 1px)`,backgroundSize:`${Math.max(26,38*scaleUnit)}px ${Math.max(26,38*scaleUnit)}px`,transform:`translate(${cinematicDrift}px,${-cinematicDrift*.4}px) scale(${glowScale})`}}/>
+
+    {effect==='technical' && <AbsoluteFill style={{pointerEvents:'none',opacity:.2}}>
+      <div style={{position:'absolute',left:'7%',right:'7%',top:scanTop+'%',height:2*scaleUnit,background:props.brand.accent,boxShadow:'0 0 22px '+props.brand.accent}}/>
+      <div style={{position:'absolute',right:width*.05,top:height*.1,color:props.brand.accent,fontSize:16*scaleUnit,fontFamily:'monospace',letterSpacing:2*scaleUnit}}>SIGNAL / FRAME {String(frame).padStart(5,'0')}</div>
+    </AbsoluteFill>}
+    {effect==='urgent' && <AbsoluteFill style={{pointerEvents:'none',border:`${3*scaleUnit}px solid ${props.brand.accent}`,opacity:.14+Math.sin(frame/fps*1.8)*.06}}/>}
+    {effect==='cinematic' && <AbsoluteFill style={{pointerEvents:'none',background:'linear-gradient(180deg,rgba(0,0,0,.28),transparent 20%,transparent 74%,rgba(0,0,0,.4))'}}/>}
+    {effect==='kinetic' && <div style={{position:'absolute',left:width*.075,top:height*.075,width:width*.18,height:5*scaleUnit,background:props.brand.accent,transform:`scaleX(${easedEntrance})`,transformOrigin:'left'}}/>}
+    <AbsoluteFill style={{padding:`${height*(showPoster ? 0.08 : 0.11)}px ${width*(centered ? 0.10 : 0.16)}px ${height*.19}px ${width*(centered ? 0.10 : 0.08)}px`,opacity,transform:`translateX(${slide}px)`}}>
       <div style={{display:'flex',justifyContent:'space-between',fontSize:24*scaleUnit,letterSpacing:3*scaleUnit,color:props.brand.accent,fontWeight:700}}><span>{String(index+1).padStart(2,'0')} / {String(props.shots.length).padStart(2,'0')}</span><span style={{fontSize:20*scaleUnit,letterSpacing:0}}>{props.brand.wordmark}</span></div>
-      <div ref={titleRef} style={{fontSize:(portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))),lineHeight:1.12,fontWeight:800,marginTop:height*.035,maxWidth:width*.76,overflowWrap:'anywhere'}}>{shot.title}</div>
-      <div ref={artRef} style={{position:'absolute',left:'8%',right:'16%',top:portrait?'26%':'26%',height:portrait?'40%':'38%',transform:`translateX(${x}%) scale(${scale}) rotate(${rotation}deg)`,filter}}>
+      <div ref={titleRef} style={{fontSize:(portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))),lineHeight:1.12,fontWeight:headline?900:800,marginTop:titleMargin,maxWidth:width*(centered ? 0.78 : 0.76),textAlign:centered?'center':'left',letterSpacing:headline?-.8*scaleUnit:0,overflowWrap:'anywhere',background:showPoster?`${props.brand.background}e0`:undefined,borderRadius:showPoster?12:0,padding:showPoster?12*scaleUnit:0,transform:`translateY(${kineticOffset}px)`,opacity:effect === 'kinetic' ? 0.35+0.65*easedEntrance : 1}}>{shot.title}</div>
+      <div ref={artRef} style={{position:'absolute',left:artSide,right:artSide,top:artTop,height:artHeight,transform:`translateX(${x}%) scale(${scale*artBreath}) rotate(${rotation}deg)`,filter}}>
         <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>
       </div>
-      {caption && <div ref={captionRef} style={{position:'absolute',left:'8%',right:'16%',bottom:'24%',padding:`${24*scaleUnit}px ${30*scaleUnit}px`,borderLeft:`${5*scaleUnit}px solid ${props.brand.accent}`,fontSize:40*scaleUnit,lineHeight:1.35,background:props.brand.background,overflowWrap:'anywhere'}}>{caption.text}</div>}
+      {caption && <div ref={captionRef} style={{position:'absolute',left:centered?'14%':'8%',right:centered?'14%':'16%',bottom:captionBottom,padding:`${24*scaleUnit}px ${30*scaleUnit}px`,borderLeft:`${(centered?0:5)*scaleUnit}px solid ${props.brand.accent}`,borderBottom:centered?`${3*scaleUnit}px solid ${props.brand.accent}`:undefined,textAlign:centered?'center':'left',fontSize:(showPoster?36:40)*scaleUnit,lineHeight:1.35,background:props.brand.background,overflowWrap:'anywhere'}}>{caption.text}</div>}
     </AbsoluteFill>
     <div style={{position:'absolute',left:0,bottom:0,height:4*scaleUnit,width:`${(frame+1)/props.totalFrames*100}%`,background:props.brand.accent}}/>
   </div>;
 };
 
-const defaults: StudioProps={version:1,width:1080,height:1920,fps:30,totalFrames:30,topic:'Video Studio',
+const defaults: StudioProps={version:1,layout:'editorial',effect:'minimal',width:1080,height:1920,fps:30,totalFrames:30,topic:'Video Studio',
   brand:{background:'#080f20',accent:'#22d3ee',text:'#ffffff',wordmark:'',font:'Arial'},
   shots:[{id:'scene-1',startFrame:0,endFrame:30,title:'Video Studio',subject:'',family:'concept',camera:'locked',strength:.5,lighting:'legacy',transition:'fade'}],captions:[]};
 const Root: React.FC=()=> <Composition id="StudioMotion" component={Studio} width={1080} height={1920} fps={30} durationInFrames={30} defaultProps={defaults}

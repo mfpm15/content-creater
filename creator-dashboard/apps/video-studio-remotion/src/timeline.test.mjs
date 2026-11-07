@@ -69,3 +69,18 @@ test('semantic shot art uses approved headlines instead of repeating generic cir
   assert.equal(treatmentFor({title:'Hasil 25%',subject:'',family:'data'}),'data');
   assert.equal(treatmentFor({title:'Cerita umum',subject:'',family:'concept'}),'story');
 });
+
+test('video layout templates are validated and backward compatible',()=>{
+  for (const layout of ['editorial','headline','split','poster','center']) {
+    const value=example();value.layout=layout;assert.equal(validateManifest(value).layout,layout);
+  }
+  const bad=example();bad.layout='<script>';assert.throws(()=>validateManifest(bad));
+  assert.equal(validateManifest(example()).layout,undefined);
+});
+
+test('motion effects use a strict allowlist',()=>{
+  for(const effect of ['minimal','cinematic','technical','kinetic','calm','urgent']){
+    const value=example();value.effect=effect;assert.equal(validateManifest(value).effect,effect);
+  }
+  const bad=example();bad.effect='url(javascript:evil)';assert.throws(()=>validateManifest(bad));
+});

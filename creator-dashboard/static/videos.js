@@ -42,6 +42,55 @@ let researchReady = false;
 let brandCatalog = { revision: 0, kits: [] };
 let brandsReady = false;
 let motionConcepts = [];
+let templates = [];
+let chosenTemplateId = '';
+
+function renderTemplateGallery() {
+  const grid=document.getElementById('templateGrid');
+  const category=document.getElementById('templateCategory').value;
+  const visible=templates.filter(t=>!category || t.category===category);
+  grid.replaceChildren();
+  for(const t of visible) {
+    const button=document.createElement('button');
+    button.type='button';button.className='template-card';
+    button.setAttribute('aria-pressed',String(chosenTemplateId===t.id));
+    button.setAttribute('aria-label',t.name+' — '+t.description);
+    const cover=document.createElement('div');cover.className='template-cover';
+    // Palette is strictly validated by the backend before being returned.
+    cover.style.setProperty('--template-bg',t.brand.background);
+    cover.style.setProperty('--template-text',t.brand.text);
+    cover.style.setProperty('--template-accent',t.brand.accent);
+    cover.style.setProperty('--template-font',t.brand.font);
+    const decoration=document.createElement('span');decoration.className='template-cover-mark';
+    const title=document.createElement('span');title.className='template-cover-title';title.textContent=t.name;
+    cover.append(decoration,title);
+    const tag=document.createElement('span');tag.className='template-tag';tag.textContent=t.category+' · '+t.layout+' · '+t.effect;
+    const name=document.createElement('strong');name.textContent=t.name;
+    const description=document.createElement('small');description.textContent=t.description;
+    button.append(cover,tag,name,description);
+    button.addEventListener('click',()=>selectTemplate(t.id));
+    grid.append(button);
+  }
+  const selected=templates.find(t=>t.id===chosenTemplateId);
+  document.getElementById('templateSelectionHint').textContent=selected
+    ? 'Dipilih: '+selected.name+'. Layout '+selected.layout+' dan palet warna diterapkan pada file render. '+(document.getElementById('brandSelect').value?'Brand kit aktif akan menimpa warna template. ':'')+'Ilustrasi tetap harus diperiksa pada storyboard.'
+    : 'Belum memakai template. Pilih kartu untuk mengaktifkan Remotion dan menggunakan palet/layout-nya. Kartu menampilkan palet desain, bukan preview video final.';
+}
+function selectTemplate(templateId) {
+  const selected=templates.find(t=>t.id===templateId);
+  if(!selected) return;
+  chosenTemplateId=selected.id;
+  document.getElementById('templateId').value=selected.id;
+  elements.engineSelect.value=selected.engine;
+  updateEngineExperience();
+  renderTemplateGallery();
+}
+document.getElementById('templateCategory').addEventListener('change',renderTemplateGallery);
+document.getElementById('clearTemplateBtn').addEventListener('click',()=>{
+  chosenTemplateId='';
+  document.getElementById('templateId').value='';
+  renderTemplateGallery();
+});
 
 function describeMotionConcept() {
   const selected = document.getElementById('motionConcept').value;
@@ -131,6 +180,12 @@ async function loadOptions() {
     if (!res.ok) throw new Error('Gagal memuat opsi animasi');
     const data = await res.json();
     motionConcepts = data.motionConcepts || [];
+    templates = data.templates || [];
+    const categories=[...new Set(templates.map(t=>t.category))].sort((a,b)=>a.localeCompare(b,'id'));
+    const filter=document.getElementById('templateCategory');
+    filter.replaceChildren(new Option('Semua genre',''));
+    for(const category of categories)filter.add(new Option(category,category));
+    renderTemplateGallery();
     const conceptSelect = document.getElementById('motionConcept');
     conceptSelect.replaceChildren(new Option('Pilih satu konsep terlebih dahulu', ''));
     for (const concept of motionConcepts) conceptSelect.add(new Option(concept.name, concept.id));
@@ -171,6 +226,11 @@ async function loadOptions() {
 
 function updateEngineExperience() {
   const eng = elements.engineSelect.value;
+  if(eng!=='remotion' && chosenTemplateId) {
+    chosenTemplateId='';
+    document.getElementById('templateId').value='';
+    renderTemplateGallery();
+  }
   if(engineStyles[eng])elements.styleSelect.value=engineStyles[eng];
   elements.styleSelect.disabled=true;
   elements.styleSelect.title='Gaya mengikuti adapter. Variasikan shot melalui rencana adegan.';
@@ -210,6 +270,7 @@ function updateEngineExperience() {
 }
 
 elements.engineSelect.addEventListener('change', updateEngineExperience);
+document.getElementById('brandSelect').addEventListener('change',renderTemplateGallery);
 document.getElementById('researchMode').addEventListener('change',updateEngineExperience);
 
 async function loadHistory() {
@@ -398,6 +459,20 @@ function renderReview(job) {
     details.append(gallery);card.append(details);
     elements.reviewGrid.prepend(card);
   }
+  if(job.scenePlan?.templateId && job.facelessQuality){
+    const card=document.createElement('section');card.className='review-card';
+    const title=document.createElement('h4');title.textContent='Pemeriksaan konten faceless';card.append(title);
+    const desc=document.createElement('p');desc.textContent='Pemeriksaan otomatis hanya mendeteksi struktur, bukan estetika atau kebenaran fakta. Periksa audio dan visual sebelum publikasi.';card.append(desc);
+    for(const issue of job.facelessQuality.warnings||[]){
+      const line=document.createElement('p');
+      line.textContent=(issue.scene?issue.scene+': ':'')+issue.message;
+      card.append(line);
+    }
+    for(const instruction of job.facelessQuality.manualRequired||[]){
+      const p=document.createElement('p');p.textContent='• '+instruction;card.append(p);
+    }
+    elements.reviewGrid.prepend(card);
+  }
   if (job.scenePlan?.brand) {
     const note = document.createElement('p');
     note.textContent = `Brand pekerjaan: ${job.scenePlan.brand.name} (salinan tetap)`;
@@ -574,6 +649,7 @@ elements.form.addEventListener('submit', async event => {
     topic: elements.topic.value.trim(),
     script: elements.script.value.trim(),
     engine: elements.engineSelect.value,
+    templateId: chosenTemplateId,
     style: elements.styleSelect.value,
     aspect: elements.aspectSelect.value,
     duration: parseInt(elements.durationSelect.value, 10),
