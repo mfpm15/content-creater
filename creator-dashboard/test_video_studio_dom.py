@@ -46,7 +46,10 @@ class VideoStudioDOMTests(unittest.TestCase):
         duplicates=[name for name,n in Counter(html.ids).items() if n>1]
         self.assertEqual(duplicates,[],f"Duplicate HTML ids: {duplicates}")
         required=set(re.findall(r"""document\.getElementById\(\s*['"]([\w-]+)['"]\s*\)""",JS))
-        missing=sorted(required-set(html.ids))
+        # Result/review controls are created programmatically; their ids are
+        # assigned with element.id='...'. They are not missing static markup.
+        dynamic=set(re.findall(r"""\.id\s*=\s*['"]([\w-]+)['"]""",JS))
+        missing=sorted(required-set(html.ids)-dynamic)
         self.assertFalse(missing,f"Video Studio JavaScript accesses nonexistent DOM IDs: {missing}")
         self.assertGreater(len(required),30)
         self.assertEqual(html.form_count,1)
