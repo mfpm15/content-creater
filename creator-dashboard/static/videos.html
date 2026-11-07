@@ -9,6 +9,21 @@
   <style>
     #brandEditor input[type="color"] { height:44px; padding:4px; cursor:pointer; }
     #styleSelect[hidden] { display:none; }
+    
+    .media-upload-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+    .media-upload-fields label{display:flex;flex-direction:column;gap:5px;color:#d9e5ff;font-size:12px}
+    .media-upload-fields input{width:100%;max-width:100%;min-height:37px;padding:7px;border:1px solid #455473;background:#071326;color:#f8fafc;border-radius:8px}
+    .media-consent{display:flex;align-items:start;gap:9px;margin:12px 0;color:#cbd5e1;font-size:12px}
+    .media-consent input{margin-top:3px}
+    .media-assets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;max-height:250px;overflow:auto;margin-top:12px}
+    .media-asset-card{border:1px solid #34465e;border-radius:10px;padding:6px;background:#0c1728;color:#e5e7eb;min-width:0;font-size:11px}
+    .media-asset-card img{height:100px;width:100%;display:block;object-fit:cover;border-radius:6px;background:#020617}
+    .media-asset-card strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:5px 0}
+    .media-asset-card small{display:block;overflow-wrap:anywhere;color:#94a3b8}
+    .media-stage-select{display:block;margin:10px 0;padding:10px;border:1px solid #37546b;border-radius:10px;background:#0b1c2b}
+    .media-stage-select label{display:block;color:#e0f2fe;font-size:13px}
+    .media-stage-select select{margin-top:6px;max-width:100%}
+
     .template-panel{margin:0 0 20px;padding:17px;border:1px solid rgba(99,102,241,.3);border-radius:16px;background:linear-gradient(145deg,rgba(31,41,68,.9),rgba(11,18,38,.87))}
     .template-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
     .template-heading h3{margin:0;color:#f8fafc;font-size:17px}
@@ -178,6 +193,23 @@
           </div>
           <div id="engineNotice" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(99,102,241,.08);color:var(--muted);font-size:13px;line-height:1.6"><strong style="color:#fff">Workflow Berbasis Sumber</strong><br>Brief → konteks/riset sesuai mode → narasi utuh → Scene Plan → storyboard dan prompt produksi → render. Naskah dan timecode pengguna dipertahankan; tiap tahap review dapat dikoreksi sebelum render.</div>
 
+
+          <section id="mediaLibraryPanel" class="template-panel" aria-label="Pustaka media visual lokal">
+            <div class="template-heading">
+              <div><h3>🖼️ Media Library — Visual Per Adegan</h3><small>Impor gambar Anda/berlisensi, lalu pilih visualnya pada review Scene Plan</small></div>
+              <a href="https://www.pexels.com/" target="_blank" rel="noopener noreferrer">Cari media di Pexels</a>
+            </div>
+            <div class="media-upload-fields">
+              <label>File gambar<input id="mediaInputFile" type="file" accept="image/png,image/jpeg,image/webp"></label>
+              <label>Asal/lisensi file<input id="mediaSource" maxlength="400" placeholder="Milik sendiri / URL sumber + lisensi" autocomplete="off"></label>
+              <label>Kreator (opsional)<input id="mediaCreator" maxlength="120" placeholder="Nama fotografer atau Anda" autocomplete="off"></label>
+            </div>
+            <label class="media-consent"><input type="checkbox" id="mediaRights"> Saya sudah memeriksa hak pakai aset ini untuk konten/monetisasi. Saya bertanggung jawab atas izin, orang, dan merek yang tampil.</label>
+            <button class="secondary-button" type="button" id="mediaUploadBtn">Impor ke Media Library</button>
+            <div id="mediaUploadStatus" role="status" aria-live="polite" style="font-size:12px;margin-top:8px"></div>
+            <div id="mediaAssetGrid" class="media-assets-grid" aria-label="Koleksi media yang sudah diimpor"></div>
+            <p class="template-hint">Aset disimpan hanya di laptop ini. Tidak otomatis diunggah ke layanan pihak ketiga. Media di sini adalah gambar statis; tiap gambar memperoleh gerakan pan/zoom ringan pada hasil Remotion.</p>
+          </section>
           <section id="templatePicker" class="template-panel" aria-label="Pilih gaya video faceless">
             <div class="template-heading">
               <div><h3>🎬 Pilih gaya video faceless</h3><small>12 gaya desain asli · tampilan dan layout langsung diterapkan pada render Remotion</small></div>

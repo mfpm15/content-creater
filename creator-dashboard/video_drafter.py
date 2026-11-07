@@ -8,6 +8,7 @@ import speech_settings
 import voice_quality
 import video_templates
 import faceless_quality
+import media_library
 import frame_rate
 import scene_diagram
 import html
@@ -312,6 +313,8 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
         creative_profile.timing(scene,raw)
         if 'diagram' in raw:scene['diagram']=scene_diagram.validate(raw['diagram'])
         if 'renderControls' in raw:scene['renderControls']=scene_render.validate(raw['renderControls'])
+        if raw.get('assetId'):
+            scene['assetId']=media_library.require_id(raw['assetId'])
     result={"topic": topic, "duration": duration, "scenes": scenes}
     if "fps" in data:result["fps"]=frame_rate.validate(data["fps"])
     if data.get("templateId"):result["templateId"]=video_templates.get(data["templateId"])["id"]
@@ -972,6 +975,11 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
             raise ValueError('Diagram berlabel hanya tersedia untuk Remotion dan Lottie')
         if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
             raise ValueError('Kontrol kamera/lighting render hanya tersedia untuk Opuscar, Three.js dan Remotion')
+        if any(scene.get('assetId') for scene in plan['scenes']):
+            if job.get('engine') != 'remotion':
+                raise ValueError('Visual gambar hanya didukung Remotion')
+            for scene in plan['scenes']:
+                if scene.get('assetId'):media_library.get(scene['assetId'])
         if job.get('engine')=='remotion':
             if not plan.get('speech') and plan.get('audioMode')!=job.get('audioMode'):raise ValueError('Mode audio Remotion wajib dipertahankan saat mengedit')
             remotion_adapter.manifest(plan,ASPECT_RATIOS[job['aspect']])
@@ -1243,6 +1251,7 @@ def _storyboard(plan: dict) -> list[dict]:
         "id": scene["id"], "number": index + 1, "start": scene["start"], "end": scene["end"],
         "duration": scene["duration"], "type": scene["type"], "shotPurpose": scene.get("shotPurpose", "develop"),
         "narration": scene["narration"], "text": scene["onScreenText"], "visual": scene["visual"],
+        **({"assetId": scene["assetId"]} if scene.get("assetId") else {}),
         "visualFamily": scene.get("visualFamily", "constellation"), "subject": scene.get("subject", ""),
         **({"diagram": scene["diagram"]} if "diagram" in scene else {}),
         "action": scene.get("action", ""), "setting": scene.get("setting", ""),
@@ -1347,6 +1356,11 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
             return
         plan = job["scenePlan"]
         if job.get('pipelineVersion')==2:preproduction.verify_packet(job.get('productionPacket'),plan,job['engine'],job['aspect'])
+        if any(scene.get('assetId') for scene in plan['scenes']):
+            if job['engine'] != 'remotion':
+                raise ValueError('Gambar pustaka media hanya didukung Remotion')
+            for scene in plan['scenes']:
+                if scene.get('assetId'):media_library.get(scene['assetId'])
         if job['engine']=='opuscar' and opuscar_quality_gate.required(plan):
             opuscar_quality_gate.verify(generate_composition(plan,ASPECT_RATIOS[job['aspect']],job.get('model',''),engine='opuscar'),job.get('visualReview'))
         missing=runtime_issues(job['engine'])

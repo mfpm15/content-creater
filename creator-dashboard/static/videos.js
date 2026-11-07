@@ -44,6 +44,72 @@ let brandsReady = false;
 let motionConcepts = [];
 let templates = [];
 let chosenTemplateId = '';
+let mediaAssets = [];
+async function loadMediaAssets() {
+  try {
+    const res=await fetch('/api/videos/assets',{cache:'no-store'});
+    if(!res.ok)throw new Error('Tidak dapat memuat pustaka media');
+    const data=await res.json();
+    mediaAssets=Array.isArray(data.assets)?data.assets:[];
+    const grid=document.getElementById('mediaAssetGrid');
+    grid.replaceChildren();
+    if(!mediaAssets.length){
+      const note=document.createElement('p');note.textContent='Belum ada gambar. Impor aset pertama untuk menggantikan ilustrasi abstrak.';grid.append(note);
+    }
+    for(const asset of mediaAssets){
+      const card=document.createElement('div');card.className='media-asset-card';
+      const img=document.createElement('img');
+      img.src=asset.url;img.alt=asset.name;img.loading='lazy';
+      const title=document.createElement('strong');title.textContent=asset.name;title.title=asset.name;
+      const by=document.createElement('small');by.textContent=asset.creator?asset.creator+' · '+asset.source:asset.source;
+      card.append(img,title,by);grid.append(card);
+    }
+    // Restore user selections without discarding unsaved edits during an open review.
+    for(const select of document.querySelectorAll('select[data-asset-scene]')){
+      const planned=activeScenePlan?.scenes?.[Number(select.dataset.assetScene)]?.assetId||'';
+      const existing=select.value||planned;
+      select.replaceChildren(new Option('Ilustrasi otomatis',''));
+      for(const asset of mediaAssets)select.add(new Option(asset.name,asset.id));
+      if(existing && !mediaAssets.some(x=>x.id===existing)){
+        select.add(new Option('Media hilang — ganti sebelum render',existing));
+      }
+      select.value=existing;
+    }
+  }catch(err){
+    document.getElementById('mediaUploadStatus').textContent=err.message;
+  }
+}
+document.getElementById('mediaUploadBtn').addEventListener('click',async event=>{
+  const button=event.currentTarget;
+  const status=document.getElementById('mediaUploadStatus');
+  const file=document.getElementById('mediaInputFile').files?.[0];
+  const source=document.getElementById('mediaSource').value.trim();
+  const creator=document.getElementById('mediaCreator').value.trim();
+  if(!file || !source){status.textContent='Pilih gambar dan isi asal/lisensi aset.';return;}
+  if(!document.getElementById('mediaRights').checked){status.textContent='Konfirmasi hak pakai terlebih dahulu.';return;}
+  if(file.size>8*1024*1024 || file.size<=0){status.textContent='Gambar maksimal 8 MB.';return;}
+  button.disabled=true;
+  status.textContent='Memeriksa dan mengimpor gambar secara lokal…';
+  try{
+    const dataUrl=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(String(reader.result));
+      reader.onerror=()=>reject(new Error('Gagal membaca berkas'));
+      reader.readAsDataURL(file);
+    });
+    const encoded=dataUrl.slice(dataUrl.indexOf(',')+1);
+    const res=await fetch('/api/videos/assets',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:file.name,source,creator,rightsConfirmed:true,base64:encoded})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||'Impor gagal');
+    status.textContent='Media berhasil diimpor. Pilih pada dropdown tiap adegan di review.';
+    document.getElementById('mediaInputFile').value='';
+    document.getElementById('mediaRights').checked=false;
+    await loadMediaAssets();
+  }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+});
+
 
 function renderTemplateGallery() {
   const grid=document.getElementById('templateGrid');
@@ -366,6 +432,18 @@ function showResult(result, aspectId) {
       const text=document.createElement('p');text.textContent=`${row.label}: ${row.status==='passed_working_profile'?'profil kerja media terpenuhi':row.issues.map(issue=>issue.message).join('; ')}. Profil referensi, bukan verifikasi ketentuan resmi platform.`;reviewBox.append(text);
     }
     if(result.review.remotion){const text=document.createElement('p');text.textContent='Remotion: frame asli tersedia di bawah. Caption tanpa cue kata memakai estimasi durasi, bukan alignment audio. Tetap periksa keterbacaan dan isi.';reviewBox.append(text)}
+    if(result.review.remotion?.visual_assets?.length){
+      const list=document.createElement('div');
+      const title=document.createElement('h4');title.textContent='Provenance gambar yang dipakai';list.append(title);
+      for(const media of result.review.remotion.visual_assets){
+        const item=document.createElement('p');
+        item.textContent=media.name+' — '+media.source+(media.creator?' · Kreator: '+media.creator:'')+
+          '. Hak penggunaan dinyatakan oleh pengimpor, bukan diverifikasi otomatis.';
+        list.append(item);
+      }
+      reviewBox.append(list);
+    }
+
     for(const name of result.review.visual_review?.screenshots||[]){if(!/^review-frame-\d{1,2}\.png$/.test(name))continue;const link=document.createElement('a');link.href=`/api/videos/${encodeURIComponent(result.slug)}/${name}`;link.textContent=`${name} · `;link.target='_blank';link.rel='noopener';reviewBox.append(link)}
   }
 }
@@ -379,11 +457,16 @@ function sceneEditor(scene, index) {
     ${select('camera','Kamera render',['legacy','locked','push-in','pull-out','pan-left','pan-right','orbit'])}
     ${select('lighting','Lighting render',['legacy','soft','dramatic'])}${select('transition','Transisi render',['legacy','fade','cut','slide'])}
     <label>Kekuatan kamera (0–1)<input type="number" min="0" max="1" step="0.05" data-render-scene="${index}" data-render-field="strength" value="${escapeHtml(controls.strength ?? .5)}"></label></details>` : '';
+  const assetMarkup=activeReviewEngine==='remotion' ? `<div class="media-stage-select"><label>Gambar konkret untuk adegan (opsional)
+    <select data-asset-scene="${index}"><option value="">Ilustrasi otomatis</option>
+    ${mediaAssets.map(a=>`<option value="${escapeHtml(a.id)}" ${a.id===scene.assetId?'selected':''}>${escapeHtml(a.name)}</option>`).join('')}
+    </select></label><small>Gunakan gambar yang relevan dan hak pakainya sudah jelas. Gambar diberi pan/zoom halus; jangan menutupi fakta penting dengan visual yang tidak sesuai.</small></div>` : '';
   return `<article class="review-card scene-editor">
     <h4>Adegan ${index + 1} · ${escapeHtml(scene.start)}-${escapeHtml(scene.end)}s</h4>
     <div class="editor-row">${field('start','Mulai')}${field('end','Selesai')}</div>
     ${field('narration','Narasi',true)}${field('onScreenText','Teks layar')}${field('visual','Visual shot',true)}
     <div class="editor-row">${field('visualFamily','Visual family')}${field('shotPurpose','Tujuan shot')}</div>
+    ${assetMarkup}
     ${field('directionSubject','Objek utama')}${field('action','Aksi')}${field('setting','Setting')}${field('composition','Komposisi',true)}
     <div class="editor-row">${field('foreground','Foreground')}${field('midground','Midground')}</div>
     ${renderControls}${field('background','Background')}${field('camera','Arahan kamera',true)}${field('lighting','Arahan lighting')}
@@ -581,6 +664,11 @@ function collectEditedPlan() {
   for (const [index, value] of controls) {
     if (scenes[index].renderControls || ['camera','lighting','transition'].some(key => value[key] !== 'legacy')) scenes[index].renderControls = value;
   }
+  elements.reviewGrid.querySelectorAll('select[data-asset-scene]').forEach(select=>{
+    const index=Number(select.dataset.assetScene);
+    if(select.value)scenes[index].assetId=select.value;
+    else delete scenes[index].assetId;
+  });
   const plan={ ...structuredClone(activeScenePlan), scenes };
   const rate=Number(document.getElementById("reviewFps")?.value ?? plan.fps ?? 30);
   if(plan.fps!==undefined || rate!==30)plan.fps=rate;
@@ -740,6 +828,7 @@ function startPolling(jobId, aspectId) {
 }
 
 loadOptions();
+loadMediaAssets();
 loadBrands();
 loadPendingJobs();
 loadHistory();

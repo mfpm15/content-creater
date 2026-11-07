@@ -1,5 +1,5 @@
 import React from 'react';
-import {AbsoluteFill, Composition, registerRoot, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Composition, Img, registerRoot, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {validateManifest} from './timeline.mjs';
 import {Illustration} from './Visuals';
 import type {StudioProps} from './types';
@@ -86,7 +86,14 @@ export const Studio: React.FC<StudioProps> = props => {
       <div style={{display:'flex',justifyContent:'space-between',fontSize:24*scaleUnit,letterSpacing:3*scaleUnit,color:props.brand.accent,fontWeight:700}}><span>{String(index+1).padStart(2,'0')} / {String(props.shots.length).padStart(2,'0')}</span><span style={{fontSize:20*scaleUnit,letterSpacing:0}}>{props.brand.wordmark}</span></div>
       <div ref={titleRef} style={{fontSize:(portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))),lineHeight:1.12,fontWeight:headline?900:800,marginTop:titleMargin,maxWidth:width*(centered ? 0.78 : 0.76),textAlign:centered?'center':'left',letterSpacing:headline?-.8*scaleUnit:0,overflowWrap:'anywhere',background:showPoster?`${props.brand.background}e0`:undefined,borderRadius:showPoster?12:0,padding:showPoster?12*scaleUnit:0,transform:`translateY(${kineticOffset}px)`,opacity:effect === 'kinetic' ? 0.35+0.65*easedEntrance : 1}}>{shot.title}</div>
       <div ref={artRef} style={{position:'absolute',left:artSide,right:artSide,top:artTop,height:artHeight,transform:`translateX(${x}%) scale(${scale*artBreath}) rotate(${rotation}deg)`,filter}}>
-        <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>
+        {shot.assetFile ? <>
+          <div style={{position:'absolute',inset:'0%',borderRadius:22*scaleUnit,overflow:'hidden',background:props.brand.background,border:`${2*scaleUnit}px solid ${props.brand.accent}55`}}>
+            <Img src={staticFile(shot.assetFile)} style={{position:'absolute',width:'100%',height:'100%',objectFit:'cover',
+              transform:`scale(${1.04+progress*.075}) translateX(${Math.sin(index+progress*2)*1.2}%)`,
+              transformOrigin:index%2?'40% 55%':'65% 45%'}}/>
+            <div style={{position:'absolute',inset:0,background:`linear-gradient(0deg,${props.brand.background}b8,transparent 40%,${props.brand.background}35)`}}/>
+          </div>
+        </> : <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>}
       </div>
       {caption && <div ref={captionRef} style={{position:'absolute',left:centered?'14%':'8%',right:centered?'14%':'16%',bottom:captionBottom,padding:`${24*scaleUnit}px ${30*scaleUnit}px`,borderLeft:`${(centered?0:5)*scaleUnit}px solid ${props.brand.accent}`,borderBottom:centered?`${3*scaleUnit}px solid ${props.brand.accent}`:undefined,textAlign:centered?'center':'left',fontSize:(showPoster?36:40)*scaleUnit,lineHeight:1.35,background:props.brand.background,overflowWrap:'anywhere'}}>{caption.text}</div>}
     </AbsoluteFill>

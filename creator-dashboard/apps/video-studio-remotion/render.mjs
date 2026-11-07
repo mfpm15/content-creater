@@ -15,7 +15,14 @@ const inputProps=validateManifest(JSON.parse(fs.readFileSync(manifestFile,'utf8'
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'video-studio-remotion-'));
 try {
   const layout=new Map();
-  const serveUrl=await bundle({entryPoint:fileURLToPath(new URL('./src/Studio.tsx',import.meta.url)),outDir:path.join(directory,'bundle'),publicDir:null});
+  const publicDir=path.join(path.dirname(output),'public');
+  fs.mkdirSync(publicDir,{recursive:true});
+  for(const shot of inputProps.shots) {
+    if(!shot.assetFile) continue;
+    const full=path.join(publicDir,shot.assetFile);
+    if(!fs.existsSync(full) || !fs.statSync(full).isFile())throw new Error('Approved local visual asset missing');
+  }
+  const serveUrl=await bundle({entryPoint:fileURLToPath(new URL('./src/Studio.tsx',import.meta.url)),outDir:path.join(directory,'bundle'),publicDir});
   const options={serveUrl,id:'StudioMotion',inputProps,browserExecutable,
     chromiumOptions:{disableWebSecurity:false},
     onBrowserLog:log=>{if(log.text.startsWith('STUDIO_LAYOUT:')){const row=JSON.parse(log.text.slice(14));layout.set(row.frame,row);}},

@@ -31,6 +31,11 @@ class FacelessQualityTests(unittest.TestCase):
         self.assertEqual(result["warnings"], [])
         self.assertGreaterEqual(len(result["manualRequired"]), 3)
 
+    def test_approved_local_images_count_as_concrete_artwork(self):
+        images=[{**scene(i, f"Visual {i}"),"assetId":f"{i:032x}"} for i in range(1,6)]
+        self.assertNotIn("abstract_overuse",
+            {issue["code"] for issue in faceless_quality.inspect({"scenes":images})["warnings"]})
+
     def test_dense_scene_and_music_only_are_warnings_not_censorship(self):
         plan = {"scenes": [scene(1, "Judul", narration=" ".join(["sangat"]*50), duration=1)],
                 "audioMode": "music"}

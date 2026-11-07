@@ -84,3 +84,15 @@ test('motion effects use a strict allowlist',()=>{
   }
   const bad=example();bad.effect='url(javascript:evil)';assert.throws(()=>validateManifest(bad));
 });
+
+
+test('shot artwork only accepts trusted local media filenames',()=>{
+  const ok=example();
+  ok.shots[0].assetFile='media/0123456789abcdef0123456789abcdef.jpg';
+  assert.equal(validateManifest(ok).shots[0].assetFile,ok.shots[0].assetFile);
+  for(const badFile of ['../../evil.png','https://example.com/x.jpg','media/wrong.svg',
+    'media/0123456789abcdef0123456789abcdef.jpg?x=1','media/../evil.png']){
+    const bad=example();bad.shots[0].assetFile=badFile;
+    assert.throws(()=>validateManifest(bad));
+  }
+});

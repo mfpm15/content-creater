@@ -1,5 +1,6 @@
 export type Shot = {
   id: string; startFrame: number; endFrame: number; title: string; subject: string;
+  assetFile?: string;
   diagram?: {kind: 'process' | 'comparison'; labels: string[]};
   family: 'process' | 'data' | 'comparison' | 'concept';
   camera: 'legacy' | 'locked' | 'push-in' | 'pull-out' | 'pan-left' | 'pan-right' | 'orbit';
