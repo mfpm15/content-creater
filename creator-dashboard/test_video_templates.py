@@ -85,6 +85,7 @@ class VideoTemplateTests(unittest.TestCase):
                         "onScreenText": "Tiga fasilitas", "visualFamily": "concept",
                     }],
                     "fps": 30, "templateId": slug, "brand": preset["brand"],
+                    "captionStyle": "pop" if slug == "cyber-news" else "pill",
                 }, "Tiga fasilitas", "", 1)
                 target = Path(temp) / slug
                 target.mkdir()
