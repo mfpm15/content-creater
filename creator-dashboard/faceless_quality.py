@@ -31,7 +31,7 @@ def inspect(plan: dict) -> dict:
             titles[title.casefold()] += 1
         if len(title) > 76:
             warn("long_title", "Judul adegan sangat panjang; ringkas agar terbaca di layar ponsel.", sid)
-        if scene.get("visualFamily") in ABSTRACT and not scene.get("diagram"):
+        if scene.get("visualFamily") in ABSTRACT and not scene.get("diagram") and not scene.get("assetId"):
             abstract += 1
         length = float(scene.get("end", 0)) - float(scene.get("start", 0))
         if length > 0 and len(text.split()) / length > MAX_WORDS_PER_SECOND:
