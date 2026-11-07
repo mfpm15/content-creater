@@ -488,6 +488,13 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 self._json(HTTPStatus.OK, {"jobs": video_drafter.list_jobs()})
             elif parts == ["api", "videos", "options"]:
                 self._json(HTTPStatus.OK, video_drafter.options())
+            elif parts == ["api", "videos", "assets"]:
+                import media_library
+                self._json(HTTPStatus.OK, {"assets": media_library.catalogue()})
+            elif len(parts) == 4 and parts[:3] == ["api", "videos", "assets"]:
+                import media_library
+                asset, file_path = media_library.get(unquote(parts[3]))
+                self._video_file(file_path, asset["mime"])
             elif parts == ['api','videos','brands']:
                 import creative_profile
                 self._json(HTTPStatus.OK,creative_profile.catalog(video_drafter.VIDEOS_DIR.parent/'brand-kits.json'))
@@ -526,6 +533,11 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 if not isinstance(payload,dict):raise ValueError('Body harus objek JSON')
                 import creative_profile
                 self._json(HTTPStatus.OK,creative_profile.save(video_drafter.VIDEOS_DIR.parent/'brand-kits.json',payload))
+            elif parts == ["api", "videos", "assets"]:
+                raw = self._read_body(11_500_000)
+                if raw is None: return
+                import media_library
+                self._json(HTTPStatus.CREATED, media_library.save(json.loads(raw or b"{}")))
             elif parts == ["api", "videos"]:
                 raw = self._read_body(200_000)
                 if raw is None:

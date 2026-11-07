@@ -17,6 +17,7 @@ from pathlib import Path
 import creative_profile
 import scene_render
 import video_templates
+import media_library
 from runtime_config import find_browser
 from security import redact, render_environment
 
@@ -60,6 +61,9 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
         shots.append({'id':scene['id'],'startFrame':start,'endFrame':end,'title':scene['onScreenText'],
                       'subject':subject,'family':family,**controls})
         if 'diagram' in scene:shots[-1]['diagram']=scene_diagram.validate(scene['diagram'])
+        if scene.get('assetId'):
+            meta,_ = media_library.get(scene['assetId'])
+            shots[-1]['assetFile'] = 'media/'+meta['filename']
         cues=scene.get('wordCues')
         if cues:
             groups=[cues[i:i+7] for i in range(0,len(cues),7)]
@@ -103,6 +107,8 @@ def render(target: Path, plan: dict, aspect: dict) -> tuple[Path,dict]:
     missing=runtime_issues()
     if missing:raise RuntimeError('Runtime Remotion belum siap: '+', '.join(missing))
     props,report=manifest(plan,aspect)
+    asset_ids=list(dict.fromkeys(shot['assetId'] for shot in plan['scenes'] if shot.get('assetId')))
+    report['visual_assets']=[media_library.stage(asset_id,target/'public') for asset_id in asset_ids]
     output=target/'silent.mp4'
     with tempfile.TemporaryDirectory(prefix='.remotion-',dir=target) as folder:
         source=Path(folder)/'timeline.json'

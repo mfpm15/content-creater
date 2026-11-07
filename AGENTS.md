@@ -2,6 +2,10 @@
 
 **Baca `AGENTS.md` ini terlebih dahulu sebelum menelusuri kode.** Semua path di bawah relatif terhadap root repositori. Untuk modul yang memiliki `AGENTS.md` sendiri, baca juga instruksi lokalnya sebelum bekerja di sana.
 
+## Panduan khusus Video Studio Faceless
+
+Untuk perubahan yang memengaruhi perencanaan shot, dubbing, aset, atau kualitas video, baca **creator-dashboard/skills/faceless-video-director/SKILL.md** dan **docs/FACELESS-VIDEO-STUDIO-2026-11-07.md**. Skill adalah panduan produksi internal, bukan pengganti pengujian hasil MP4. Kode pihak ketiga tidak boleh diimpor tanpa verifikasi lisensi kode **dan** aset secara terpisah. Workflow visual harus mempertahankan approval dan metadata hak pakai.
+
 ## 1. Tech Stack & Versi Utama
 
 Repositori ini adalah kumpulan aplikasi konten dengan **dashboard/launcher bersama**, bukan satu aplikasi dengan satu dependency tree. Tidak ada `package.json` di root. Versi berikut berasal dari manifest; rentang versi bukan jaminan versi terpasang.
