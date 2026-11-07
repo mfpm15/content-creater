@@ -55,7 +55,6 @@ class VideoStudioDOMTests(unittest.TestCase):
         self.assertEqual(html.min_details_depth,0)
 
     def test_one_click_form_and_safe_manual_alternatives_remain(self):
-        ids=set(_Ids.__dict__)  # dummy names are not used as actual UI controls
         doc=_Ids();doc.feed(HTML)
         values=set(doc.ids)
         for field in ("topicInput","creativeBriefInput","quickAutoMedia","quickAutoRender",
