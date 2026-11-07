@@ -59,6 +59,9 @@ class VideoTemplateTests(unittest.TestCase):
             self.assertEqual(props["effect"], "technical")
             self.assertEqual(report["templateId"], "cyber-news")
             self.assertEqual(props["brand"]["accent"], video_templates.get("cyber-news")["brand"]["accent"])
+            changed = {**plan, "templateId": "news-alert"}
+            with self.assertRaisesRegex(ValueError, "template tidak boleh diganti"):
+                vd.update_job_plan(key, {"stage": "scene_plan", "revision": 0, "scenePlan": changed})
 
     def test_existing_jobs_keep_editorial_layout(self):
         plan = vd.normalize_scene_plan({
