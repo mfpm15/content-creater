@@ -1316,6 +1316,18 @@ def _run_job(job_id: str) -> None:
         prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
         prompt+='\nBahasa judul layar: '+job.get('speech',{}).get('language','id')+'. Pertahankan naskah pengguna; jangan menerjemahkan narasi terkunci.\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
         prompt+=renderer_contract.planner_instruction(job['engine'])
+        if job.get('engine')=='remotion':
+            prompt+=("\nATURAN ANTI-SLIDESHOW: utamakan subjek konkret yang konsisten antarscene dan berubah melalui sebab-akibat. "
+                     "Jangan membuat satu gambar + headline + fade yang sama pada semua scene. "
+                     "Gunakan perbedaan ukuran shot, perubahan perhatian visual, dan perpindahan kamera yang bermakna; "
+                     "batasi maksimal dua tingkat teks penting pada setiap frame. "
+                     "Setiap shot harus punya alasan visual dan aksi, bukan efek acak; hindari radar dan orbit generik berulang. "
+                     "Field subject wajib 1–4 kata benda spesifik yang dapat dicari sebagai gambar dokumenter, bukan instruksi atau kalimat. "
+                     "Jika adegan menyangkut fakta/peristiwa nyata, bedakan ilustrasi umum dari bukti dokumenter, jangan menyatakan gambar umum sebagai foto peristiwa.")
+            if job.get("autoMedia"):
+                prompt+=("\nMEDIA OTOMATIS: pilih subject konkret dan singkat, bila memungkinkan gunakan istilah objek internasional "
+                         "yang umum dipakai pada katalog Wikimedia Commons. Tetap pertahankan bahasa narasi yang diminta. "
+                         "Jangan meminta atau mengklaim foto tokoh/peristiwa spesifik tanpa sumber.")
         if job.get("templateId"):
             chosen=video_templates.get(job["templateId"])
             prompt+="\nVISUAL TEMPLATE "+chosen["name"]+": "+chosen["direction"]+" Sesuaikan setiap scene dengan cerita; jangan gunakan satu motif berulang."
