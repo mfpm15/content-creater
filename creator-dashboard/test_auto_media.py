@@ -91,6 +91,37 @@ class AutoMediaTests(unittest.TestCase):
             props,_=remotion_adapter.manifest(job["scenePlan"],vd.ASPECT_RATIOS["9:16"])
             self.assertEqual(props["captionStyle"],"pop")
 
+    def test_zero_results_never_trigger_unbounded_network_search(self):
+        plan={"scenes":[{"id":f"scene-{i}","onScreenText":f"Server rack {i}"} for i in range(1,201)]}
+        with patch.object(auto_media,"_search",return_value=[]) as worker:
+            report=auto_media.suggest(plan)
+        self.assertEqual(worker.call_count,auto_media.MAX_SHOTS)
+        self.assertEqual(report["attemptedSearches"],auto_media.MAX_SHOTS)
+        self.assertEqual(report["maxSearches"],auto_media.MAX_SHOTS)
+        self.assertEqual(len(report["warnings"]),auto_media.MAX_SHOTS)
+        self.assertFalse(any("assetId" in s for s in plan["scenes"]))
+
+    def test_malformed_provider_page_and_url_fall_back_not_crash(self):
+        plan={"scenes":[{"id":"scene-1","onScreenText":"Server rack"}]}
+        values=[None, "bad", [], {"imageinfo":"malformed"},
+                {"imageinfo":[{"extmetadata":{"LicenseShortName":"bad"},"thumburl":"https://upload.wikimedia.org:bad/wikipedia/commons/a.png"}]},
+                {"imageinfo":[{"extmetadata":{"LicenseShortName":{"value":"CC0 1.0"}},"thumburl":"https://upload.wikimedia.org:bad/wikipedia/commons/a.png"}]}]
+        with patch.object(auto_media,"_search",return_value=values),\
+             patch.object(auto_media,"_download") as downloader:
+            report=auto_media.suggest(plan)
+        self.assertEqual(report["assets"],[])
+        self.assertTrue(report["warnings"])
+        downloader.assert_not_called()
+        self.assertFalse(auto_media._wikimedia_thumbnail("https://upload.wikimedia.org:bad/wikipedia/commons/foo.jpg"))
+
+    def test_malformed_api_payload_fails_closed(self):
+        with patch.object(auto_media,"_download",return_value=b'{"query":{"pages":"not-an-array"}}'):
+            with self.assertRaisesRegex(ValueError,"Daftar hasil"):
+                auto_media._search("Server rack")
+        with patch.object(auto_media,"_download",return_value=b'[]'):
+            with self.assertRaisesRegex(ValueError,"objek JSON"):
+                auto_media._search("Server rack")
+
     def test_api_rejects_invalid_automation_flags_without_job(self):
         with patch.object(vd,"JOBS",{}):
             for key,value in (("autoMedia","yes"),("autoRender",1),("smartTemplate",None)):
