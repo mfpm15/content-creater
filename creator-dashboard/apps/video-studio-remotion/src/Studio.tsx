@@ -1,11 +1,8 @@
 import React from 'react';
-import {AbsoluteFill, Composition, interpolate, registerRoot, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Composition, registerRoot, useCurrentFrame, useVideoConfig} from 'remotion';
 import {validateManifest} from './timeline.mjs';
 import {Illustration} from './Visuals';
-import type {Shot, StudioProps} from './types';
-
-// Original procedural artwork. Numbers are literal labels from narration/title,
-// never fabricated bar values or performance predictions.
+import type {StudioProps} from './types';
 
 export const Studio: React.FC<StudioProps> = props => {
   const frame = useCurrentFrame();
