@@ -30,7 +30,8 @@ import urllib.request
 import uuid
 import wave
 from pathlib import Path
-from security import open_authenticated, render_environment
+from security import open_authenticated, redact, render_environment
+import tavily_research
 
 from video_job_store import save_job, recover_jobs
 from runtime_config import resolve_python
@@ -54,7 +55,9 @@ RESEARCH_MODEL = os.getenv("VIDEO_RESEARCH_MODEL", "gemini-2.5-flash")
 LLM_URL = os.getenv("VIDEO_LLM_BASE_URL", os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:20128/v1").rstrip("/")
 LLM_MODEL = os.getenv("VIDEO_LLM_MODEL", os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "ms/GPT-5.6-Think-Deeper")
 LLM_KEY = os.getenv("VIDEO_LLM_API_KEY", os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "9router-local")
-LLM_TIMEOUT = int(os.getenv("VIDEO_LLM_TIMEOUT", "120"))
+# Batas per percobaan model dan total semua percobaan (detik).
+LLM_TIMEOUT = int(os.getenv("VIDEO_LLM_TIMEOUT", "150"))
+PLAN_BUDGET = int(os.getenv("VIDEO_PLAN_BUDGET", "330"))
 
 STYLES = {
     "remotion_editorial": {"id":"remotion_editorial","name":"Remotion Editorial","description":"Diagram editorial dengan timeline frame, caption pendek dan warna brand."},
@@ -101,8 +104,9 @@ def get_available_models() -> list[dict]:
 
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else DEFAULT_MODELS[0]["id"]
-    research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "templates":video_templates.catalogue(), "captionStyles":caption_design.options(), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
+    research_ready = _research_ready()
+    provider = "Tavily" if os.getenv("TAVILY_API_KEY") or tavily_research.available() else "Google Search grounding"
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "templates":video_templates.catalogue(), "captionStyles":caption_design.options(), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": provider, "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
@@ -378,17 +382,32 @@ Materi pengguna:
 {input_material}
 
 Balas satu objek JSON valid saja dengan:
-1. creativeDirection: logline, audiencePromise, narrativeArc, visualThesis, pacingArc, paletteLogic, typographySystem, motionLanguage, soundStrategy, continuitySystem, riskChecks.
-2. scenes: array berisi start, end, narration, onScreenText, soundCue, type, shotPurpose, visualFamily, subject, action, setting, visual, metaphor, composition, foreground, midground, background, camera, lighting, colorMood, typography, transition, continuity.
+1. creativeDirection: logline, audiencePromise, narrativeArc, visualThesis, paletteLogic (satu kalimat singkat per field).
+2. scenes: array berisi start, end, narration, onScreenText, soundCue, type, shotPurpose, visualFamily, subject, visual, camera, transition. Isi hanya field ini, singkat dan konkret (visual maksimal dua kalimat). Field lain (action, setting, metaphor, composition, foreground, midground, background, lighting, colorMood, typography, continuity) dilengkapi sistem otomatis, jangan ditulis.
+Jumlah adegan: sekitar {max(2, min(14, round(duration / 5)))} (rata-rata 4-6 detik per adegan, maksimal 14).
 Untuk engine opuscar/threejs/remotion saja, renderControls opsional mengendalikan gambar: camera (legacy/locked/push-in/pull-out/pan-left/pan-right/orbit), strength (angka 0–1), lighting (legacy/soft/dramatic), transition (legacy/fade/cut/slide). Kamera 2D hanya mengubah ilustrasi, bukan judul/subtitle. Arahan bebas tetap catatan produksi, bukan kode. Jangan menambahkan kontrol ini pada lottie/continuous. Untuk Remotion/Lottie, diagram opsional {{kind: process|comparison, labels: [teks]}} memakai 2–5 label proses atau tepat 2 label perbandingan, masing-masing maksimal 48 karakter dan berdasarkan naskah. Tanpa diagram eksplisit, tidak ada langkah proses yang dikarang. Remotion mendukung visualFamily process/data/comparison dan concept (keluarga lain menjadi concept), durasi ditutup tanpa gap, judul maksimal 120 karakter; jangan mengarang angka diagram.
 
 Pastikan jumlah scene proporsional terhadap durasi, setiap scene berbeda fungsi dan visualnya, total timing tepat {duration} detik, serta seluruh keputusan cukup detail untuk divisualkan tanpa menebak maksud sutradara."""
 
+def _google_ready() -> bool:
+    return bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
+
+
+def _research_ready() -> bool:
+    return _google_ready() or tavily_research.available()
+
+
 def _research_web(topic: str, script: str) -> dict:
-    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
-        raise RuntimeError("Web Search wajib aktif. Atur GOOGLE_API_KEY atau GEMINI_API_KEY lalu restart dashboard")
-    if not PODCASTFY_PYTHON.is_file():
-        raise RuntimeError("Environment Google Search belum tersedia")
+    """Tavily dulu (kunci langsung atau lewat 9Router), lalu Google grounding sebagai cadangan."""
+    failures = []
+    if os.getenv("TAVILY_API_KEY") or tavily_research.available():
+        try:
+            return tavily_research.search(topic, script)
+        except Exception as exc:
+            failures.append(f"Tavily: {redact(str(exc))}")
+    if not _google_ready():
+        raise RuntimeError("Web Search tidak tersedia. " + ("; ".join(failures) + ". " if failures else "") +
+            "Atur TAVILY_API_KEY (atau tambahkan kredensial Tavily di 9Router), atau GOOGLE_API_KEY/GEMINI_API_KEY, lalu restart dashboard")
     payload = json.dumps({"topic": topic, "context": script, "model": RESEARCH_MODEL}, ensure_ascii=False)
     process = subprocess.run(
         [str(PODCASTFY_PYTHON), str(RESEARCH_WORKER)], input=payload, text=True,
@@ -421,12 +440,19 @@ def _call_9router(prompt: str, model: str = "") -> str:
     return data["choices"][0]["message"]["content"]
 
 
-def _call_llm(prompt: str, model: str = "") -> str:
-    """Model terpilih dulu; bila layanan down (5xx/429/timeout/koneksi), coba model lain yang diizinkan."""
+def _call_llm(prompt: str, model: str = "", notify=None) -> str:
+    """Model terpilih dulu; bila layanan down/lambat (5xx, 429, timeout, koneksi), coba model lain.
+
+    Total waktu dibatasi PLAN_BUDGET agar tiga model yang timeout berurutan tidak membuat
+    pengguna menunggu belasan menit tanpa kabar. Error 4xx lain tidak dicoba ulang.
+    """
     first = model or LLM_MODEL
     order = [first] + [item["id"] for item in DEFAULT_MODELS if item["id"] != first]
+    deadline = time.monotonic() + PLAN_BUDGET
     last: Exception | None = None
-    for candidate in order:
+    for index, candidate in enumerate(order):
+        if index and time.monotonic() + 20 > deadline:
+            break
         try:
             return _call_9router(prompt, candidate)
         except urllib.error.HTTPError as exc:
@@ -435,6 +461,10 @@ def _call_llm(prompt: str, model: str = "") -> str:
             last = exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             last = exc
+        if notify and index + 1 < len(order):
+            notify(f"Model {candidate} tidak merespons ({type(last).__name__}); mencoba {order[index + 1]}")
+    if isinstance(last, TimeoutError) or "timed out" in str(last):
+        raise RuntimeError("Model terlalu lama merespons. Coba model Claude Haiku (cepat) atau durasi lebih pendek") from last
     raise last  # type: ignore[misc]
 
 
@@ -1099,7 +1129,7 @@ def start_job(payload: dict) -> dict:
     if len(topic)>500 or len(script)>30000:raise ValueError('Topik maksimal 500 karakter; naskah maksimal 30.000 karakter')
     research_mode=payload.get('researchMode','planner')
     if research_mode not in {'planner','web','provided'}:raise ValueError('Mode perencanaan tidak dikenal')
-    research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
+    research_ready = _research_ready()
     # UI baru menonaktifkan Web Search ketika provider belum siap. Untuk klien lama,
     # permintaan web yang membawa naskah dialihkan ke mode lokal. Permintaan tanpa
     # naskah tetap diterima agar kontrak API lama tidak rusak; thread riset akan
@@ -1306,7 +1336,7 @@ def _run_job(job_id: str) -> None:
         mode=job.get('researchMode','planner')
         provided=mode=='provided'
         web=mode=='web'
-        step = "Mencari sumber melalui Google Search" if web else "Menyusun naskah lokal untuk review" if provided else "Menyusun creative direction dengan model terpilih"
+        step = "Mencari sumber web" if web else "Menyusun naskah lokal untuk review" if provided else "Menyusun creative direction dengan model terpilih"
         _update_job(job_id, {"status": "researching", "step": step, "progress": 10})
         if web:
             research = _research_web(job["topic"], job["script"])
@@ -1331,7 +1361,8 @@ def _run_job(job_id: str) -> None:
             draft=preproduction.narration(job['script'],'provided_script')
         else:
             _update_job(job_id,{'status':'writing_narration','step':'Menulis narasi utuh sebelum pembagian scene','progress':22})
-            response=_clean_json(_call_llm(preproduction.script_prompt(job['topic'],_research_context(research)+'\nArahan produksi: '+job.get('creativeBrief',''),job['duration'],job.get('speech',{}).get('language','id')),job['model']))
+            notify=lambda text:_update_job(job_id,{'step':text})
+            response=_clean_json(_call_llm(preproduction.script_prompt(job['topic'],_research_context(research)+'\nArahan produksi: '+job.get('creativeBrief',''),job['duration'],job.get('speech',{}).get('language','id')),job['model'],notify))
             draft=preproduction.narration(response.get('narration'),'generated')
         _update_job(job_id,{'narrationDraft':draft,'initialNarrationDraft':draft,
             'status':'planning_scenes','step':'Membagi narasi menjadi shot dan arahan visual','progress':28})
@@ -1357,7 +1388,7 @@ def _run_job(job_id: str) -> None:
         if job.get('motionDesign'):
             concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
             prompt+='\nKonsep wajib: '+concept['idea']+' '+concept['carry']+' Tutup seluruh durasi tanpa gap.'
-        data = {} if explicit or provided else _clean_json(_call_llm(prompt, job["model"]))
+        data = {} if explicit or provided else _clean_json(_call_llm(prompt, job["model"], lambda text: _update_job(job_id, {"step": text})))
         if job.get('motionDesign'):data['motionDesign']=job['motionDesign']
         else:data.pop('motionDesign',None)
         if job.get('engine')=='remotion':data['audioMode']=job['audioMode']

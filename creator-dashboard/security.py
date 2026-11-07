@@ -46,7 +46,7 @@ def render_environment():
     result=os.environ.copy()
     for name in tuple(result):
         application=name.startswith(('ARTICLE_','VIDEO_','LLM_','OPENAI_','CLIPPER_'))
-        if name in {'GOOGLE_API_KEY','GEMINI_API_KEY'} or application and any(tag in name for tag in ('API_KEY','TOKEN','PASSWORD','SECRET')):
+        if name in {'GOOGLE_API_KEY','GEMINI_API_KEY','TAVILY_API_KEY'} or application and any(tag in name for tag in ('API_KEY','TOKEN','PASSWORD','SECRET')):
             result.pop(name)
     result['HYPERFRAMES_NO_TELEMETRY']='1'
     browser=find_browser()

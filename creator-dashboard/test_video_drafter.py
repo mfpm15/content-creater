@@ -20,7 +20,9 @@ class VideoDrafterTest(unittest.TestCase):
         self.workspace.cleanup()
 
     def test_options_expose_render_adapters_and_primary_models(self):
-        opts = video_drafter.options()
+        with patch.dict(video_drafter.os.environ, {}, clear=True), \
+             patch.object(video_drafter.tavily_research, "available", return_value=False):
+            opts = video_drafter.options()
         self.assertEqual([item["id"] for item in opts["engines"]], ["opuscar", "threejs", "lottie", "continuous", "remotion"])
         self.assertEqual(opts["defaultEngine"], "opuscar")
         self.assertFalse(next(item for item in opts["engines"] if item["id"] == "threejs").get("disabled", False))
@@ -285,10 +287,56 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertEqual(job["scenePlan"]["scenes"][0]["narration"], "Narasi hasil edit.")
         self.assertEqual(job["scenePlan"]["scenes"][0]["composition"], "subjek kecil dengan ruang teks luas")
 
+    def test_options_report_tavily_when_key_is_present(self):
+        with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-test"}, clear=True):
+            opts = video_drafter.options()
+        self.assertEqual(opts["research"]["provider"], "Tavily")
+        self.assertTrue(opts["research"]["ready"])
+
     def test_research_web_fails_closed_without_api_key(self):
-        with patch.dict(video_drafter.os.environ, {}, clear=True):
-            with self.assertRaisesRegex(RuntimeError, "Web Search wajib aktif"):
+        with patch.dict(video_drafter.os.environ, {}, clear=True), \
+             patch.object(video_drafter.tavily_research, "available", return_value=False):
+            with self.assertRaisesRegex(RuntimeError, "Web Search tidak tersedia"):
                 video_drafter._research_web("Topik", "Konteks")
+
+    def test_research_web_uses_tavily_first_and_keeps_claims_unverified(self):
+        payload = {"answer": "Ringkasan.", "results": [
+            {"title": "Sumber A", "url": "https://example.org/a", "content": "isi a"},
+            {"title": "Duplikat", "url": "https://example.org/a", "content": "dup"},
+            {"title": "Bukan web", "url": "javascript:alert(1)", "content": "x"}]}
+        with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-test"}, clear=True), \
+             patch.object(video_drafter.tavily_research, "_post", return_value=payload) as post, \
+             patch.object(video_drafter.subprocess, "run", side_effect=AssertionError("Google tidak boleh dipakai")):
+            result = video_drafter._research_web("Topik", "Konteks")
+        self.assertEqual(post.call_args.args[0], video_drafter.tavily_research.DIRECT_URL)
+        self.assertEqual(result["provider"], "Tavily")
+        self.assertEqual([s["url"] for s in result["sources"]], ["https://example.org/a"])
+        self.assertFalse(result["verified"])
+        self.assertEqual(result["sources"][0]["claimVerification"], "unverified")
+
+    def test_research_web_falls_back_to_google_when_tavily_fails(self):
+        completed = type("Completed", (), {"stdout": '{"summary":"s","sources":[{"id":1,"title":"t","url":"https://example.org","publisher":"example.org"}]}', "stderr": "", "returncode": 0})()
+        with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-test", "GEMINI_API_KEY": "g-test"}, clear=True), \
+             patch("pathlib.Path.is_file", return_value=True), \
+             patch.object(video_drafter.tavily_research, "_post", side_effect=OSError("down")), \
+             patch.object(video_drafter.subprocess, "run", return_value=completed):
+            result = video_drafter._research_web("Topik", "")
+        self.assertEqual(result["sourceCount"] if "sourceCount" in result else len(result["sources"]), 1)
+
+    def test_tavily_direct_key_is_not_leaked_to_render_environment(self):
+        with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-secret-value"}):
+            self.assertNotIn("TAVILY_API_KEY", video_drafter.render_environment())
+
+    def test_llm_total_budget_stops_retries_and_reports_slow_model(self):
+        calls = []
+
+        def slow(prompt, model=""):
+            calls.append(model)
+            raise TimeoutError("timed out")
+        with patch.object(video_drafter, "PLAN_BUDGET", 0), patch.object(video_drafter, "_call_9router", side_effect=slow):
+            with self.assertRaisesRegex(RuntimeError, "terlalu lama"):
+                video_drafter._call_llm("p", "cc/claude-sonnet-5-5")
+        self.assertEqual(calls, ["cc/claude-sonnet-5-5"])
 
     def test_research_context_contains_sources_and_urls(self):
         research = {

@@ -359,7 +359,7 @@ async function loadOptions() {
     const researchToggle=document.getElementById('quickResearch');
     researchToggle.disabled=!researchReady;
     researchToggle.checked=researchReady;
-    researchToggle.title=researchReady?'Riset tersedia, namun fakta tetap perlu review':'Riset web perlu konfigurasi Google Search grounding';
+    researchToggle.title=researchReady?'Riset via '+(data.research?.provider||'web')+'; fakta tetap perlu review':'Riset web perlu TAVILY_API_KEY, kredensial Tavily di 9Router, atau GOOGLE_API_KEY/GEMINI_API_KEY';
 
     const researchSelect = document.getElementById('researchMode');
     const webOption = researchSelect.querySelector('option[value="web"]');

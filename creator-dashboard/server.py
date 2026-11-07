@@ -23,6 +23,27 @@ from urllib.parse import unquote, urlparse
 from security import redact, redact_tree, local_request_allowed
 from runtime_config import resolve_tool_command
 
+
+def _load_dotenv() -> None:
+    """Isi variabel yang belum ada dari .env (root repo lalu creator-dashboard); nilai kosong dilewati."""
+    here = Path(__file__).resolve().parent
+    for path in (here.parent / ".env", here / ".env"):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            name, _, value = line.partition("=")
+            name, value = name.strip(), value.strip().strip("'\"")
+            if name and value and name not in os.environ:
+                os.environ[name] = value
+
+
+_load_dotenv()
+
 import article_drafter
 import video_drafter
 import youtube_analytics
