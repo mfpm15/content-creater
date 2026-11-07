@@ -36,7 +36,7 @@ export const Studio: React.FC<StudioProps> = props => {
   const kineticOffset=effect==='kinetic'?(1-easedEntrance)*height*.025:0;
   const artBreath=effect==='calm'?1+Math.sin(frame/fps*.6)*.014:
     effect==='cinematic'?1+progress*.025:effect==='kinetic'?1+progress*.065:1;
-  const ambientOpacity=effect==='minimal'?.08:effect==='calm'?.12:effect==='urgent'?.23:.2;
+  const ambientOpacity=effect === 'minimal' ? 0.08 : effect === 'calm' ? 0.12 : effect === 'urgent' ? 0.23 : 0.2;
   const scanTop=(progress*116-9);
   const layout=props.layout||'editorial';
   const showPoster=layout==='poster';
@@ -84,7 +84,7 @@ export const Studio: React.FC<StudioProps> = props => {
     {effect==='kinetic' && <div style={{position:'absolute',left:width*.075,top:height*.075,width:width*.18,height:5*scaleUnit,background:props.brand.accent,transform:`scaleX(${easedEntrance})`,transformOrigin:'left'}}/>}
     <AbsoluteFill style={{padding:`${height*(showPoster ? 0.08 : 0.11)}px ${width*(centered ? 0.10 : 0.16)}px ${height*.19}px ${width*(centered ? 0.10 : 0.08)}px`,opacity,transform:`translateX(${slide}px)`}}>
       <div style={{display:'flex',justifyContent:'space-between',fontSize:24*scaleUnit,letterSpacing:3*scaleUnit,color:props.brand.accent,fontWeight:700}}><span>{String(index+1).padStart(2,'0')} / {String(props.shots.length).padStart(2,'0')}</span><span style={{fontSize:20*scaleUnit,letterSpacing:0}}>{props.brand.wordmark}</span></div>
-      <div ref={titleRef} style={{fontSize:(portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))),lineHeight:1.12,fontWeight:headline?900:800,marginTop:titleMargin,maxWidth:width*(centered ? 0.78 : 0.76),textAlign:centered?'center':'left',letterSpacing:headline?-.8*scaleUnit:0,overflowWrap:'anywhere',background:showPoster?`${props.brand.background}e0`:undefined,borderRadius:showPoster?12:0,padding:showPoster?12*scaleUnit:0,transform:`translateY(${kineticOffset}px)`,opacity:effect==='kinetic'?.35+.65*easedEntrance:1}}>{shot.title}</div>
+      <div ref={titleRef} style={{fontSize:(portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))),lineHeight:1.12,fontWeight:headline?900:800,marginTop:titleMargin,maxWidth:width*(centered ? 0.78 : 0.76),textAlign:centered?'center':'left',letterSpacing:headline?-.8*scaleUnit:0,overflowWrap:'anywhere',background:showPoster?`${props.brand.background}e0`:undefined,borderRadius:showPoster?12:0,padding:showPoster?12*scaleUnit:0,transform:`translateY(${kineticOffset}px)`,opacity:effect === 'kinetic' ? 0.35+0.65*easedEntrance : 1}}>{shot.title}</div>
       <div ref={artRef} style={{position:'absolute',left:artSide,right:artSide,top:artTop,height:artHeight,transform:`translateX(${x}%) scale(${scale*artBreath}) rotate(${rotation}deg)`,filter}}>
         <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>
       </div>
