@@ -53,8 +53,7 @@ function renderTemplateGallery() {
   for(const t of visible) {
     const button=document.createElement('button');
     button.type='button';button.className='template-card';
-    button.setAttribute('role','radio');
-    button.setAttribute('aria-checked',String(chosenTemplateId===t.id));
+    button.setAttribute('aria-pressed',String(chosenTemplateId===t.id));
     button.setAttribute('aria-label',t.name+' — '+t.description);
     const cover=document.createElement('div');cover.className='template-cover';
     // Palette is strictly validated by the backend before being returned.
