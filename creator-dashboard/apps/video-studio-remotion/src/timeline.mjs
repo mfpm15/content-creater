@@ -10,13 +10,14 @@ export function validateManifest(value) {
   const text = (s, max) => typeof s === 'string' && s.length <= max;
   const plain = o => o && typeof o === 'object' && Object.getPrototypeOf(o) === Object.prototype;
   if (!plain(value)) fail();
-  const keys = ['version','width','height','fps','totalFrames','topic','layout','effect','brand','shots','captions'];
+  const keys = ['version','width','height','fps','totalFrames','topic','layout','effect','captionStyle','brand','shots','captions'];
   if (Object.keys(value).some(key => !keys.includes(key))) fail();
   if (value.version !== 1 || ![30,60].includes(value.fps) || !integer(value.totalFrames) || value.totalFrames < 1 || value.totalFrames > 600*value.fps) fail();
   if (![value.width,value.height].every(n => integer(n) && n >= 128 && n <= 3840 && n % 2 === 0) || !text(value.topic,500)) fail();
   const brand = value.brand;
   if (!plain(brand) || Object.keys(brand).some(k => !['background','accent','text','wordmark','font'].includes(k)) ||
       !['background','accent','text'].every(k => /^#[0-9a-fA-F]{6}$/.test(brand[k])) || !text(brand.wordmark,100) || !['Arial','Verdana','Georgia','Tahoma'].includes(brand.font)) fail();
+  if (value.captionStyle !== undefined && !['clean','pop','pill','outline','highlight'].includes(value.captionStyle)) fail();
   if (value.layout !== undefined && !['editorial','headline','split','poster','center'].includes(value.layout)) fail();
   if (value.effect !== undefined && !['minimal','cinematic','technical','kinetic','calm','urgent'].includes(value.effect)) fail();
   if (!Array.isArray(value.shots) || value.shots.length < 1 || value.shots.length > 200 || !Array.isArray(value.captions) || value.captions.length > 10000) fail();
@@ -41,7 +42,19 @@ export function validateManifest(value) {
   if (end !== value.totalFrames) fail();
   end = 0;
   for (const caption of value.captions) {
-    if (!plain(caption) || Object.keys(caption).some(k => !['startFrame','endFrame','text'].includes(k)) || !integer(caption.startFrame) || !integer(caption.endFrame) || caption.startFrame < end || caption.endFrame <= caption.startFrame || caption.endFrame > value.totalFrames || !text(caption.text,500)) fail();
+    if (!plain(caption) || Object.keys(caption).some(k => !['startFrame','endFrame','text','wordFrames'].includes(k)) || !integer(caption.startFrame) || !integer(caption.endFrame) || caption.startFrame < end || caption.endFrame <= caption.startFrame || caption.endFrame > value.totalFrames || !text(caption.text,500)) fail();
+    if (caption.wordFrames !== undefined) {
+      if (!Array.isArray(caption.wordFrames) || !caption.wordFrames.length || caption.wordFrames.length > 12) fail();
+      let previous=caption.startFrame;
+      for(const word of caption.wordFrames) {
+        if (!plain(word) || Object.keys(word).some(k=>!['text','startFrame','endFrame'].includes(k)) ||
+            !text(word.text,80) || !word.text.trim() ||
+            !integer(word.startFrame) || !integer(word.endFrame) ||
+            word.startFrame < caption.startFrame || word.startFrame < previous ||
+            word.endFrame <= word.startFrame || word.endFrame > caption.endFrame) fail();
+        previous=word.startFrame;
+      }
+    }
     end = caption.endFrame;
   }
   return value;
