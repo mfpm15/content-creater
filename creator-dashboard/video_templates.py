@@ -25,6 +25,16 @@ _ROWS = [
     ("creator-pop", "Creator Pop", "Sosial Media", "Konten fakta cepat dengan judul mencolok dan ritme dinamis.", "split", "#24122c", "#f5a2ff", "#fff7ff", "Tahoma", "Hook ringkas, ritme bervariasi, CTA tidak memaksa, hindari format identik setiap video."),
 ]
 LAYOUTS = frozenset({"headline", "split", "poster", "center"})
+EFFECTS = {
+    "cyber-news": "technical", "investigasi-noir": "cinematic",
+    "tech-future": "technical", "medis-fakta": "calm",
+    "sejarah-arsip": "cinematic", "ekonomi-gold": "kinetic",
+    "kelas-cerah": "calm", "motivasi-rose": "cinematic",
+    "news-alert": "urgent", "minimal-ink": "minimal",
+    "nature-story": "calm", "creator-pop": "kinetic",
+}
+EFFECT_MODES = frozenset({"technical", "cinematic", "kinetic", "calm", "urgent", "minimal"})
+
 TEMPLATES = {
     slug: {
         "id": slug,
@@ -33,6 +43,7 @@ TEMPLATES = {
         "description": description,
         "engine": "remotion",
         "layout": layout,
+        "effect": EFFECTS[slug],
         "direction": direction,
         "brand": {
             "name": name,
