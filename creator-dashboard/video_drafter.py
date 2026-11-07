@@ -7,6 +7,7 @@ import sound_effects
 import speech_settings
 import voice_quality
 import video_templates
+import faceless_quality
 import frame_rate
 import scene_diagram
 import html
@@ -889,7 +890,7 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
                    "model": source.get("model", LLM_MODEL), "status": "awaiting_scene_plan", "step": "Review layout rasio baru sebelum render",
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
                    "storyboard": None, "video": None, "revision": 0, "approvals": {},
-                   "rendererReview":renderer_contract.inspect(plan,engine), "origin": {"slug": slug, "scene_plan_digest": hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()}}
+                   "rendererReview":renderer_contract.inspect(plan,engine), "facelessQuality":faceless_quality.inspect(plan) if plan.get("templateId") else None, "origin": {"slug": slug, "scene_plan_digest": hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()}}
             if "speech" in plan:job["speech"]=plan["speech"]
             if engine=='continuous':job['motionDesign']=plan.get('motionDesign')
             if engine=='remotion':job['audioMode']=plan.get('audioMode','music')
@@ -987,6 +988,7 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
             if job["engine"]=="continuous":job["motionDesign"]=plan["motionDesign"]
         job["fps"] = frame_rate.get(plan)
         job["rendererReview"]=renderer_contract.inspect(plan,job.get("engine","opuscar"))
+        job["facelessQuality"]=faceless_quality.inspect(plan) if job.get("templateId") else None
         job["scenePlan"] = plan
         job["storyboard"] = _storyboard(plan) if stage == "storyboard" else None
         job["step"] = "Perubahan editor tersimpan"
@@ -1309,7 +1311,8 @@ def _run_job(job_id: str) -> None:
         if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
             raise ValueError('Model mengembalikan kontrol render yang tidak didukung adapter ini')
         if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])
-        _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan,"rendererReview":renderer_contract.inspect(plan,job["engine"])})
+        _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan,"rendererReview":renderer_contract.inspect(plan,job["engine"]),
+            "facelessQuality":faceless_quality.inspect(plan) if job.get("templateId") else None})
     except Exception as exc:
         _update_job(job_id, {"status": "failed", "step": f"Gagal: {exc}", "progress": 100, "error": str(exc)})
 
