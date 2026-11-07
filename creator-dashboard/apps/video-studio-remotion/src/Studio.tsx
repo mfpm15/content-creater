@@ -29,6 +29,11 @@ export const Studio: React.FC<StudioProps> = props => {
   const glowScale = 1+Math.sin(frame/fps*.8)*.07;
   const slide = shot.transition==='slide' ? (1-Math.min(1,local/edge))*width*.06 : 0;
   const caption = props.captions.find(c=>frame>=c.startFrame && frame<c.endFrame);
+  const captionStyle=props.captionStyle||'clean';
+  const captionEntrance=caption?Math.min(1,Math.max(0,(frame-caption.startFrame)/Math.max(1,fps*.15))):1;
+  const captionEase=1-Math.pow(1-captionEntrance,3);
+  const captionMotion=captionStyle==='pop'||captionStyle==='pill';
+
   const filter = shot.lighting==='soft' ? 'brightness(1.15) contrast(.85)' : shot.lighting==='dramatic' ? 'brightness(.82) contrast(1.35)' : 'none';
   const effect=props.effect||'minimal';
   const enterProgress=Math.min(1,Math.max(0,local/(fps*.42)));
@@ -95,13 +100,35 @@ export const Studio: React.FC<StudioProps> = props => {
           </div>
         </> : <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>}
       </div>
-      {caption && <div ref={captionRef} style={{position:'absolute',left:centered?'14%':'8%',right:centered?'14%':'16%',bottom:captionBottom,padding:`${24*scaleUnit}px ${30*scaleUnit}px`,borderLeft:`${(centered?0:5)*scaleUnit}px solid ${props.brand.accent}`,borderBottom:centered?`${3*scaleUnit}px solid ${props.brand.accent}`:undefined,textAlign:centered?'center':'left',fontSize:(showPoster?36:40)*scaleUnit,lineHeight:1.35,background:props.brand.background,overflowWrap:'anywhere'}}>{caption.text}</div>}
+      {caption && <div ref={captionRef} style={{position:'absolute',left:centered?'14%':'8%',right:centered?'14%':'16%',bottom:captionBottom,
+        padding:`${(captionStyle==='pill'?19:24)*scaleUnit}px ${30*scaleUnit}px`,
+        borderLeft:captionStyle==='clean'||captionStyle==='highlight'?`${5*scaleUnit}px solid ${props.brand.accent}`:undefined,
+        borderBottom:centered?`${3*scaleUnit}px solid ${props.brand.accent}`:undefined,
+        borderRadius:captionStyle==='pill'?36*scaleUnit:captionStyle==='pop'?15*scaleUnit:6*scaleUnit,
+        border:captionStyle==='outline'?`${2*scaleUnit}px solid ${props.brand.accent}`:undefined,
+        boxShadow:captionStyle==='pill'||captionStyle==='pop'?`0 ${9*scaleUnit}px ${25*scaleUnit}px #00000055`:undefined,
+        transform:captionMotion?`translateY(${(1-captionEase)*25*scaleUnit}px) scale(${.92+.08*captionEase})`:undefined,
+        opacity:captionMotion ? 0.32+0.68*captionEase : 1,
+        textAlign:centered?'center':'left',
+        fontSize:(showPoster?36:captionStyle==='pop'?45:40)*scaleUnit,lineHeight:1.35,
+        fontWeight:captionStyle==='pop'?900:captionStyle==='outline'?700:600,
+        background:captionStyle==='pill'?`linear-gradient(105deg,${props.brand.accent}55,${props.brand.background} 65%)`:props.brand.background,
+        overflowWrap:'anywhere'}}>
+        {captionStyle==='highlight' && caption.wordFrames?.length
+          ? caption.wordFrames.map((word,i)=><React.Fragment key={i}>{i>0?' ':''}<span style={{
+              color:frame>=word.startFrame && frame<word.endFrame?props.brand.accent:props.brand.text,
+              fontWeight:frame>=word.startFrame && frame<word.endFrame?900:600,
+              textDecoration:frame>=word.startFrame && frame<word.endFrame?'underline':'none',
+              textUnderlineOffset:5*scaleUnit,
+            }}>{word.text}</span></React.Fragment>)
+          : caption.text}
+      </div>}
     </AbsoluteFill>
     <div style={{position:'absolute',left:0,bottom:0,height:4*scaleUnit,width:`${(frame+1)/props.totalFrames*100}%`,background:props.brand.accent}}/>
   </div>;
 };
 
-const defaults: StudioProps={version:1,layout:'editorial',effect:'minimal',width:1080,height:1920,fps:30,totalFrames:30,topic:'Video Studio',
+const defaults: StudioProps={version:1,layout:'editorial',effect:'minimal',captionStyle:'clean',width:1080,height:1920,fps:30,totalFrames:30,topic:'Video Studio',
   brand:{background:'#080f20',accent:'#22d3ee',text:'#ffffff',wordmark:'',font:'Arial'},
   shots:[{id:'scene-1',startFrame:0,endFrame:30,title:'Video Studio',subject:'',family:'concept',camera:'locked',strength:.5,lighting:'legacy',transition:'fade'}],captions:[]};
 const Root: React.FC=()=> <Composition id="StudioMotion" component={Studio} width={1080} height={1920} fps={30} durationInFrames={30} defaultProps={defaults}
