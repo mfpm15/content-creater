@@ -79,7 +79,7 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
                         y=max(x+1,min(b,frame(cue['end'])))
                         words.append({'text':cue['word'],'startFrame':x,'endFrame':y})
                     captions.append({'startFrame':a,'endFrame':b,'text':' '.join(cue['word'] for cue in group),'wordFrames':words})
-            methods.append({'scene':scene['id'],'method':'supplied_word_cues_rounded_to_frames'})
+            methods.append({'scene':scene['id'],'method':'edge_tts_word_boundaries_rounded_to_frames' if scene.get('wordCueSource')=='edge_tts' else 'supplied_word_cues_rounded_to_frames'})
         else:
             # Full text is preserved. Estimated visual pacing is not forced alignment.
             words=scene['narration'].split()
