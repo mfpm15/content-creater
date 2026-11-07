@@ -1,31 +1,23 @@
-"""Web research through Tavily for Video Studio.
+"""Web research through Tavily (direct REST, no Google and no 9Router) for Video Studio and articles.
 
-Order: TAVILY_API_KEY (direct, HTTPS) first, otherwise 9Router's /v1/search with
-provider "tavily" when that provider has credentials in 9Router. Results keep the
-same shape as the Google grounding worker, and claims stay unverified.
+Requires TAVILY_API_KEY. Results keep a stable shape and claims stay unverified:
+a search result is a lead, not a fact-check.
 """
 from __future__ import annotations
 
 import json
 import os
 import time
-import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
 from security import open_authenticated
 
-DIRECT_URL = "https://api.tavily.com/search"
-_PROBE: dict = {"at": 0.0, "ok": False}
-PROBE_TTL = 600
+URL = "https://api.tavily.com/search"
 
 
-def _router_base() -> str:
-    return (os.getenv("VIDEO_LLM_BASE_URL") or os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:20128/v1").rstrip("/")
-
-
-def _router_key() -> str:
-    return os.getenv("VIDEO_LLM_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "9router-local"
+def available() -> bool:
+    return bool(os.getenv("TAVILY_API_KEY"))
 
 
 def _post(url: str, key: str, body: dict, timeout: float) -> dict:
@@ -33,22 +25,6 @@ def _post(url: str, key: str, body: dict, timeout: float) -> dict:
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     with open_authenticated(request, timeout=timeout) as response:
         return json.loads(response.read().decode())
-
-
-def available() -> bool:
-    """True when Tavily can be reached. The 9Router probe is cached because it spends one search credit."""
-    if os.getenv("TAVILY_API_KEY"):
-        return True
-    now = time.time()
-    if now - _PROBE["at"] < PROBE_TTL:
-        return _PROBE["ok"]
-    try:
-        _post(f"{_router_base()}/search", _router_key(), {"query": "ping", "provider": "tavily", "max_results": 1}, 8)
-        ok = True
-    except (urllib.error.URLError, OSError, ValueError):
-        ok = False
-    _PROBE.update(at=now, ok=ok)
-    return ok
 
 
 def _quality(url: str) -> str:
@@ -61,16 +37,13 @@ def _quality(url: str) -> str:
 
 
 def search(topic: str, context: str = "") -> dict:
+    key = os.getenv("TAVILY_API_KEY")
+    if not key:
+        raise RuntimeError("Riset web memerlukan TAVILY_API_KEY di .env, lalu restart dashboard")
     query = " ".join(part for part in (topic.strip(), context.strip()[:160]) if part)[:390]
-    body = {"query": query, "max_results": 6, "search_depth": "basic", "include_answer": True}
-    direct = os.getenv("TAVILY_API_KEY")
-    if direct:
-        data = _post(DIRECT_URL, direct, body, 30)
-    else:
-        data = _post(f"{_router_base()}/search", _router_key(), {**body, "provider": "tavily"}, 40)
-    rows = data.get("results") or (data.get("data") or {}).get("results") or []
+    data = _post(URL, key, {"query": query, "max_results": 6, "search_depth": "basic", "include_answer": True}, 30)
     sources, seen = [], set()
-    for row in rows:
+    for row in data.get("results") or []:
         url = str(row.get("url") or "").strip()
         if not url.startswith(("https://", "http://")) or url in seen:
             continue

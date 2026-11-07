@@ -113,6 +113,36 @@
       background: rgba(99,102,241,.12);
       color: #fff;
     }
+    .video-preview-box[hidden],.job-status[hidden],.empty-result[hidden]{display:none!important}
+    .result-panel{position:sticky;top:92px;align-self:start;max-height:calc(100vh - 108px);overflow-y:auto;scroll-margin-top:92px}
+    @media(max-width:1100px){.result-panel{position:static;max-height:none}}
+    .empty-result{padding:22px 14px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);font-size:13px;line-height:1.55;text-align:center}
+    .empty-result strong{display:block;color:#e2e8f0;margin-bottom:6px;font-size:14px}
+    .empty-result p{margin:0}
+    .job-status{margin:0 0 16px;padding:14px;border:1px solid rgba(99,102,241,.45);border-radius:12px;background:linear-gradient(145deg,rgba(31,41,68,.85),rgba(11,18,38,.85))}
+    .job-status[hidden]{display:none}
+    .job-status-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+    .job-status-head strong{color:#f8fafc;font-size:14px;overflow-wrap:anywhere}
+    .job-elapsed{font-variant-numeric:tabular-nums;color:#a5b4fc;font-size:12px;white-space:nowrap}
+    .job-step{margin:8px 0 2px;font-size:13px;font-weight:700;color:#e0e7ff;line-height:1.45}
+    .job-hint{margin:8px 0 0;font-size:11px;color:#fbbf24;line-height:1.5;min-height:0}
+    .job-hint:empty{display:none}
+    .job-status.failed{border-color:rgba(248,113,113,.6)}
+    .job-status.failed .job-step{color:#fecaca}
+    .job-status.done{border-color:rgba(52,211,153,.55)}
+    .stage-tracker{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+    .stage-tracker li{display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#7c8aa5;line-height:1.35}
+    .stage-tracker .dot{flex:0 0 18px;height:18px;border-radius:50%;border:2px solid #3b4a63;display:grid;place-items:center;font-size:10px;margin-top:1px}
+    .stage-tracker li.done{color:#a7f3d0}
+    .stage-tracker li.done .dot{border-color:#34d399;background:#064e3b;color:#a7f3d0}
+    .stage-tracker li.active{color:#fff;font-weight:700}
+    .stage-tracker li.active .dot{border-color:#818cf8;border-top-color:transparent;animation:stage-spin .9s linear infinite}
+    .stage-tracker li.wait .dot{opacity:.6}
+    .stage-tracker li.failed{color:#fecaca}
+    .stage-tracker li.failed .dot{border-color:#f87171;background:#450a0a;color:#fecaca}
+    .stage-tracker small{display:block;color:#8da0bf;font-weight:400;font-size:11px}
+    @keyframes stage-spin{to{transform:rotate(360deg)}}
+    @media(prefers-reduced-motion:reduce){.stage-tracker li.active .dot{animation:none;border-top-color:#818cf8}}
     .review-panel {
       display: none;
       margin: 14px 0;
@@ -245,7 +275,7 @@
             <div class="quick-checks">
               <label><input type="checkbox" id="quickAutoMedia" checked> Cari gambar otomatis (Wikimedia, CC0/domain publik)</label>
               <label><input type="checkbox" id="quickAutoRender" checked> Otomatis lanjut sampai MP4 (tanpa publikasi)</label>
-              <label><input type="checkbox" id="quickResearch"> Riset informasi web bersumber (jika layanan tersedia)</label>
+              <label><input type="checkbox" id="quickResearch"> Riset informasi web bersumber (Tavily)</label>
             </div>
             <small class="quick-legal">* Highlight kata memerlukan timestamp kata yang benar; tanpa timestamp, efek animasi hanya pada frasa. Foto otomatis tetap membutuhkan pengecekan sumber, relevansi dan hak pakai sebelum dipublikasikan.</small>
           </section>
@@ -284,8 +314,8 @@
 
           <label>Sumber rencana
             <select id="researchMode" name="researchMode">
-              <option value="planner" selected>Judul → Motion Planner 9Router</option>
-              <option value="web">Riset web + Motion Planner 9Router</option>
+              <option value="planner" selected>Judul → Motion Planner</option>
+              <option value="web">Riset web (Tavily) + Motion Planner</option>
               <option value="provided">Naskah sendiri → rencana lokal tanpa provider</option>
             </select>
             <small>Mode Judul memakai model terpilih. Riset Web menambahkan sumber yang tetap perlu diperiksa. Naskah Sendiri membuat rencana lokal tanpa memanggil model. Semua hasil tetap direview sebelum render.</small>
@@ -339,10 +369,10 @@
                 <option value="90">90 Detik</option>
               </select>
             </label>
-            <label>Model Sutradara & Motion Planner (9Router)
+            <label>Model Sutradara & Motion Planner
               <select name="model" id="modelSelect">
-                <option value="ms/GPT-5.6-Think-Deeper" selected>GPT-5.6 Think Deeper · utama</option>
-                <option value="cc/claude-sonnet-5-5">Claude Sonnet 5.5 · tambahan</option>
+                <option value="cc/claude-sonnet-5-5" selected>Claude Sonnet 5.5 · utama</option>
+                <option value="ms/GPT-5.6-Think-Deeper">GPT-5.6 Think Deeper · tambahan</option>
                 <option value="cc/claude-haiku-5-5">Claude Haiku 5.5 · cepat</option>
               </select>
             </label>
@@ -381,11 +411,21 @@
           <div id="formStatus" class="form-status"></div>
         </form>
 
-        <section class="panel">
-          <h2>2. Review & Hasil</h2>
-          <div id="statusContainer" style="display: none; margin-bottom: 16px;">
-            <p id="statusStep" style="font-weight: bold; margin: 0; color: var(--accent);">Menyiapkan render...</p>
+        <section class="panel result-panel" id="resultPanel" aria-labelledby="resultHeading">
+          <h2 id="resultHeading">2. Review & Hasil</h2>
+          <div id="statusContainer" class="job-status" hidden aria-live="polite">
+            <div class="job-status-head">
+              <strong id="jobTopic">Video baru</strong>
+              <span id="jobElapsed" class="job-elapsed">0:00</span>
+            </div>
+            <p id="statusStep" class="job-step">Menyiapkan…</p>
             <div class="progress-track"><div id="progressBar" class="progress-fill"></div></div>
+            <ol id="stageTracker" class="stage-tracker" aria-label="Tahapan yang sedang berjalan"></ol>
+            <p id="statusHint" class="job-hint"></p>
+          </div>
+          <div id="emptyResult" class="empty-result">
+            <strong>Belum ada proses berjalan</strong>
+            <p>Isi judul lalu tekan <b>Buat Video Otomatis</b>. Progres tiap tahap, review, dan hasil video akan muncul di sini.</p>
           </div>
 
           <section id="reviewPanel" class="review-panel" aria-live="polite">
@@ -399,9 +439,7 @@
             </div>
           </section>
 
-          <div id="videoContainer" class="video-preview-box">
-            <p style="color: var(--muted); font-size: 13px;">Belum ada video yang dipilih atau digenerate.</p>
-          </div>
+          <div id="videoContainer" class="video-preview-box" hidden></div>
 
           <div id="videoActions" style="display: none; gap: 10px; margin-top: 14px;">
             <a id="downloadBtn" class="primary-button" href="#" download style="flex: 1; text-align: center;">Unduh Hasil</a>

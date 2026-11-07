@@ -38,7 +38,7 @@ FFmpeg adalah prasyarat media bersama. Setiap aplikasi mempertahankan venv, pack
 | `creator-dashboard/animation_clock.py` | Clock bersama GSAP/CSS/WebGL dan bridge kontrak frame HyperFrames/Opuscar; menjaga suppressed seek tetap menggambar |
 | `creator-dashboard/continuous_motion.py` | Adapter SVG/MP4 kontinu: konsep, beat sheet, render browser/FFmpeg lokal, probe carrier dan perubahan piksel |
 | `creator-dashboard/creative_profile.py`, `benchmark_media.py` | Validasi/katalog brand dan cue kata eksplisit; CLI benchmark lokal terpisah untuk hash, audio dan precision/recall cut |
-| `creator-dashboard/google_search_research.py` | Worker terpisah: JSON stdin/stdout, Google Search grounding via Google GenAI |
+| `creator-dashboard/{tavily_research,research_service}.py` | Riset web lewat Tavily REST langsung (`TAVILY_API_KEY` dari `.env` lokal, dimuat `server.py`); hasil `verified:false`, bukan fact-check. Google grounding sudah dihapus |
 | `creator-dashboard/{analytics_import,analytics_learning}.py` | Pemetaan CSV eksplisit, retensi per scene, observasi lokal 24h/7d dan keputusan eksperimen |
 | `creator-dashboard/article_storage.py` | Penulisan privat, staging dokumen, journal commit dan rollback/recovery artikel; dipakai revisi, diagram, unggah gambar dan rebuild |
 | `creator-dashboard/{article_tools,evidence,source_reader,local_diagrams}.py` | Ledger kutipan/klaim, revisi bagian dengan backup/persetujuan, fetch HTTPS allowlist, diagram SVG/PNG untuk DOCX |

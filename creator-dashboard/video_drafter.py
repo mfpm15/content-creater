@@ -49,11 +49,8 @@ ROOT = Path(__file__).resolve().parent
 VIDEOS_DIR = ROOT / "output" / "videos"
 HYPERFRAMES_APP_DIR = ROOT / "apps" / "hyperframes"
 OPUSCAR_DIR = ROOT / "apps" / "lemo-opuscar"
-PODCASTFY_PYTHON = resolve_python(ROOT / "apps" / "podcastfy")
-RESEARCH_WORKER = ROOT / "google_search_research.py"
-RESEARCH_MODEL = os.getenv("VIDEO_RESEARCH_MODEL", "gemini-2.5-flash")
 LLM_URL = os.getenv("VIDEO_LLM_BASE_URL", os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:20128/v1").rstrip("/")
-LLM_MODEL = os.getenv("VIDEO_LLM_MODEL", os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "ms/GPT-5.6-Think-Deeper")
+LLM_MODEL = os.getenv("VIDEO_LLM_MODEL", os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "cc/claude-sonnet-5-5")
 LLM_KEY = os.getenv("VIDEO_LLM_API_KEY", os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "9router-local")
 # Batas per percobaan model dan total semua percobaan (detik).
 LLM_TIMEOUT = int(os.getenv("VIDEO_LLM_TIMEOUT", "150"))
@@ -80,12 +77,11 @@ ENGINES = {
     "continuous": {"id":"continuous","name":"Continuous Motion","description":"Diagram satu dunia dengan carrier berlanjut, jeda gerak, dan MP4 lokal tanpa CDN.","defaultStyle":"continuous_motion","output":"mp4"},
     "remotion": {"id":"remotion","name":"Remotion Editorial","description":"Diagram editorial lokal, caption per potongan teks dan render MP4 berbasis frame.","defaultStyle":"remotion_editorial","output":"mp4"},
 }
-# Align Video Studio with the repository-wide 9Router policy:
-# GPT Think Deeper first, then Claude Sonnet/Haiku. Search grounding through
-# Google's dedicated research worker is separate from the editorial LLM list.
+# Urutan = prioritas default dan urutan fallback. Sonnet utama (diminta pengguna),
+# GPT kedua, Haiku terakhir karena paling cepat tetapi paling ringkas.
 DEFAULT_MODELS = [
-    {"id": "ms/GPT-5.6-Think-Deeper", "name": "GPT-5.6 Think Deeper", "provider": "GPT", "tier": "utama"},
-    {"id": "cc/claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "provider": "Claude", "tier": "tambahan"},
+    {"id": "cc/claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "provider": "Claude", "tier": "utama"},
+    {"id": "ms/GPT-5.6-Think-Deeper", "name": "GPT-5.6 Think Deeper", "provider": "GPT", "tier": "tambahan"},
     {"id": "cc/claude-haiku-5-5", "name": "Claude Haiku 5.5", "provider": "Claude", "tier": "cepat"},
 ]
 ALLOWED_MODEL_IDS = {item["id"] for item in DEFAULT_MODELS}
@@ -105,8 +101,7 @@ def get_available_models() -> list[dict]:
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else DEFAULT_MODELS[0]["id"]
     research_ready = _research_ready()
-    provider = "Tavily" if os.getenv("TAVILY_API_KEY") or tavily_research.available() else "Google Search grounding"
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "templates":video_templates.catalogue(), "captionStyles":caption_design.options(), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": provider, "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "templates":video_templates.catalogue(), "captionStyles":caption_design.options(), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": "Tavily", "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
@@ -389,39 +384,20 @@ Untuk engine opuscar/threejs/remotion saja, renderControls opsional mengendalika
 
 Pastikan jumlah scene proporsional terhadap durasi, setiap scene berbeda fungsi dan visualnya, total timing tepat {duration} detik, serta seluruh keputusan cukup detail untuk divisualkan tanpa menebak maksud sutradara."""
 
-def _google_ready() -> bool:
-    return bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-
-
 def _research_ready() -> bool:
-    return _google_ready() or tavily_research.available()
+    return tavily_research.available()
 
 
 def _research_web(topic: str, script: str) -> dict:
-    """Tavily dulu (kunci langsung atau lewat 9Router), lalu Google grounding sebagai cadangan."""
-    failures = []
-    if os.getenv("TAVILY_API_KEY") or tavily_research.available():
-        try:
-            return tavily_research.search(topic, script)
-        except Exception as exc:
-            failures.append(f"Tavily: {redact(str(exc))}")
-    if not _google_ready():
-        raise RuntimeError("Web Search tidak tersedia. " + ("; ".join(failures) + ". " if failures else "") +
-            "Atur TAVILY_API_KEY (atau tambahkan kredensial Tavily di 9Router), atau GOOGLE_API_KEY/GEMINI_API_KEY, lalu restart dashboard")
-    payload = json.dumps({"topic": topic, "context": script, "model": RESEARCH_MODEL}, ensure_ascii=False)
-    process = subprocess.run(
-        [str(PODCASTFY_PYTHON), str(RESEARCH_WORKER)], input=payload, text=True,
-        capture_output=True, timeout=max(LLM_TIMEOUT, 120), env=os.environ.copy(),
-    )
+    """Riset web lewat Tavily. Gagal tertutup dengan pesan jelas bila kunci atau layanan bermasalah."""
+    if not tavily_research.available():
+        raise RuntimeError("Web Search tidak tersedia. Atur TAVILY_API_KEY di .env lalu restart dashboard")
     try:
-        result = json.loads(process.stdout or "{}")
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("Respons Google Search tidak valid") from exc
-    if process.returncode or result.get("error"):
-        raise RuntimeError(str(result.get("error") or process.stderr or "Google Search gagal"))
-    if not result.get("sources"):
-        raise RuntimeError("Google Search tidak menghasilkan sumber yang dapat diverifikasi")
-    return result
+        return tavily_research.search(topic, script)
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        raise RuntimeError("Riset Tavily gagal: " + redact(str(exc))) from None
 
 
 def _research_context(research: dict) -> str:

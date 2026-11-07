@@ -27,29 +27,30 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertEqual(opts["defaultEngine"], "opuscar")
         self.assertFalse(next(item for item in opts["engines"] if item["id"] == "threejs").get("disabled", False))
         self.assertEqual(opts["workflow"], ["brief", "research", "narration", "scene_plan", "storyboard", "render"])
-        self.assertEqual(opts["research"]["provider"], "Google Search grounding")
+        self.assertEqual(opts["research"]["provider"], "Tavily")
+        self.assertFalse(opts["research"]["ready"])
         self.assertFalse(opts["research"]["required"])
         self.assertEqual(opts["research"]["requiredForModes"], ["web"])
         model_ids = [item["id"] for item in opts["models"]]
         self.assertEqual(model_ids, [
-            "ms/GPT-5.6-Think-Deeper",
             "cc/claude-sonnet-5-5",
+            "ms/GPT-5.6-Think-Deeper",
             "cc/claude-haiku-5-5",
         ])
         self.assertFalse(any("gemini" in model.lower() or "opus" in model.lower() for model in model_ids))
-        self.assertEqual(opts["defaultModel"], "ms/GPT-5.6-Think-Deeper")
+        self.assertEqual(opts["defaultModel"], "cc/claude-sonnet-5-5")
 
-    def test_legacy_or_unsupported_video_model_falls_back_to_gpt(self):
+    def test_legacy_or_unsupported_video_model_falls_back_to_default_sonnet(self):
         with patch.object(video_drafter, "LLM_MODEL", "ag/gemini-3.8-flash-high"), \
              patch.object(video_drafter.threading.Thread, "start"):
             options = video_drafter.options()
-            self.assertEqual(options["defaultModel"], "ms/GPT-5.6-Think-Deeper")
+            self.assertEqual(options["defaultModel"], "cc/claude-sonnet-5-5")
             result = video_drafter.start_job({
                 "topic": "Uji AI video", "engine": "remotion",
                 "model": "cc/claude-opus-5-5",
             })
             job = video_drafter.job_status(result["jobId"])
-            self.assertEqual(job["model"], "ms/GPT-5.6-Think-Deeper")
+            self.assertEqual(job["model"], "cc/claude-sonnet-5-5")
 
     def test_explicit_timecodes_and_fields_are_preserved(self):
         scenes = video_drafter.parse_explicit_scenes("00:00-00:07 Narasi: Pembuka asli\nVisual: Kota pagi\nTeks layar: Mulai\nSFX: whoosh\n\n00:07-00:20 Narasi: Isi asli\nVisual: Grafik data")
@@ -299,29 +300,40 @@ class VideoDrafterTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Web Search tidak tersedia"):
                 video_drafter._research_web("Topik", "Konteks")
 
-    def test_research_web_uses_tavily_first_and_keeps_claims_unverified(self):
+    def test_research_web_uses_tavily_and_keeps_claims_unverified(self):
         payload = {"answer": "Ringkasan.", "results": [
             {"title": "Sumber A", "url": "https://example.org/a", "content": "isi a"},
             {"title": "Duplikat", "url": "https://example.org/a", "content": "dup"},
             {"title": "Bukan web", "url": "javascript:alert(1)", "content": "x"}]}
         with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-test"}, clear=True), \
              patch.object(video_drafter.tavily_research, "_post", return_value=payload) as post, \
-             patch.object(video_drafter.subprocess, "run", side_effect=AssertionError("Google tidak boleh dipakai")):
+             patch.object(video_drafter.subprocess, "run", side_effect=AssertionError("Tidak boleh memakai subprocess")):
             result = video_drafter._research_web("Topik", "Konteks")
-        self.assertEqual(post.call_args.args[0], video_drafter.tavily_research.DIRECT_URL)
+        self.assertEqual(post.call_args.args[0], video_drafter.tavily_research.URL)
         self.assertEqual(result["provider"], "Tavily")
         self.assertEqual([s["url"] for s in result["sources"]], ["https://example.org/a"])
         self.assertFalse(result["verified"])
         self.assertEqual(result["sources"][0]["claimVerification"], "unverified")
 
-    def test_research_web_falls_back_to_google_when_tavily_fails(self):
-        completed = type("Completed", (), {"stdout": '{"summary":"s","sources":[{"id":1,"title":"t","url":"https://example.org","publisher":"example.org"}]}', "stderr": "", "returncode": 0})()
-        with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-test", "GEMINI_API_KEY": "g-test"}, clear=True), \
-             patch("pathlib.Path.is_file", return_value=True), \
-             patch.object(video_drafter.tavily_research, "_post", side_effect=OSError("down")), \
-             patch.object(video_drafter.subprocess, "run", return_value=completed):
-            result = video_drafter._research_web("Topik", "")
-        self.assertEqual(result["sourceCount"] if "sourceCount" in result else len(result["sources"]), 1)
+    def test_research_web_reports_tavily_failure_without_leaking_key(self):
+        with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-secret-value"}, clear=True), \
+             patch.object(video_drafter.tavily_research, "_post", side_effect=OSError("down tvly-secret-value")):
+            with self.assertRaisesRegex(RuntimeError, "Riset Tavily gagal") as caught:
+                video_drafter._research_web("Topik", "")
+        self.assertNotIn("tvly-secret-value", str(caught.exception))
+
+    def test_default_model_is_sonnet_and_fallback_order_is_sonnet_gpt_haiku(self):
+        self.assertEqual(video_drafter.DEFAULT_MODELS[0]["id"], "cc/claude-sonnet-5-5")
+        calls = []
+
+        def always_down(prompt, model=""):
+            calls.append(model)
+            import urllib.error
+            raise urllib.error.HTTPError("u", 503, "x", {}, None)
+        with patch.object(video_drafter, "_call_9router", side_effect=always_down):
+            with self.assertRaises(Exception):
+                video_drafter._call_llm("p", "cc/claude-sonnet-5-5")
+        self.assertEqual(calls, ["cc/claude-sonnet-5-5", "ms/GPT-5.6-Think-Deeper", "cc/claude-haiku-5-5"])
 
     def test_tavily_direct_key_is_not_leaked_to_render_environment(self):
         with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-secret-value"}):
@@ -353,11 +365,9 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertIn("[1] Dokumentasi Resmi", context)
         self.assertIn("https://example.org/report", context)
 
-    def test_research_web_requires_grounded_sources(self):
-        completed = type("Completed", (), {"stdout": '{"summary":"tanpa sumber","sources":[]}', "stderr": "", "returncode": 0})()
-        with patch.dict(video_drafter.os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True), \
-             patch("pathlib.Path.is_file", return_value=True), \
-             patch.object(video_drafter.subprocess, "run", return_value=completed):
+    def test_research_web_requires_sources(self):
+        with patch.dict(video_drafter.os.environ, {"TAVILY_API_KEY": "tvly-test"}, clear=True), \
+             patch.object(video_drafter.tavily_research, "_post", return_value={"results": []}):
             with self.assertRaisesRegex(RuntimeError, "tidak menghasilkan sumber"):
                 video_drafter._research_web("Topik", "")
 

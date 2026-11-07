@@ -359,15 +359,15 @@ async function loadOptions() {
     const researchToggle=document.getElementById('quickResearch');
     researchToggle.disabled=!researchReady;
     researchToggle.checked=researchReady;
-    researchToggle.title=researchReady?'Riset via '+(data.research?.provider||'web')+'; fakta tetap perlu review':'Riset web perlu TAVILY_API_KEY, kredensial Tavily di 9Router, atau GOOGLE_API_KEY/GEMINI_API_KEY';
+    researchToggle.title=researchReady?'Riset via Tavily; fakta tetap perlu review':'Riset web perlu TAVILY_API_KEY di .env, lalu restart dashboard';
 
     const researchSelect = document.getElementById('researchMode');
     const webOption = researchSelect.querySelector('option[value="web"]');
     if (webOption) {
       webOption.disabled = !researchReady;
       webOption.textContent = researchReady
-        ? 'Riset web + Motion Planner 9Router'
-        : 'Riset web tidak tersedia — gunakan Motion Planner 9Router';
+        ? 'Riset web (Tavily) + Motion Planner'
+        : 'Riset web tidak tersedia (TAVILY_API_KEY belum diatur) — gunakan Motion Planner';
     }
     if (!researchReady && researchSelect.value === 'web') researchSelect.value = 'planner';
     elements.engineSelect.innerHTML = data.engines.map(engine =>
@@ -491,12 +491,17 @@ async function deleteVideo(slug) {
     return;
   }
   elements.videoActions.style.display = 'none';
-  elements.videoContainer.innerHTML = '<p style="color:var(--muted);font-size:13px">Project telah dihapus.</p>';
+  elements.videoContainer.hidden = true;
+  elements.videoContainer.replaceChildren();
+  document.getElementById('aspectVariants').hidden = true;
+  document.getElementById('emptyResult').hidden = !elements.statusContainer.hidden;
   loadHistory();
 }
 
 function showResult(result, aspectId) {
   resultSlug = result.slug;
+  document.getElementById('emptyResult').hidden = true;
+  elements.videoContainer.hidden = false;
   document.getElementById("aspectVariants").hidden = !resultSlug;
   const isLandscape = (aspectId || result.aspect?.id) === '16:9';
   elements.videoContainer.className = `video-preview-box ${isLandscape ? 'landscape' : ''}`;
@@ -607,7 +612,7 @@ function sceneEditor(scene, index) {
 function researchMarkup(research) {
   if (!research) return '<div class="review-card"><h4>Research belum tersedia</h4></div>';
   const sources = (research.sources || []).map(source => `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener">[${source.id}] ${escapeHtml(source.title)}</a><small style="display:block;color:var(--muted)">${escapeHtml(source.publisher)} · ${escapeHtml(source.quality)}</small></li>`).join('');
-  return `<article class="review-card research-card"><h4>Research & Sources · ${escapeHtml(research.provider)}</h4><p style="white-space:pre-wrap">${escapeHtml(research.summary)}</p><details open><summary>${research.sourceCount || 0} sumber grounding</summary><ol>${sources}</ol></details></article>`;
+  return `<article class="review-card research-card"><h4>Research & Sources · ${escapeHtml(research.provider)}</h4><p style="white-space:pre-wrap">${escapeHtml(research.summary)}</p><details open><summary>${research.sourceCount || 0} sumber (belum diverifikasi)</summary><ol>${sources}</ol></details></article>`;
 }
 
 function renderReview(job) {
@@ -856,6 +861,92 @@ elements.reviseBtn.addEventListener('click', async () => {
   }
 });
 
+const STAGES = {
+  research: 'Riset web (Tavily)',
+  narration: 'Menulis narasi',
+  scene_plan: 'Membagi scene & arahan visual',
+  review: 'Review Scene Plan',
+  storyboard: 'Storyboard & review visual',
+  render: 'Audio, render & pemeriksaan',
+};
+const STATUS_STAGE = {
+  queued: 'research', researching: 'research', writing_narration: 'narration', planning_scenes: 'scene_plan',
+  awaiting_scene_plan: 'review', awaiting_storyboard: 'storyboard', rendering: 'render', succeeded: 'render',
+};
+let jobClock = null;
+let jobStartedAt = 0;
+let jobHadResearch = false;
+
+function stageOrder(autoRender) {
+  const order = jobHadResearch ? ['research'] : [];
+  order.push('narration', 'scene_plan');
+  if (!autoRender) order.push('review', 'storyboard');
+  order.push('render');
+  return order;
+}
+
+function formatElapsed(seconds) {
+  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+}
+
+function showJobPanel(topic) {
+  document.getElementById('emptyResult').hidden = true;
+  elements.statusContainer.hidden = false;
+  elements.statusContainer.className = 'job-status';
+  document.getElementById('jobTopic').textContent = topic || 'Video baru';
+  jobStartedAt = Date.now();
+  if (jobClock) clearInterval(jobClock);
+  const tick = () => { document.getElementById('jobElapsed').textContent = formatElapsed((Date.now() - jobStartedAt) / 1000); };
+  tick();
+  jobClock = setInterval(tick, 1000);
+}
+
+function stopJobClock() {
+  if (jobClock) clearInterval(jobClock);
+  jobClock = null;
+}
+
+function renderStageTracker(job, failed) {
+  const tracker = document.getElementById('stageTracker');
+  const order = stageOrder(!!job.autoRender);
+  const current = STATUS_STAGE[job.status] || (failed ? STATUS_STAGE[job.failedStatus] : '') || 'research';
+  const currentIndex = Math.max(0, order.indexOf(current));
+  tracker.replaceChildren();
+  order.forEach((key, index) => {
+    const state = failed && index === currentIndex ? 'failed' : index < currentIndex || job.status === 'succeeded' ? 'done'
+      : index === currentIndex ? (job.status.startsWith('awaiting_') ? 'done' : 'active') : 'wait';
+    const item = document.createElement('li');
+    item.className = state;
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.textContent = state === 'done' ? '✓' : state === 'failed' ? '!' : '';
+    const label = document.createElement('span');
+    label.textContent = STAGES[key];
+    if (state === 'active' && job.step) {
+      const detail = document.createElement('small');
+      detail.textContent = job.step;
+      label.append(detail);
+    }
+    item.append(dot, label);
+    tracker.append(item);
+  });
+}
+
+function jobHint(job) {
+  const seconds = (Date.now() - jobStartedAt) / 1000;
+  if (job.status === 'planning_scenes' && seconds > 45) return 'Model sedang menyusun scene. Tahap ini biasanya 30–90 detik; jika model lambat, sistem otomatis pindah ke model lain.';
+  if (job.status === 'rendering' && seconds > 60) return 'Render video berjalan di komputer ini dan bisa memakan beberapa menit. Jangan tutup tab.';
+  if (job.status === 'researching' && seconds > 20) return 'Mengambil sumber dari Tavily…';
+  return '';
+}
+
+function scrollToResult() {
+  const panel = document.getElementById('resultPanel');
+  panel.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  panel.setAttribute('tabindex', '-1');
+  panel.focus({ preventScroll: true });
+}
+
 elements.form.addEventListener('submit', async event => {
   event.preventDefault();
   const payload = {
@@ -889,11 +980,16 @@ elements.form.addEventListener('submit', async event => {
   elements.generateBtn.disabled = true;
   elements.formStatus.textContent = '';
   elements.reviewPanel.style.display = 'none';
-  elements.statusContainer.style.display = 'block';
+  elements.videoContainer.hidden = true;
+  elements.videoActions.style.display = 'none';
   elements.progressBar.style.background = '';
   elements.progressBar.style.width = '5%';
-  elements.statusStep.textContent = 'Mengirim brief ke motion planner...';
+  jobHadResearch = payload.researchMode === 'web';
+  showJobPanel(payload.topic);
+  elements.statusStep.textContent = 'Mengirim brief…';
+  renderStageTracker({ status: 'queued', step: 'Mengirim brief…', autoRender: payload.autoRender }, false);
   setWorkflowStep('brief');
+  scrollToResult();
   try {
     const response = await fetch('/api/videos', {
       method: 'POST',
@@ -907,7 +1003,9 @@ elements.form.addEventListener('submit', async event => {
     startPolling(activeJobId, activeAspect);
   } catch (error) {
     elements.generateBtn.disabled = false;
-    elements.statusContainer.style.display = 'none';
+    stopJobClock();
+    elements.statusContainer.hidden = true;
+    document.getElementById('emptyResult').hidden = false;
     elements.formStatus.textContent = error.message;
     elements.formStatus.className = 'form-status error';
   }
@@ -915,13 +1013,21 @@ elements.form.addEventListener('submit', async event => {
 
 function startPolling(jobId, aspectId) {
   if (pollTimer) clearInterval(pollTimer);
+  if (!jobStartedAt || elements.statusContainer.hidden) showJobPanel('Melanjutkan proses');
+  let failures = 0;
   const poll = async () => {
     try {
       const response = await fetch(`/api/videos/jobs/${encodeURIComponent(jobId)}`);
       if (!response.ok) throw new Error('Gagal mengambil status job');
       const job = await response.json();
-      elements.statusStep.textContent = job.step || 'Memproses animasi...';
+      failures = 0;
+      if (job.topic) document.getElementById('jobTopic').textContent = job.topic;
+      jobHadResearch = job.researchMode === 'web';
+      elements.statusStep.textContent = job.step || 'Memproses…';
       elements.progressBar.style.width = `${job.progress || 5}%`;
+      elements.statusContainer.className = 'job-status';
+      document.getElementById('statusHint').textContent = jobHint(job);
+      renderStageTracker(job, false);
       if (job.status === 'researching') {
         setWorkflowStep('research');
       } else if (job.status === 'writing_narration') {
@@ -930,31 +1036,49 @@ function startPolling(jobId, aspectId) {
         setWorkflowStep('scene_plan');
       } else if (job.status === 'awaiting_scene_plan' || job.status === 'awaiting_storyboard') {
         if(job.autoRender){
-          elements.statusStep.textContent='Produksi otomatis: melakukan pemeriksaan dan melanjutkan ke tahap berikutnya…';
+          elements.statusStep.textContent='Produksi otomatis: memeriksa rencana lalu lanjut ke tahap berikutnya…';
         }else{
           clearInterval(pollTimer);
+          stopJobClock();
+          elements.generateBtn.disabled = false;
+          elements.statusStep.textContent = job.status === 'awaiting_scene_plan'
+            ? 'Scene Plan siap. Periksa lalu setujui di bawah.' : 'Storyboard siap. Periksa lalu setujui di bawah.';
+          document.getElementById('statusHint').textContent = '';
           renderReview(job);
+          elements.reviewPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       } else if (job.status === 'rendering') {
         setWorkflowStep('render');
       } else if (job.status === 'succeeded') {
         clearInterval(pollTimer);
+        stopJobClock();
         elements.generateBtn.disabled = false;
         elements.reviewPanel.style.display = 'none';
-        elements.statusStep.textContent = 'Selesai. Hasil animasi siap.';
+        elements.statusContainer.className = 'job-status done';
+        elements.statusStep.textContent = `Selesai dalam ${document.getElementById('jobElapsed').textContent}. Hasil video siap diputar dan diunduh.`;
+        document.getElementById('statusHint').textContent = '';
         elements.progressBar.style.width = '100%';
         setWorkflowStep('render');
         if (job.video) showResult({...job.video,review:job.review}, aspectId);
         loadHistory();
       } else if (job.status === 'interrupted' || job.status === 'failed') {
         clearInterval(pollTimer);
+        stopJobClock();
         elements.generateBtn.disabled = false;
+        elements.statusContainer.className = 'job-status failed';
         elements.statusStep.textContent = `Gagal: ${job.error || 'Terjadi kesalahan saat proses'}`;
+        document.getElementById('statusHint').textContent = job.status === 'interrupted'
+          ? 'Proses terhenti. Buat ulang video dengan judul yang sama.' : 'Coba lagi; jika model lambat pilih Claude Haiku di Pengaturan lanjutan.';
         elements.progressBar.style.width = '100%';
         elements.progressBar.style.background = '#ef4444';
+        renderStageTracker({ ...job, failedStatus: job.status === 'failed' ? 'planning_scenes' : job.status }, true);
       }
     } catch (error) {
       console.error(error);
+      failures += 1;
+      if (failures >= 4) {
+        document.getElementById('statusHint').textContent = 'Koneksi ke dashboard terputus. Proses tetap berjalan di server; memuat ulang halaman tidak membatalkannya.';
+      }
     }
   };
   poll();
@@ -978,7 +1102,7 @@ document.getElementById('createAspectBtn').addEventListener('click', async event
     const job = await opened.json();
     if (!opened.ok) throw new Error(job.error || 'Gagal membuka variasi');
     activeJobId = job.jobId; activeAspect = job.aspect;
-    elements.statusContainer.style.display = 'block';
+    document.getElementById('emptyResult').hidden = true;
     renderReview(job);
     elements.formStatus.textContent = `${result.jobs.length} variasi dibuat; review variasi pertama dibuka.`;
   } catch(error) { elements.formStatus.textContent=error.message; }
