@@ -10,7 +10,10 @@
     #brandEditor input[type="color"] { height:44px; padding:4px; cursor:pointer; }
     #styleSelect[hidden] { display:none; }
     
-    .media-upload-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+    .voice-preview-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+    .voice-preview-row audio{max-width:240px;width:100%}
+    .voice-preview-row span{color:#bfd5e9}
+        .media-upload-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
     .media-upload-fields label{display:flex;flex-direction:column;gap:5px;color:#d9e5ff;font-size:12px}
     .media-upload-fields input{width:100%;max-width:100%;min-height:37px;padding:7px;border:1px solid #455473;background:#071326;color:#f8fafc;border-radius:8px}
     .media-consent{display:flex;align-items:start;gap:9px;margin:12px 0;color:#cbd5e1;font-size:12px}
@@ -318,6 +321,11 @@
             <label>Bahasa narasi<select id="speechLanguage"><option value="id" selected>Bahasa Indonesia · Ardi</option><option value="en">English · Guy</option></select></label>
           </div>
           <label><input type="checkbox" id="sfxEnabled" checked> Efek SFX singkat sesuai scene</label>
+          <div class="voice-preview-row">
+            <button id="testVoiceBtn" class="secondary-button" type="button">🔊 Tes dubbing sebelum render</button>
+            <audio id="testVoiceAudio" controls hidden preload="none" aria-label="Contoh suara Edge-TTS"></audio>
+            <span id="testVoiceStatus" role="status" aria-live="polite" style="font-size:12px"></span>
+          </div>
           <p>Musik latar tidak ditambahkan otomatis. SFX singkat mengikuti cue scene dan dibuat lebih pelan dari narasi. TTS memerlukan internet, tanpa API key berbayar. Bahasa mengatur narasi baru dan suara; naskah sendiri tetap dipertahankan. Lottie mengekspor audio narasi sebagai WAV terpisah.</p>
           <select name="style" id="styleSelect" hidden><option value="opuscar_cinematic" selected>Opuscar Cinematic</option></select>
           <button id="generateBtn" class="primary-button" type="submit" style="width: 100%; margin-top: 18px; padding: 14px; font-size: 14px;">
