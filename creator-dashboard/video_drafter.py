@@ -11,6 +11,7 @@ import faceless_quality
 import media_library
 import auto_media
 import caption_design
+import word_timing
 import frame_rate
 import scene_diagram
 import html
@@ -1422,6 +1423,12 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         engine_label = ENGINES[job['engine']]['name']
         _update_job(job_id, {"status": "rendering", "step": "Membuat musik/foley lokal tanpa dubbing" if plan.get('audioMode')=='music' or plan.get("motionDesign",{}).get("voiceMode")=="music" else "Membuat dubbing, musik, foley, dan subtitle sebelum render visual", "progress": 55})
         final_audio = _build_audio(target, plan)
+        render_plan = plan
+        word_report = None
+        if job["engine"] == "remotion" and plan.get("speech", {}).get("mode") == "tts":
+            render_plan,word_report = word_timing.enrich(plan, target)
+            (target/"render-plan.json").write_text(json.dumps(render_plan,ensure_ascii=False,indent=2),encoding="utf-8")
+            (target/"word-alignment-report.json").write_text(json.dumps(word_report,ensure_ascii=False,indent=2),encoding="utf-8")
         _update_job(job_id, {"step": f"Merender visual dinamis {engine_label}", "progress": 72})
         renderer = HYPERFRAMES_APP_DIR / "node_modules" / "hyperframes" / "bin" / "hyperframes.mjs"
         silent = target / "silent.mp4"
@@ -1431,13 +1438,15 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
             silent,motion_report=continuous_motion.render(target,plan,ASPECT_RATIOS[job['aspect']],
                 progress=lambda fraction:_update_job(job_id,{'progress':72+round(fraction*16),'step':f'Render kontinu {round(fraction*100)}%'}))
         elif job['engine']=='remotion':
-            silent,remotion_report=remotion_adapter.render(target,plan,ASPECT_RATIOS[job['aspect']])
+            silent,remotion_report=remotion_adapter.render(target,render_plan,ASPECT_RATIOS[job['aspect']])
         else:
             subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", str(frame_rate.get(plan)), "--workers", "1"], cwd=target, check=True, timeout=600,env=render_environment())
         _update_job(job_id, {"step": "Melakukan mux audio dan video", "progress": 90})
         output = _mux_video(target, silent, final_audio, plan["duration"])
         from video_review import review
         review_result = review(output, plan["duration"], plan)
+        if word_report:
+            review_result['wordAlignment']=word_report
         if remotion_report:
             review_result['remotion']=remotion_report
         if motion_report:
