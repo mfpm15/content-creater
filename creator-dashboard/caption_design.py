@@ -6,7 +6,7 @@ STYLES = {
     "outline": {"id": "outline", "name": "Cinematic Outline", "description": "Teks sinematik dengan stroke tipis"},
     "highlight": {"id": "highlight", "name": "Word Highlight", "description": "Sorot kata jika tersedia timestamp asli"},
 }
-DEFAULT = "pop"
+DEFAULT = "clean"
 
 
 def validate(value: str | None) -> str:
