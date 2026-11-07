@@ -76,12 +76,13 @@ ENGINES = {
     "continuous": {"id":"continuous","name":"Continuous Motion","description":"Diagram satu dunia dengan carrier berlanjut, jeda gerak, dan MP4 lokal tanpa CDN.","defaultStyle":"continuous_motion","output":"mp4"},
     "remotion": {"id":"remotion","name":"Remotion Editorial","description":"Diagram editorial lokal, caption per potongan teks dan render MP4 berbasis frame.","defaultStyle":"remotion_editorial","output":"mp4"},
 }
+# Align Video Studio with the repository-wide 9Router policy:
+# GPT Think Deeper first, then Claude Sonnet/Haiku. Search grounding through
+# Google's dedicated research worker is separate from the editorial LLM list.
 DEFAULT_MODELS = [
-    {"id": "ag/gemini-3.8-flash-high", "name": "Gemini 3.8 Flash High", "provider": "Gemini", "tier": "utama"},
-    {"id": "ag/gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash Medium", "provider": "Gemini", "tier": "utama"},
     {"id": "ms/GPT-5.6-Think-Deeper", "name": "GPT-5.6 Think Deeper", "provider": "GPT", "tier": "utama"},
-    {"id": "cc/claude-opus-5-5", "name": "Claude Opus 5.5", "provider": "Claude", "tier": "tambahan"},
     {"id": "cc/claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "provider": "Claude", "tier": "tambahan"},
+    {"id": "cc/claude-haiku-5-5", "name": "Claude Haiku 5.5", "provider": "Claude", "tier": "cepat"},
 ]
 ALLOWED_MODEL_IDS = {item["id"] for item in DEFAULT_MODELS}
 JOBS_LOCK = threading.Lock()
@@ -98,7 +99,7 @@ def get_available_models() -> list[dict]:
 
 
 def options() -> dict:
-    default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
+    default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else DEFAULT_MODELS[0]["id"]
     research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
     return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "templates":video_templates.catalogue(), "captionStyles":caption_design.options(), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
@@ -1090,7 +1091,7 @@ def start_job(payload: dict) -> dict:
     if research_mode=='provided' and not script:raise ValueError('Mode naskah sendiri memerlukan naskah; periksa fakta sebelum menyetujui')
     aspect = str(payload.get("aspect") or "9:16"); aspect = aspect if aspect in ASPECT_RATIOS else "9:16"
     duration = int(payload.get("duration") or 60); duration = duration if duration in DURATIONS else 60
-    fallback_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
+    fallback_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else DEFAULT_MODELS[0]["id"]
     model = str(payload.get("model") or fallback_model); model = model if model in ALLOWED_MODEL_IDS else fallback_model
     engine = str(payload.get("engine") or "opuscar")
     if engine not in ENGINES or ENGINES[engine].get("disabled"): raise ValueError("Render Adapter belum tersedia")
