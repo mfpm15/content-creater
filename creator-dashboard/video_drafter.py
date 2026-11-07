@@ -961,6 +961,10 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         if job.get("templateId") and "templateId" not in raw_plan:
             raw_plan={**raw_plan,"templateId":job["templateId"]}
         plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
+        if plan.get("templateId") and job.get("engine") != "remotion":
+            raise ValueError("Template Faceless hanya berlaku untuk Remotion")
+        if plan.get("templateId", "") != job.get("templateId", ""):
+            raise ValueError("Pilihan template tidak boleh diganti selama review; buat pekerjaan baru")
         if job.get('engine') not in {'remotion','lottie'} and any('diagram' in scene for scene in plan['scenes']):
             raise ValueError('Diagram berlabel hanya tersedia untuk Remotion dan Lottie')
         if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
