@@ -23,6 +23,9 @@ class _Ids(HTMLParser):
         self.form_count=0
         self.details_depth=0
         self.min_details_depth=0
+        self.select_depth=0
+        self.min_select_depth=0
+        self.textarea_depth=0
     def handle_starttag(self, tag, attrs):
         d=dict(attrs)
         if d.get("id"):
@@ -32,12 +35,21 @@ class _Ids(HTMLParser):
             self.form_depth+=1
         if tag=="details":
             self.details_depth+=1
+        if tag=="select":
+            self.select_depth+=1
+        if tag=="textarea":
+            self.textarea_depth+=1
     def handle_endtag(self, tag):
         if tag=="form":
             self.form_depth-=1
         if tag=="details":
             self.details_depth-=1
             self.min_details_depth=min(self.min_details_depth,self.details_depth)
+        if tag=="select":
+            self.select_depth-=1
+            self.min_select_depth=min(self.min_select_depth,self.select_depth)
+        if tag=="textarea":
+            self.textarea_depth-=1
 
 
 class VideoStudioDOMTests(unittest.TestCase):
@@ -56,6 +68,9 @@ class VideoStudioDOMTests(unittest.TestCase):
         self.assertEqual(html.form_depth,0)
         self.assertEqual(html.details_depth,0)
         self.assertEqual(html.min_details_depth,0)
+        self.assertEqual(html.select_depth,0)
+        self.assertEqual(html.min_select_depth,0)
+        self.assertEqual(html.textarea_depth,0)
 
     def test_one_click_form_and_safe_manual_alternatives_remain(self):
         doc=_Ids();doc.feed(HTML)
