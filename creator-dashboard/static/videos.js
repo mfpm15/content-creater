@@ -516,7 +516,9 @@ function showResult(result, aspectId) {
       for(const media of result.review.remotion.visual_assets){
         const item=document.createElement('p');
         item.textContent=media.name+' — '+media.source+(media.creator?' · Kreator: '+media.creator:'')+
-          '. Hak penggunaan dinyatakan oleh pengimpor, bukan diverifikasi otomatis.';
+          (media.rightsBasis==='external_metadata_unverified'
+            ? '. Lisensi berasal dari metadata penyedia dan belum diverifikasi independen.'
+            : '. Hak penggunaan dikonfirmasi pengimpor dan tetap perlu dicek sebelum publikasi.');
         list.append(item);
       }
       reviewBox.append(list);
