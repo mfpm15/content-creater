@@ -1,22 +1,9 @@
 import React from 'react';
 import {literalNumbers} from './timeline.mjs';
 import type {Shot} from './types';
+import {treatmentFor} from './visual-treatment.mjs';
 
 /** A small, honest visual vocabulary: no invented footage or external assets. */
-type Kind = 'calendar'|'medical'|'facilities'|'warning'|'security'|'verified'|'device'|'people'|'data'|'story';
-export function treatmentFor(shot: Pick<Shot,'title'|'subject'|'family'>): Kind {
-  const s=(shot.title+' '+shot.subject).toLowerCase();
-  if (/(darah|blood|donor|transfusi|rumah sakit)/i.test(s)) return 'medical';
-  if (/(fasilitas|lokasi|gedung|cabang|facility|facilities|data center)/i.test(s)) return 'facilities';
-  if (/(ganggu|terhenti|outage|down|gagal|risiko|bahaya|ancaman|warning|krisis)/i.test(s)) return 'warning';
-  if (/(siber|cyber|security|keamanan|peretas|enkripsi|firewall|serangan)/i.test(s)) return 'security';
-  if (/(resmi|verifikasi|cek fakta|sumber|verified|klarifikasi|informasi)/i.test(s)) return 'verified';
-  if (/(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|tanggal|kronologi|timeline)/i.test(s)) return 'calendar';
-  if (/(aplikasi|ponsel|telepon|laptop|dashboard|perangkat|device|layar)/i.test(s)) return 'device';
-  if (/(manusia|orang|pasien|pegawai|pengguna|pelanggan|masyarakat|people|tim)/i.test(s)) return 'people';
-  if (shot.family==='data' || literalNumbers(shot.title).length>0) return 'data';
-  return 'story';
-}
 const clamp=(n:number)=>Math.min(1,Math.max(0,n));
 const smooth=(n:number)=>1-Math.pow(1-clamp(n),3);
 const enter=(p:number,delay=0)=>smooth((p-delay)/.3);
