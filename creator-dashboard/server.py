@@ -533,6 +533,11 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 if not isinstance(payload,dict):raise ValueError('Body harus objek JSON')
                 import creative_profile
                 self._json(HTTPStatus.OK,creative_profile.save(video_drafter.VIDEOS_DIR.parent/'brand-kits.json',payload))
+            elif parts == ["api", "videos", "voice-preview"]:
+                raw = self._read_body(10_000)
+                if raw is None: return
+                import voice_preview
+                self._json(HTTPStatus.OK, voice_preview.preview(json.loads(raw or b"{}")))
             elif parts == ["api", "videos", "assets"]:
                 raw = self._read_body(11_500_000)
                 if raw is None: return
@@ -583,6 +588,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self._json(HTTPStatus.CONFLICT, {"error": str(exc)})
         except ValueError as exc:
             self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except RuntimeError as exc:
+            self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
         except KeyError:
             self._json(HTTPStatus.NOT_FOUND, {"error": "Pekerjaan tidak ditemukan"})
         except Exception as exc:
