@@ -6,6 +6,7 @@ import video_preproduction as preproduction
 import sound_effects
 import speech_settings
 import voice_quality
+import video_templates
 import frame_rate
 import scene_diagram
 import html
@@ -94,7 +95,7 @@ def get_available_models() -> list[dict]:
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
     research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "templates":video_templates.catalogue(), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
@@ -312,6 +313,7 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
         if 'renderControls' in raw:scene['renderControls']=scene_render.validate(raw['renderControls'])
     result={"topic": topic, "duration": duration, "scenes": scenes}
     if "fps" in data:result["fps"]=frame_rate.validate(data["fps"])
+    if data.get("templateId"):result["templateId"]=video_templates.get(data["templateId"])["id"]
     if "speech" in data:result["speech"]=speech_settings.validate(data["speech"])
     if 'creativeBrief' in data:
         if not isinstance(data['creativeBrief'],str) or len(data['creativeBrief'])>4000:raise ValueError('Arahan produksi maksimal 4.000 karakter')
@@ -873,7 +875,7 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
         for aspect in dict.fromkeys(aspects):
             key = uuid.uuid4().hex
             job = {"jobId": key, "pipelineVersion":2, "fps": frame_rate.get(plan), "topic": plan["topic"], "script": "", "engine": engine,
-                   "style": ENGINES[engine]["defaultStyle"], "aspect": aspect, "duration": plan["duration"],
+                   "style": ENGINES[engine]["defaultStyle"], "templateId":plan.get("templateId",""), "aspect": aspect, "duration": plan["duration"],
                    "model": source.get("model", LLM_MODEL), "status": "awaiting_scene_plan", "step": "Review layout rasio baru sebelum render",
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
                    "storyboard": None, "video": None, "revision": 0, "approvals": {},
@@ -945,6 +947,8 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         if raw_plan.get('motionDesign') is not None and job.get('engine')!='continuous':
             raise ValueError('Desain kontinu hanya tersedia untuk adapter Continuous Motion')
         if job.get('speech') and 'speech' not in raw_plan:raw_plan={**raw_plan,'speech':job['speech']}
+        if job.get("templateId") and "templateId" not in raw_plan:
+            raw_plan={**raw_plan,"templateId":job["templateId"]}
         plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
         if job.get('engine') not in {'remotion','lottie'} and any('diagram' in scene for scene in plan['scenes']):
             raise ValueError('Diagram berlabel hanya tersedia untuk Remotion dan Lottie')
@@ -1057,10 +1061,14 @@ def start_job(payload: dict) -> dict:
     model = str(payload.get("model") or fallback_model); model = model if model in ALLOWED_MODEL_IDS else fallback_model
     engine = str(payload.get("engine") or "opuscar")
     if engine not in ENGINES or ENGINES[engine].get("disabled"): raise ValueError("Render Adapter belum tersedia")
+    template_id = payload.get("templateId") or ""
+    template = video_templates.get(template_id) if template_id else None
+    if template and engine != template["engine"]:
+        raise ValueError("Template ini hanya mendukung Remotion; pilih adapter Remotion")
     fps = frame_rate.validate(payload.get("fps", frame_rate.DEFAULT))
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
-    job = {"jobId": job_id, "pipelineVersion":2, "creativeBrief":creative_brief.strip(), "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    job = {"jobId": job_id, "pipelineVersion":2, "creativeBrief":creative_brief.strip(), "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "templateId": template_id, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
     if payload.get('voiceMode')!='music':job['speech']=speech_settings.build(payload.get('speechLanguage','id'),payload.get('voiceMode','tts'),payload.get('sfx',True))
     if engine=='remotion':
         if payload.get('voiceMode','tts') not in ('music','tts','none'):raise ValueError('Audio harus music atau tts')
@@ -1068,6 +1076,8 @@ def start_job(payload: dict) -> dict:
     if engine=='continuous':
         job['motionDesign']=continuous_motion.design({'concept':payload.get('motionConcept'),'voiceMode':payload.get('voiceMode','tts'),'fps':fps},
                 [{'start':0,'end':duration}],duration)
+    if template:
+        job["brand"]=creative_profile.snapshot(template["brand"])
     if payload.get('brandId'):
         kit=next((row for row in creative_profile.catalog(VIDEOS_DIR.parent/'brand-kits.json')['kits'] if row['id']==payload['brandId']),None)
         if not kit:raise ValueError('Brand tidak ditemukan; muat ulang daftar')
@@ -1264,6 +1274,9 @@ def _run_job(job_id: str) -> None:
         prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
         prompt+='\nBahasa judul layar: '+job.get('speech',{}).get('language','id')+'. Pertahankan naskah pengguna; jangan menerjemahkan narasi terkunci.\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
         prompt+=renderer_contract.planner_instruction(job['engine'])
+        if job.get("templateId"):
+            chosen=video_templates.get(job["templateId"])
+            prompt+="\nVISUAL TEMPLATE "+chosen["name"]+": "+chosen["direction"]+" Sesuaikan setiap scene dengan cerita; jangan gunakan satu motif berulang."
         if job.get('speech'):prompt+='\nAudio ikuti konfigurasi aktual: '+json.dumps(job['speech'])+'. Hanya elemen yang diaktifkan yang akan dibuat; SFX singkat harus mendukung aksi.'
         if job.get('motionDesign'):
             concept=next(row for row in continuous_motion.CONCEPTS if row['id']==job['motionDesign']['concept'])
@@ -1276,6 +1289,7 @@ def _run_job(job_id: str) -> None:
         if "speech" in job:data["speech"]=job["speech"]
         if job.get("creativeBrief"):data["creativeBrief"]=job["creativeBrief"]
         data["fps"]=frame_rate.get(job)
+        if job.get("templateId"):data["templateId"]=job["templateId"]
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
         preproduction.verify_narration(draft,plan)
         if not explicit:preproduction.verify_timing(plan,job["duration"])
