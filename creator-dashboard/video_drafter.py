@@ -629,6 +629,8 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
     }}
     function fitSceneText() {{
         for (const scene of document.querySelectorAll('.scene')) {{
+            // A hidden scene measures as zero-sized: fit only after its timeline reveals it.
+            if (getComputedStyle(scene).display === 'none') continue;
             const title = scene.querySelector('.hero-title');
             fitText(title, title.parentElement.clientHeight, 3);
             const capsule = scene.querySelector('.subtitle-capsule');
@@ -650,6 +652,14 @@ html,body{{margin:0;background:#030712;color:#fff;font-family:-apple-system,Blin
     const drawDirectedScenes = createDirectedRenderer();
     {animation_clock.SCRIPT}
     attachAnimationClock(tl, drawDirectedScenes, {duration});
+    // GSAP hides scenes during initial font measurement. Refit AFTER every deterministic seek.
+    const seekBeforeTextFit = window.__seek;
+    window.__seek = function(seconds) {{
+        const result = seekBeforeTextFit(seconds);
+        fitSceneText();
+        return result;
+    }};
+    window.render = window.__seek;
     </script>
 </div>
 </body></html>'''
