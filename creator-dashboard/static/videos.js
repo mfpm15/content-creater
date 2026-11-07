@@ -44,6 +44,7 @@ let brandsReady = false;
 let motionConcepts = [];
 let templates = [];
 let chosenTemplateId = '';
+let smartTemplate = true;
 let mediaAssets = [];
 async function loadMediaAssets() {
   try {
@@ -142,6 +143,36 @@ document.getElementById('mediaUploadBtn').addEventListener('click',async event=>
 });
 
 
+function renderQuickStyles() {
+  const host=document.getElementById('quickStyleButtons');
+  host.replaceChildren();
+  const items=[{id:'auto',label:'✨ Otomatis'}, ...['cyber-news','kelas-cerah','creator-pop','investigasi-noir'].map(id=>({id,label:templates.find(x=>x.id===id)?.name||id}))];
+  for(const item of items){
+    const b=document.createElement('button');b.type='button';b.className='quick-style-button';
+    b.textContent=item.label;b.setAttribute('aria-pressed',String(item.id==='auto'?smartTemplate:!smartTemplate&&chosenTemplateId===item.id));
+    b.addEventListener('click',()=>{
+      if(item.id==='auto'){
+        smartTemplate=true;chosenTemplateId='';
+        document.getElementById('templateId').value='';
+        elements.engineSelect.value='remotion';
+        updateEngineExperience();
+        renderTemplateGallery();
+      }else selectTemplate(item.id);
+      renderQuickStyles();
+    });
+    host.append(b);
+  }
+  const s=document.getElementById('quickStyleStatus');
+  s.textContent=smartTemplate?'Otomatis · tema dipilih berdasarkan judul':'Pilihan: '+(templates.find(x=>x.id===chosenTemplateId)?.name||'Template khusus');
+}
+document.getElementById('quickDuration').addEventListener('change',event=>{
+  elements.durationSelect.value=event.currentTarget.value;
+});
+document.getElementById('quickAspect').addEventListener('change',event=>{
+  elements.aspectSelect.value=event.currentTarget.value;
+});
+document.getElementById('quickAutoRender').addEventListener('change',updateEngineExperience);
+
 function renderTemplateGallery() {
   const grid=document.getElementById('templateGrid');
   const category=document.getElementById('templateCategory').value;
@@ -177,16 +208,22 @@ function selectTemplate(templateId) {
   const selected=templates.find(t=>t.id===templateId);
   if(!selected) return;
   chosenTemplateId=selected.id;
+  smartTemplate=false;
   document.getElementById('templateId').value=selected.id;
   elements.engineSelect.value=selected.engine;
   updateEngineExperience();
   renderTemplateGallery();
+  renderQuickStyles();
 }
 document.getElementById('templateCategory').addEventListener('change',renderTemplateGallery);
 document.getElementById('clearTemplateBtn').addEventListener('click',()=>{
+  smartTemplate=true;
   chosenTemplateId='';
   document.getElementById('templateId').value='';
+  elements.engineSelect.value='remotion';
+  updateEngineExperience();
   renderTemplateGallery();
+  renderQuickStyles();
 });
 
 function describeMotionConcept() {
@@ -283,6 +320,7 @@ async function loadOptions() {
     filter.replaceChildren(new Option('Semua genre',''));
     for(const category of categories)filter.add(new Option(category,category));
     renderTemplateGallery();
+    renderQuickStyles();
     const conceptSelect = document.getElementById('motionConcept');
     conceptSelect.replaceChildren(new Option('Pilih satu konsep terlebih dahulu', ''));
     for (const concept of motionConcepts) conceptSelect.add(new Option(concept.name, concept.id));
@@ -290,6 +328,11 @@ async function loadOptions() {
     engineRuntime=Object.fromEntries(data.engines.map(engine=>[engine.id,engine.runtimeMissing||[]]));
     engineStyles=Object.fromEntries(data.engines.map(engine=>[engine.id,engine.defaultStyle]));
     researchReady=!!data.research?.ready;
+    const researchToggle=document.getElementById('quickResearch');
+    researchToggle.disabled=!researchReady;
+    researchToggle.checked=researchReady;
+    researchToggle.title=researchReady?'Riset tersedia, namun fakta tetap perlu review':'Riset web perlu konfigurasi Google Search grounding';
+
     const researchSelect = document.getElementById('researchMode');
     const webOption = researchSelect.querySelector('option[value="web"]');
     if (webOption) {
@@ -314,6 +357,9 @@ async function loadOptions() {
     elements.modelSelect.innerHTML = data.models.map(model =>
       `<option value="${escapeHtml(model.id)}" ${model.id === data.defaultModel ? 'selected' : ''}>${escapeHtml(model.name)} · ${escapeHtml(model.tier)}</option>`
     ).join('');
+    elements.engineSelect.value='remotion';
+    elements.aspectSelect.value=document.getElementById('quickAspect').value;
+    elements.durationSelect.value=document.getElementById('quickDuration').value;
     updateEngineExperience();
   } catch (error) {
     elements.formStatus.textContent = error.message;
@@ -334,8 +380,9 @@ function updateEngineExperience() {
   document.getElementById('continuousControls').hidden = !['continuous','remotion'].includes(eng);
   document.getElementById('continuousConceptFields').hidden = eng !== 'continuous';
   document.getElementById('motionConcept').required = eng === 'continuous';
-  elements.formEngineTitle.textContent = '1. Buat Brief Animasi';
-  elements.generateBtn.textContent = 'Buat Scene Plan';
+  elements.formEngineTitle.textContent = 'Studio Otomatis · Buat video faceless';
+  elements.generateBtn.textContent = document.getElementById('quickAutoRender').checked ? '🎬 Buat Video Otomatis' : 'Buat Scene Plan & Review';
+
   if (eng === 'continuous') {
     elements.engineNotice.textContent = 'Continuous Motion: satu dunia visual, elemen utama berlanjut, jeda gerak, dan render MP4 lokal. Pilih konsep sebelum membuat rencana.';
   } else if (eng === 'remotion') {
@@ -549,6 +596,15 @@ function renderReview(job) {
     elements.reviewGrid.innerHTML = (job.scenePlan?.scenes || []).map(sceneEditor).join('');
     elements.approveBtn.textContent = 'Setujui Storyboard & Mulai Render';
     elements.reviseBtn.style.display = 'inline-flex';
+  }
+  if(job.autoMediaReport){
+    const card=document.createElement('section');card.className='review-card';
+    const h=document.createElement('h4');h.textContent='Media otomatis · perlu review';card.append(h);
+    const p=document.createElement('p');p.textContent=(job.autoMediaReport.assets?.length||0)+' gambar domain publik/CC0 terpilih. Periksa apakah gambar benar-benar relevan dan lisensinya sesuai sebelum publikasi.';card.append(p);
+    for(const warning of job.autoMediaReport.warnings||[]){
+      const line=document.createElement('p');line.textContent=warning.scene+': '+warning.reason;card.append(line);
+    }
+    elements.reviewGrid.prepend(card);
   }
   if (job.visualReview && job.status === 'awaiting_storyboard') {
     const card=document.createElement('section');card.className='review-card';
@@ -768,14 +824,19 @@ elements.form.addEventListener('submit', async event => {
     topic: elements.topic.value.trim(),
     script: elements.script.value.trim(),
     engine: elements.engineSelect.value,
-    templateId: chosenTemplateId,
+    templateId: smartTemplate ? '' : chosenTemplateId,
+    smartTemplate: smartTemplate && elements.engineSelect.value==='remotion',
+    autoMedia: document.getElementById('quickAutoMedia').checked && elements.engineSelect.value==='remotion',
+    autoRender: document.getElementById('quickAutoRender').checked && elements.engineSelect.value==='remotion',
+    captionStyle: document.getElementById('captionStyleSelect').value,
     style: elements.styleSelect.value,
     aspect: elements.aspectSelect.value,
     duration: parseInt(elements.durationSelect.value, 10),
     fps: Number(document.getElementById("fpsSelect").value),
     creativeBrief: document.getElementById("creativeBriefInput").value.trim(),
     model: elements.modelSelect.value,
-    researchMode: document.getElementById('researchMode').value,
+    researchMode: document.getElementById('quickResearch').checked && researchReady
+      ? 'web' : document.getElementById('researchMode').value,
     brandId: document.getElementById('brandSelect').value,
     motionConcept: document.getElementById('motionConcept').value,
     voiceMode: document.getElementById('motionVoice').value,
@@ -830,8 +891,12 @@ function startPolling(jobId, aspectId) {
       } else if (job.status === 'planning_scenes') {
         setWorkflowStep('scene_plan');
       } else if (job.status === 'awaiting_scene_plan' || job.status === 'awaiting_storyboard') {
-        clearInterval(pollTimer);
-        renderReview(job);
+        if(job.autoRender){
+          elements.statusStep.textContent='Produksi otomatis: melakukan pemeriksaan dan melanjutkan ke tahap berikutnya…';
+        }else{
+          clearInterval(pollTimer);
+          renderReview(job);
+        }
       } else if (job.status === 'rendering') {
         setWorkflowStep('render');
       } else if (job.status === 'succeeded') {
