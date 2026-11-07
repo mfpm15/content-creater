@@ -432,6 +432,18 @@ function showResult(result, aspectId) {
       const text=document.createElement('p');text.textContent=`${row.label}: ${row.status==='passed_working_profile'?'profil kerja media terpenuhi':row.issues.map(issue=>issue.message).join('; ')}. Profil referensi, bukan verifikasi ketentuan resmi platform.`;reviewBox.append(text);
     }
     if(result.review.remotion){const text=document.createElement('p');text.textContent='Remotion: frame asli tersedia di bawah. Caption tanpa cue kata memakai estimasi durasi, bukan alignment audio. Tetap periksa keterbacaan dan isi.';reviewBox.append(text)}
+    if(result.review.remotion?.visual_assets?.length){
+      const list=document.createElement('div');
+      const title=document.createElement('h4');title.textContent='Provenance gambar yang dipakai';list.append(title);
+      for(const media of result.review.remotion.visual_assets){
+        const item=document.createElement('p');
+        item.textContent=media.name+' — '+media.source+(media.creator?' · Kreator: '+media.creator:'')+
+          '. Hak penggunaan dinyatakan oleh pengimpor, bukan diverifikasi otomatis.';
+        list.append(item);
+      }
+      reviewBox.append(list);
+    }
+
     for(const name of result.review.visual_review?.screenshots||[]){if(!/^review-frame-\d{1,2}\.png$/.test(name))continue;const link=document.createElement('a');link.href=`/api/videos/${encodeURIComponent(result.slug)}/${name}`;link.textContent=`${name} · `;link.target='_blank';link.rel='noopener';reviewBox.append(link)}
   }
 }
