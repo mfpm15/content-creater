@@ -54,6 +54,7 @@ class AutoMediaTests(unittest.TestCase):
             meta,_=media_library.get(asset_id,root=root)
             self.assertIn("Lisensi: cc0 1.0",meta["source"])
             self.assertIn("Example photographer",meta["creator"])
+            self.assertEqual(meta["rightsBasis"],"external_metadata_unverified")
             self.assertTrue(report["assets"][0]["rightsReviewRequired"])
 
     def test_invalid_license_and_missing_match_retain_illustration(self):
