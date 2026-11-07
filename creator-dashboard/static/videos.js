@@ -79,6 +79,37 @@ async function loadMediaAssets() {
     document.getElementById('mediaUploadStatus').textContent=err.message;
   }
 }
+
+document.getElementById('testVoiceBtn').addEventListener('click',async event=>{
+  const button=event.currentTarget;
+  const status=document.getElementById('testVoiceStatus');
+  const audio=document.getElementById('testVoiceAudio');
+  const language=document.getElementById('speechLanguage').value;
+  if(document.getElementById('motionVoice').value!=='tts'){
+    status.textContent='Pilih Edge-TTS lebih dahulu; mode tanpa suara tidak membuat narasi.';
+    return;
+  }
+  button.disabled=true;status.textContent='Memeriksa provider suara dan menghasilkan contoh…';
+  audio.pause();audio.hidden=true;audio.removeAttribute('src');
+  try{
+    const text=language==='id'
+      ? 'Halo, selamat datang. Ini contoh suara narator untuk video edukasi Anda.'
+      : 'Hello, welcome. This is the narrator voice for your educational video.';
+    const res=await fetch('/api/videos/voice-preview',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({language,text})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||'Provider suara tidak siap.');
+    if(data.mime!=='audio/wav' || !/^[A-Za-z0-9+/=]+$/.test(data.audioBase64))
+      throw new Error('Preview TTS tidak menghasilkan WAV valid.');
+    audio.src='data:audio/wav;base64,'+data.audioBase64;
+    audio.hidden=false;
+    status.textContent='Contoh WAV berhasil. Dengarkan untuk memastikan pelafalan dan kualitas suara.';
+    audio.play().catch(()=>{ /* Browser may require pressing native Play. */ });
+  }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+});
+
 document.getElementById('mediaUploadBtn').addEventListener('click',async event=>{
   const button=event.currentTarget;
   const status=document.getElementById('mediaUploadStatus');
