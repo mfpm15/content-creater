@@ -87,7 +87,7 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
     if any(len(shot['title'])>500 for shot in shots) or any(len(c['text'])>500 for c in captions):raise ValueError('Teks Remotion terlalu panjang; ringkas judul atau token narasi')
     brand=creative_profile.brand(plan.get('brand') or creative_profile.DEFAULT)
     chosen=video_templates.get(plan["templateId"]) if plan.get("templateId") else None
-    props={'version':1,'width':width,'height':height,'fps':fps,'totalFrames':total,'topic':plan['topic'], 'layout':chosen['layout'] if chosen else 'editorial',
+    props={'version':1,'width':width,'height':height,'fps':fps,'totalFrames':total,'topic':plan['topic'], 'layout':chosen['layout'] if chosen else 'editorial', 'effect':chosen['effect'] if chosen else 'minimal',
            'brand':{key:brand[key] for key in ('background','accent','text','wordmark','font')},'shots':shots,'captions':captions}
     return props,{'adapter':'remotion','version':'4.0.540','caption_timing':methods,
                   'visual_families':['process','data','comparison','concept'],
