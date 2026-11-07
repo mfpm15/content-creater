@@ -77,3 +77,10 @@ test('video layout templates are validated and backward compatible',()=>{
   const bad=example();bad.layout='<script>';assert.throws(()=>validateManifest(bad));
   assert.equal(validateManifest(example()).layout,undefined);
 });
+
+test('motion effects use a strict allowlist',()=>{
+  for(const effect of ['minimal','cinematic','technical','kinetic','calm','urgent']){
+    const value=example();value.effect=effect;assert.equal(validateManifest(value).effect,effect);
+  }
+  const bad=example();bad.effect='url(javascript:evil)';assert.throws(()=>validateManifest(bad));
+});
