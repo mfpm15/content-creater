@@ -3,6 +3,7 @@ import json
 import os
 import stat
 import tempfile
+import time
 from pathlib import Path
 
 from security import redact_tree as _redact_tree
@@ -22,6 +23,7 @@ def save_job(directory: Path, job: dict) -> None:
     key = job['jobId']
     if not _job_key(key):
         return  # historical/test-only in-memory job
+    job['updatedAt'] = round(time.time(), 1)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     if _linked(directory):
         raise ValueError('Checkpoint directory must not be a symbolic link')

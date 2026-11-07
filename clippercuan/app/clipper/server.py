@@ -953,7 +953,7 @@ def asr_test(body: Settings):
 
 @app.get("/api/llm/catalog")
 def llm_catalog():
-    """Daftar model Gemini + GPT-5.6 Think Deeper dan rantai fallback aktif."""
+    """Daftar model GPT-5.6 Think Deeper + Claude dan rantai fallback aktif."""
     return {**llm.model_catalog(), "chain_posts": llm.chain_for("posts"), "chain_moments": llm.chain_for("moments")}
 
 

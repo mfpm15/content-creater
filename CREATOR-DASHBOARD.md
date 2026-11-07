@@ -95,14 +95,14 @@ Dashboard hanya memakai konfigurasi tool yang diizinkan di `creator-dashboard/to
 
 ## Konfigurasi API key
 
-Setiap project tetap menggunakan konfigurasi aslinya. Dashboard dan Clipper Cuan memakai fallback environment bersama: `LLM_BASE_URL` lalu `OPENAI_BASE_URL`, `LLM_API_KEY` lalu `OPENAI_API_KEY`, serta `LLM_MODEL` lalu `OPENAI_MODEL`. Default lokal: `http://localhost:20128/v1` dan `ag/gemini-3.8-flash-medium`. API key diwariskan hanya ke proses backend dan tidak dikirim lewat HTML, JavaScript, katalog tool, atau API publik.
+Setiap project tetap menggunakan konfigurasi aslinya. Dashboard dan Clipper Cuan memakai fallback environment bersama: `LLM_BASE_URL` lalu `OPENAI_BASE_URL`, `LLM_API_KEY` lalu `OPENAI_API_KEY`, serta `LLM_MODEL` lalu `OPENAI_MODEL`. Default lokal: `http://localhost:20128/v1` dan `ms/GPT-5.6-Think-Deeper`. API key diwariskan hanya ke proses backend dan tidak dikirim lewat HTML, JavaScript, katalog tool, atau API publik.
 
 Contoh tersedia di `.env.example`. Jangan commit `.env`. Set environment Windows sebelum menjalankan dashboard:
 
 ```bat
 set LLM_BASE_URL=http://localhost:20128/v1
 set LLM_API_KEY=isi_secret_lokal
-set LLM_MODEL=ag/gemini-3.8-flash-medium
+set LLM_MODEL=ms/GPT-5.6-Think-Deeper
 start-dashboard.bat
 ```
 
@@ -140,7 +140,7 @@ Salin file contoh:
 copy creator-dashboard\apps\ai-youtube-shorts-generator\.env.example creator-dashboard\apps\ai-youtube-shorts-generator\.env
 ```
 
-Untuk mode API isi `MUAPI_API_KEY`. Untuk mode lokal dengan 9Router, isi `OPENAI_API_KEY`, `OPENAI_BASE_URL`, dan `OPENAI_MODEL`. Model default disiapkan sebagai `ag/gemini-3.8-flash-medium`; ganti ke `ag/gemini-3.8-flash-high` bila membutuhkan penilaian highlight yang lebih teliti. Nilai Base URL harus memakai endpoint OpenAI-compatible yang diberikan 9Router. Setelah itu install dependensi local mode:
+Untuk mode API isi `MUAPI_API_KEY`. Untuk mode lokal dengan 9Router, isi `OPENAI_API_KEY`, `OPENAI_BASE_URL`, dan `OPENAI_MODEL`. Model default disiapkan sebagai `ms/GPT-5.6-Think-Deeper`; alternatif `cc/claude-sonnet-5-5`. Nilai Base URL harus memakai endpoint OpenAI-compatible yang diberikan 9Router. Setelah itu install dependensi local mode:
 
 ```bat
 uv pip install --python creator-dashboard\apps\ai-youtube-shorts-generator\.venv\Scripts\python.exe -r creator-dashboard\apps\ai-youtube-shorts-generator\requirements-local.txt
@@ -160,17 +160,17 @@ OpenCreator memerlukan Node.js 22+ dan pnpm 9.15 melalui Corepack. Launcher dash
 Untuk model teks melalui endpoint OpenAI-compatible 9Router, buka **Settings > AI services** di OpenCreator dan isi Base URL 9Router, API key, serta salah satu model berikut:
 
 ```text
-ag/gemini-3.8-flash-high
-ag/gemini-3.8-flash-medium
+ms/GPT-5.6-Think-Deeper
+cc/claude-sonnet-5-5
 ```
 
-Gunakan `ag/gemini-3.8-flash-high` untuk perencanaan atau penilaian yang membutuhkan kualitas lebih tinggi, dan `ag/gemini-3.8-flash-medium` untuk draft cepat serta volume lebih besar. Base URL dan API key tidak disimpan di `creator-dashboard/tools.json` agar secret tidak bocor melalui konfigurasi launcher.
+Gunakan `ms/GPT-5.6-Think-Deeper` untuk perencanaan atau penilaian utama, dan `cc/claude-sonnet-5-5` sebagai cadangan. Model Gemini ditiadakan. Base URL dan API key tidak disimpan di `creator-dashboard/tools.json` agar secret tidak bocor melalui konfigurasi launcher.
 
 ### Short Video Factory
 
 Tool ini memerlukan Node.js minimal 22.17 dan pnpm 10.12.4. Launcher menghapus `ELECTRON_RUN_AS_NODE` sebelum menjalankan aplikasi agar executable Electron benar-benar membuka desktop window. Peringatan Metadata API tidak menghentikan aplikasi karena repository memiliki snapshot terverifikasi dan fallback GitHub.
 
-Pada konfigurasi LLM Short Video Factory pilih protokol **OpenAI Compatible**, masukkan Base URL dan API key 9Router, lalu gunakan `ag/gemini-3.8-flash-high` atau `ag/gemini-3.8-flash-medium` sebagai nama model.
+Pada konfigurasi LLM Short Video Factory pilih protokol **OpenAI Compatible**, masukkan Base URL dan API key 9Router, lalu gunakan `ms/GPT-5.6-Think-Deeper` atau `cc/claude-sonnet-5-5` sebagai nama model.
 
 ## Troubleshooting
 

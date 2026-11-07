@@ -50,7 +50,7 @@ async function loadOptions() {
   typeSelect.value = options.defaultType;
   const modelSelect = document.querySelector('#articleModelSelect');
   const models = Array.isArray(options.models) && options.models.length ? options.models : [
-    { id: 'ag/gemini-3.8-flash-high', name: 'Gemini 3.8 Flash High', tier: 'utama' },
+    { id: 'ms/GPT-5.6-Think-Deeper', name: 'GPT-5.6 Think Deeper', tier: 'utama' },
   ];
   modelSelect.replaceChildren(...models.map(model =>
     el('option', { value: model.id }, `${model.name} · ${model.tier}`)));
@@ -208,7 +208,7 @@ form.addEventListener('submit', async event => {
 loadOptions().then(loadHistory).catch(error => {
   const modelSelect = document.querySelector('#articleModelSelect');
   if (modelSelect && !modelSelect.options.length) {
-    modelSelect.replaceChildren(el('option', { value: 'ag/gemini-3.8-flash-high' }, 'Gemini 3.8 Flash High · utama'));
+    modelSelect.replaceChildren(el('option', { value: 'ms/GPT-5.6-Think-Deeper' }, 'GPT-5.6 Think Deeper · utama'));
   }
   toast(`Opsi gagal dimuat: ${error.message}. Muat ulang halaman.`);
 });

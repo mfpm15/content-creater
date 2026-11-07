@@ -22,20 +22,11 @@ from .config import DATA_DIR
 SETTINGS_FILE = DATA_DIR / "settings.json"
 DEFAULT_LLM_BASE_URL = "http://localhost:20128/v1"
 # Satu model utama untuk seleksi momen, judul, ringkasan, dan paket posting.
-# Varian High dipilih untuk mengutamakan akurasi editorial dibanding sedikit penghematan latensi.
-DEFAULT_LLM_MODEL = "ag/gemini-3.8-flash-high"
+# Gemini ditiadakan; GPT Think Deeper utama, Claude sebagai cadangan.
 GPT_THINKER = "ms/GPT-5.6-Think-Deeper"
-# Semua model Gemini di 9Router, urut dari yang paling seimbang (cepat + akurat) ke cadangan.
-GEMINI_MODELS = [
-    "ag/gemini-3.8-flash-high", "ag/gemini-3.8-flash-medium", "ag/gemini-3.8-flash", "ag/gemini-3.8-flash-low",
-    "ag/gemini-4-argon-medium", "ag/gemini-4-argon-high", "ag/gemini-4-argon-low",
-    "ag/gemini-3.1-pro-high", "ag/gemini-3.1-pro-low", "ag/gemini-pro-agent",
-    "ag/gemini-3.7-flash-medium", "ag/gemini-3.7-flash-high", "ag/gemini-3.7-flash-low",
-    "ag/gemini-3.6-flash-medium", "ag/gemini-3.6-flash-high", "ag/gemini-3.6-flash-low",
-]
-# Kualitas editorial didahulukan. Medium/standar tetap tersedia sebagai fallback bila High gagal.
-DEFAULT_FALLBACKS = ["ag/gemini-3.8-flash-high", "ag/gemini-3.8-flash-medium",
-                     "ag/gemini-3.8-flash", "ag/gemini-3.8-flash-low"]
+CLAUDE_MODELS = ["cc/claude-sonnet-5-5", "cc/claude-haiku-5-5"]
+DEFAULT_LLM_MODEL = GPT_THINKER
+DEFAULT_FALLBACKS = [GPT_THINKER, *CLAUDE_MODELS]
 DEFAULT_LLM = {
     "enabled": False,
     "base_url": DEFAULT_LLM_BASE_URL,
@@ -50,7 +41,7 @@ DEFAULT_LLM = {
 
 
 def model_catalog() -> dict:
-    return {"gemini": GEMINI_MODELS, "gpt": [GPT_THINKER], "default_fallbacks": DEFAULT_FALLBACKS}
+    return {"gpt": [GPT_THINKER], "claude": CLAUDE_MODELS, "default_fallbacks": DEFAULT_FALLBACKS}
 
 
 def normalize_base_url(value: str) -> str:

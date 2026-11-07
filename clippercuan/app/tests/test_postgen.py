@@ -39,12 +39,12 @@ def test_profiles_get_distinct_niche_tags():
     assert "#mlbb" in ml and "#podcast" in pod
 
 
-def test_chain_starts_with_gemini_38_high_for_all_editorial_tasks():
+def test_chain_starts_with_gpt_thinker_and_has_no_gemini():
     c = {**llm.DEFAULT_LLM}
     for task in ("moments", "titles", "posts"):
         chain = llm.chain_for(task, c)
-        assert chain[0] == "ag/gemini-3.8-flash-high"
-        assert all(m.startswith("ag/gemini") for m in chain)
+        assert chain[0] == llm.GPT_THINKER
+        assert not any("gemini" in m for m in chain)
         assert len(chain) == len(set(chain))
 
 

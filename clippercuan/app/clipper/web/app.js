@@ -649,7 +649,7 @@ async function pageSettings() {
       <p class="hint">Dipakai untuk memilih momen terbaik, membuat judul, dan caption posting. Transkripsi tetap memakai Whisper lokal.</p>
       <div class="row2"><label>Base URL<input class="in" id="lUrl" placeholder="http://localhost:20128/v1"></label><label>API key<input class="in" id="lKey" type="password" placeholder="sk-…"></label></div>
       <div class="acts" style="margin-bottom:14px"><button class="btn ghost" id="lTest">Tes koneksi &amp; ambil model</button><span class="muted" id="lMsg"></span></div>
-      <div class="row2"><label>Model pemilih momen (pintar)<input class="in" id="lM1" list="lModels" placeholder="mis. claude-sonnet / gpt thinker"></label><label>Model judul &amp; caption (cepat)<input class="in" id="lM2" list="lModels" placeholder="mis. haiku / gemini flash"></label></div>
+      <div class="row2"><label>Model pemilih momen (pintar)<input class="in" id="lM1" list="lModels" placeholder="mis. claude-sonnet / gpt thinker"></label><label>Model judul &amp; caption (cepat)<input class="in" id="lM2" list="lModels" placeholder="mis. claude-sonnet / gpt thinker"></label></div>
       <datalist id="lModels"></datalist>
       <label>Temperature <input type="range" id="lTemp" min="0" max="100"></label>
       <button class="btn" id="lSave">Simpan</button></div>

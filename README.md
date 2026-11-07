@@ -82,7 +82,7 @@ python creator-dashboard\test_dashboard.py
 Semua tool diarahkan ke satu endpoint OpenAI-compatible:
 
 - Base URL: `http://localhost:20128/v1`
-- Model: `ag/gemini-3.8-flash-high`
+- Model: `ms/GPT-5.6-Think-Deeper`
 - API key: isi sesuai gateway Anda (gateway lokal bisa menerima placeholder)
 
 File konfigurasi lokal tidak ikut di repo (diabaikan oleh `.gitignore`). Setelah clone, buat sendiri:

@@ -122,7 +122,7 @@ creator-dashboard/output/articles/<slug>/
 ## Rancangan teknis
 
 - **Tempat kode:** modul baru `creator-dashboard/article_drafter.py` + halaman baru di `static/`. `server.py` hanya menambah beberapa endpoint (`/api/articles`). Server tetap stdlib.
-- **LLM:** panggil 9Router (`http://localhost:20128/v1/chat/completions`, model `ag/gemini-3.8-flash-high`) lewat `urllib`. Tanpa dependensi baru.
+- **LLM:** panggil 9Router (`http://localhost:20128/v1/chat/completions`, model `ms/GPT-5.6-Think-Deeper`) lewat `urllib`. Tanpa dependensi baru.
 - **Pembuat Word:** `python-docx` (belum terpasang). Dipasang di venv khusus `creator-dashboard/.venv-articles`, bukan ke tool lain.
 - **Render PNG:** Playwright dengan Microsoft Edge yang sudah ada di mesin ini (`channel="msedge"`), jadi tidak perlu unduh Chromium.
 - **Skill referensi:** salin hanya `references/` dan aturan gaya dari `diagram-design` ke `creator-dashboard/article-drafter/diagram-style/` beserta file lisensi MIT. Tidak pakai `npx skills add`.

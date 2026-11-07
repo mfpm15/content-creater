@@ -64,7 +64,7 @@ Perkiraan waktu (CPU 4 core, model *small*): video 2 menit ≈ 1–1,5 menit unt
 
 ## AI router (9Router)
 Backend membaca `LLM_BASE_URL`/`OPENAI_BASE_URL`, `LLM_API_KEY`/`OPENAI_API_KEY`, dan `LLM_MODEL`/`OPENAI_MODEL`.
-Default lokal memakai `http://localhost:20128/v1` serta model `ag/gemini-3.8-flash-medium`. Request chat dikirim ke
+Default lokal memakai `http://localhost:20128/v1` serta model `ms/GPT-5.6-Think-Deeper` (Claude sebagai cadangan; Gemini ditiadakan). Request chat dikirim ke
 `/chat/completions`; credential tidak ditulis ke frontend atau repository. Pengaturan UI tetap tersedia, tetapi environment
 menjadi sumber prioritas agar konsisten dengan dashboard. Jika router mati, aplikasi otomatis kembali ke skor lokal.
 

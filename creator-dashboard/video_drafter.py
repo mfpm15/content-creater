@@ -970,7 +970,9 @@ def update_job_plan(job_id: str, payload: dict) -> dict:
         if job.get('speech') and 'speech' not in raw_plan:raw_plan={**raw_plan,'speech':job['speech']}
         if job.get("templateId") and "templateId" not in raw_plan:
             raw_plan={**raw_plan,"templateId":job["templateId"]}
-        plan = normalize_scene_plan(raw_plan, job["topic"], "", job["duration"])
+        # Durasi dasar = durasi rencana saat ini; naskah bertimecode bisa lebih pendek dari form.
+        base_duration = int((job.get("scenePlan") or {}).get("duration") or job["duration"])
+        plan = normalize_scene_plan(raw_plan, job["topic"], "", base_duration)
         if plan.get("templateId") and job.get("engine") != "remotion":
             raise ValueError("Template Faceless hanya berlaku untuk Remotion")
         if plan.get("templateId", "") != job.get("templateId", ""):
@@ -1440,7 +1442,9 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         elif job['engine']=='remotion':
             silent,remotion_report=remotion_adapter.render(target,render_plan,ASPECT_RATIOS[job['aspect']])
         else:
-            subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", str(frame_rate.get(plan)), "--workers", "1"], cwd=target, check=True, timeout=600,env=render_environment())
+            # Satu worker Chromium: video panjang butuh >10 menit, timeout ikut durasi.
+            render_timeout = max(600, math.ceil(float(plan["duration"]) * 12))
+            subprocess.run(["node", str(renderer), "render", "-o", str(silent), "--fps", str(frame_rate.get(plan)), "--workers", "1"], cwd=target, check=True, timeout=render_timeout,env=render_environment())
         _update_job(job_id, {"step": "Melakukan mux audio dan video", "progress": 90})
         output = _mux_video(target, silent, final_audio, plan["duration"])
         from video_review import review

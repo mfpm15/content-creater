@@ -32,14 +32,14 @@ def test_new_project_uses_balanced_full_width_workspace():
     assert "main{min-width:0;padding:0" in css
 
 
-def test_moment_chain_prioritizes_fast_models():
+def test_moment_chain_honors_chosen_model_first():
     chain = llm.chain_for("moments", {
         **llm.DEFAULT_LLM,
-        "model_moments": "ag/gemini-3.8-flash-medium",
+        "model_moments": "cc/claude-sonnet-5-5",
         "fallback_models": llm.DEFAULT_FALLBACKS,
     })
-    assert chain[0] == "ag/gemini-3.8-flash-medium"
-    assert llm.GPT_THINKER not in chain
+    assert chain[0] == "cc/claude-sonnet-5-5"
+    assert not any("gemini" in m for m in chain)
 
 
 def test_local_moment_score_is_absolute_not_artificially_inflated():

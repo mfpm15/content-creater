@@ -29,14 +29,12 @@ import article_storage
 ROOT = Path(__file__).resolve().parent
 ARTICLES_DIR = ROOT / "output" / "articles"
 LLM_URL = os.getenv("ARTICLE_LLM_BASE_URL", os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:20128/v1").rstrip("/")
-LLM_MODEL = os.getenv("ARTICLE_LLM_MODEL", os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "ag/gemini-3.8-flash-high")
+LLM_MODEL = os.getenv("ARTICLE_LLM_MODEL", os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "ms/GPT-5.6-Think-Deeper")
 LLM_KEY = os.getenv("ARTICLE_LLM_API_KEY", os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "9router-local")
 ARTICLE_MODELS = [
-    {"id": "ag/gemini-3.8-flash-high", "name": "Gemini 3.8 Flash High", "provider": "Gemini", "tier": "utama"},
-    {"id": "ag/gemini-3.8-flash-medium", "name": "Gemini 3.8 Flash Medium", "provider": "Gemini", "tier": "cepat"},
-    {"id": "ms/GPT-5.6-Think-Deeper", "name": "GPT-5.6 Think Deeper", "provider": "GPT", "tier": "penalaran"},
-    {"id": "cc/claude-opus-5-5", "name": "Claude Opus 5.5", "provider": "Claude", "tier": "tambahan"},
+    {"id": "ms/GPT-5.6-Think-Deeper", "name": "GPT-5.6 Think Deeper", "provider": "GPT", "tier": "utama"},
     {"id": "cc/claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "provider": "Claude", "tier": "tambahan"},
+    {"id": "cc/claude-haiku-5-5", "name": "Claude Haiku 5.5 (cepat)", "provider": "Claude", "tier": "cepat"},
 ]
 ARTICLE_MODEL_IDS = {item["id"] for item in ARTICLE_MODELS}
 LLM_TIMEOUT = int(os.getenv("ARTICLE_LLM_TIMEOUT", "300"))

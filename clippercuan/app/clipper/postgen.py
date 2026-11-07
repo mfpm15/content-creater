@@ -1,7 +1,7 @@
 """Generator caption siap posting per profil konten & platform.
 
 Output satu paket: judul, caption TikTok / YouTube Shorts / Instagram Reels, hashtag, CTA, dan
-teks siap salin. LLM (rantai Gemini + GPT-5.6 Think Deeper) dipakai bila aktif; bila gagal, versi
+teks siap salin. LLM (rantai GPT-5.6 Think Deeper + Claude) dipakai bila aktif; bila gagal, versi
 lokal berbasis aturan tetap menghasilkan teks yang bisa langsung diposting.
 
 Aturan: klaim hanya dari transkrip, tanpa engagement bait palsu, hashtag 3-6 relevan (bukan spam).

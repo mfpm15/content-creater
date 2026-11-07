@@ -44,10 +44,10 @@ def test_chat_request_contract_and_authorization():
 
     c = {"base_url": "http://localhost:20128/v1", "api_key": "top-secret", "temperature": 0.2, "timeout": 7}
     with patch("clipper.llm.open_authenticated", fake_open):
-        assert llm.chat("ag/gemini-3.8-flash-medium", "system", "user", c) == "ok"
+        assert llm.chat("ms/GPT-5.6-Think-Deeper", "system", "user", c) == "ok"
     assert captured["url"].endswith("/v1/chat/completions")
     assert captured["headers"]["Authorization"] == "Bearer top-secret"
-    assert captured["body"]["model"] == "ag/gemini-3.8-flash-medium"
+    assert captured["body"]["model"] == "ms/GPT-5.6-Think-Deeper"
     assert captured["body"]["messages"] == [{"role": "system", "content": "system"}, {"role": "user", "content": "user"}]
     assert captured["body"]["stream"] is False
     assert captured["timeout"] == 7
