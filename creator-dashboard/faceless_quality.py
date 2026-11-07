@@ -22,6 +22,7 @@ def inspect(plan: dict) -> dict:
     if not scenes:
         warn("no_scenes", "Belum ada adegan. Tambahkan Scene Plan sebelum render.")
     titles = Counter()
+    image_ids = Counter()
     abstract = 0
     for scene in scenes:
         sid = str(scene.get("id", ""))
@@ -31,6 +32,7 @@ def inspect(plan: dict) -> dict:
             titles[title.casefold()] += 1
         if len(title) > 76:
             warn("long_title", "Judul adegan sangat panjang; ringkas agar terbaca di layar ponsel.", sid)
+        if scene.get('assetId'):image_ids[scene['assetId']] += 1
         if scene.get("visualFamily") in ABSTRACT and not scene.get("diagram") and not scene.get("assetId"):
             abstract += 1
         length = float(scene.get("end", 0)) - float(scene.get("start", 0))
@@ -39,6 +41,10 @@ def inspect(plan: dict) -> dict:
         if length > 0 and length < 1.25:
             warn("short_scene", "Adegan kurang dari 1,25 detik; periksa waktu baca teks dan efek.", sid)
 
+    if any(count > 1 for count in image_ids.values()):
+        warn("reused_hero_image", "Gambar sama digunakan berulang pada beberapa adegan; periksa agar video tidak terasa slideshow.")
+    if plan.get("captionStyle") == "highlight" and not any(s.get("wordCues") for s in scenes):
+        warn("word_alignment_missing", "Highlight kata dipilih tanpa timestamp kata. Renderer menggunakan animasi frasa, bukan sinkronisasi ucapan.")
     if any(count > 1 for count in titles.values()):
         warn("duplicate_headline", "Ada judul adegan yang identik. Periksa apakah cerita terasa berulang.")
     if len(scenes) >= 4 and abstract > len(scenes) * .55:
