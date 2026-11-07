@@ -66,10 +66,14 @@ async function loadMediaAssets() {
     }
     // Restore user selections without discarding unsaved edits during an open review.
     for(const select of document.querySelectorAll('select[data-asset-scene]')){
-      const existing=select.value;
+      const planned=activeScenePlan?.scenes?.[Number(select.dataset.assetScene)]?.assetId||'';
+      const existing=select.value||planned;
       select.replaceChildren(new Option('Ilustrasi otomatis',''));
       for(const asset of mediaAssets)select.add(new Option(asset.name,asset.id));
-      select.value=mediaAssets.some(x=>x.id===existing)?existing:'';
+      if(existing && !mediaAssets.some(x=>x.id===existing)){
+        select.add(new Option('Media hilang — ganti sebelum render',existing));
+      }
+      select.value=existing;
     }
   }catch(err){
     document.getElementById('mediaUploadStatus').textContent=err.message;
