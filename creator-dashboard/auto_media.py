@@ -56,10 +56,15 @@ def _license(meta: dict) -> str | None:
 
 
 def _wikimedia_thumbnail(url: str) -> bool:
-    u = urllib.parse.urlsplit(url)
-    return u.scheme == "https" and u.hostname == "upload.wikimedia.org" and u.port is None and (
-        u.path.startswith("/wikipedia/commons/thumb/") or u.path.startswith("/wikipedia/commons/")
-    ) and not u.username and not u.password and not u.fragment
+    if not isinstance(url, str):
+        return False
+    try:
+        u = urllib.parse.urlsplit(url)
+        return u.scheme == "https" and u.hostname == "upload.wikimedia.org" and u.port is None and (
+            u.path.startswith("/wikipedia/commons/thumb/") or u.path.startswith("/wikipedia/commons/")
+        ) and not u.username and not u.password and not u.fragment
+    except ValueError:
+        return False
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -155,11 +160,16 @@ def suggest(plan: dict, *, limit: int = MAX_SHOTS) -> dict:
             if not (isinstance(description, str) and description.startswith("https://commons.wikimedia.org/wiki/File:")):
                 continue
             try:
+                artist = metadata.get("Artist")
+                artist_name = (artist.get("value") if isinstance(artist, dict) else None) or "Wikimedia Commons"
+            except (AttributeError, TypeError):
+                artist_name = "Wikimedia Commons"
+            try:
                 raw = _download(url, MAX_IMAGE_BYTES)
                 data = media_library.save({
                     "name": _plain(title.removeprefix("File:"), 120) or "Gambar Wikimedia",
                     "source": (description + " | Lisensi: " + license_name + " (metadata Wikimedia; perlu pemeriksaan)").strip()[:400],
-                    "creator": _plain((metadata.get("Artist") or {}).get("value") or "Wikimedia Commons", 120),
+                    "creator": _plain(artist_name, 120),
                     "rightsConfirmed": True,  # Provider states CC0/PD; legal rights remain unverified
                     "externalLicenseMetadata": True,
                     "base64": base64.b64encode(raw).decode("ascii"),
