@@ -10,13 +10,14 @@ export function validateManifest(value) {
   const text = (s, max) => typeof s === 'string' && s.length <= max;
   const plain = o => o && typeof o === 'object' && Object.getPrototypeOf(o) === Object.prototype;
   if (!plain(value)) fail();
-  const keys = ['version','width','height','fps','totalFrames','topic','brand','shots','captions'];
+  const keys = ['version','width','height','fps','totalFrames','topic','layout','brand','shots','captions'];
   if (Object.keys(value).some(key => !keys.includes(key))) fail();
   if (value.version !== 1 || ![30,60].includes(value.fps) || !integer(value.totalFrames) || value.totalFrames < 1 || value.totalFrames > 600*value.fps) fail();
   if (![value.width,value.height].every(n => integer(n) && n >= 128 && n <= 3840 && n % 2 === 0) || !text(value.topic,500)) fail();
   const brand = value.brand;
   if (!plain(brand) || Object.keys(brand).some(k => !['background','accent','text','wordmark','font'].includes(k)) ||
       !['background','accent','text'].every(k => /^#[0-9a-fA-F]{6}$/.test(brand[k])) || !text(brand.wordmark,100) || !['Arial','Verdana','Georgia','Tahoma'].includes(brand.font)) fail();
+  if (value.layout !== undefined && !['editorial','headline','split','poster','center'].includes(value.layout)) fail();
   if (!Array.isArray(value.shots) || value.shots.length < 1 || value.shots.length > 200 || !Array.isArray(value.captions) || value.captions.length > 10000) fail();
   let end = 0;
   const ids = new Set();
