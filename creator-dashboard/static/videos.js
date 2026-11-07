@@ -64,7 +64,7 @@ function renderTemplateGallery() {
     const decoration=document.createElement('span');decoration.className='template-cover-mark';
     const title=document.createElement('span');title.className='template-cover-title';title.textContent=t.name;
     cover.append(decoration,title);
-    const tag=document.createElement('span');tag.className='template-tag';tag.textContent=t.category+' · '+t.layout;
+    const tag=document.createElement('span');tag.className='template-tag';tag.textContent=t.category+' · '+t.layout+' · '+t.effect;
     const name=document.createElement('strong');name.textContent=t.name;
     const description=document.createElement('small');description.textContent=t.description;
     button.append(cover,tag,name,description);
@@ -457,6 +457,20 @@ function renderReview(job) {
       const image=document.createElement('img');image.src=url;image.alt=`Style frame adegan ${index+1}`;image.loading='lazy';image.style.width='100%';gallery.append(image);
     }
     details.append(gallery);card.append(details);
+    elements.reviewGrid.prepend(card);
+  }
+  if(job.scenePlan?.templateId && job.facelessQuality){
+    const card=document.createElement('section');card.className='review-card';
+    const title=document.createElement('h4');title.textContent='Pemeriksaan konten faceless';card.append(title);
+    const desc=document.createElement('p');desc.textContent='Pemeriksaan otomatis hanya mendeteksi struktur, bukan estetika atau kebenaran fakta. Periksa audio dan visual sebelum publikasi.';card.append(desc);
+    for(const issue of job.facelessQuality.warnings||[]){
+      const line=document.createElement('p');
+      line.textContent=(issue.scene?issue.scene+': ':'')+issue.message;
+      card.append(line);
+    }
+    for(const instruction of job.facelessQuality.manualRequired||[]){
+      const p=document.createElement('p');p.textContent='• '+instruction;card.append(p);
+    }
     elements.reviewGrid.prepend(card);
   }
   if (job.scenePlan?.brand) {
