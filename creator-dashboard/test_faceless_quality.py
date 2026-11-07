@@ -36,6 +36,13 @@ class FacelessQualityTests(unittest.TestCase):
         self.assertNotIn("abstract_overuse",
             {issue["code"] for issue in faceless_quality.inspect({"scenes":images})["warnings"]})
 
+    def test_repeated_images_and_unaligned_word_highlights_are_flagged(self):
+        plan={"scenes":[{**scene(1, "Pembuka"),"assetId":"1"*32},
+                        {**scene(2, "Lanjutan"),"assetId":"1"*32}],
+              "captionStyle":"highlight"}
+        codes={item["code"] for item in faceless_quality.inspect(plan)["warnings"]}
+        self.assertTrue({"reused_hero_image","word_alignment_missing"} <= codes)
+
     def test_dense_scene_and_music_only_are_warnings_not_censorship(self):
         plan = {"scenes": [scene(1, "Judul", narration=" ".join(["sangat"]*50), duration=1)],
                 "audioMode": "music"}

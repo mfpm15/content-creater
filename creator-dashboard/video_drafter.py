@@ -9,6 +9,8 @@ import voice_quality
 import video_templates
 import faceless_quality
 import media_library
+import auto_media
+import caption_design
 import frame_rate
 import scene_diagram
 import html
@@ -97,7 +99,7 @@ def get_available_models() -> list[dict]:
 def options() -> dict:
     default_model = LLM_MODEL if LLM_MODEL in ALLOWED_MODEL_IDS else "ag/gemini-3.8-flash-high"
     research_ready = bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) and PODCASTFY_PYTHON.is_file()
-    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "templates":video_templates.catalogue(), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
+    return {"engines": [{**engine,"runtimeMissing":runtime_issues(engine['id'])} for engine in ENGINES.values()], "motionConcepts":continuous_motion.CONCEPTS, "templates":video_templates.catalogue(), "captionStyles":caption_design.options(), "styles": list(STYLES.values()), "aspects": list(ASPECT_RATIOS.values()), "durations": DURATIONS, "models": get_available_models(), "defaultEngine": "opuscar", "defaultStyle": "opuscar_cinematic", "defaultAspect": "9:16", "defaultDuration": 60, "frameRates":list(frame_rate.RATES), "defaultFps":frame_rate.DEFAULT, "defaultModel": default_model, "workflow": ["brief", "research", "narration", "scene_plan", "storyboard", "render"], "research": {"provider": "Google Search grounding", "model": RESEARCH_MODEL, "required": False, "requiredForModes":["web"], "ready": research_ready,"modes":["planner","web","provided"]}}
 
 
 def runtime_issues(engine: str) -> list[str]:
@@ -318,6 +320,7 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
     result={"topic": topic, "duration": duration, "scenes": scenes}
     if "fps" in data:result["fps"]=frame_rate.validate(data["fps"])
     if data.get("templateId"):result["templateId"]=video_templates.get(data["templateId"])["id"]
+    if data.get("captionStyle") is not None:result["captionStyle"]=caption_design.validate(data["captionStyle"])
     if "speech" in data:result["speech"]=speech_settings.validate(data["speech"])
     if 'creativeBrief' in data:
         if not isinstance(data['creativeBrief'],str) or len(data['creativeBrief'])>4000:raise ValueError('Arahan produksi maksimal 4.000 karakter')
@@ -892,7 +895,7 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
         for aspect in dict.fromkeys(aspects):
             key = uuid.uuid4().hex
             job = {"jobId": key, "pipelineVersion":2, "fps": frame_rate.get(plan), "topic": plan["topic"], "script": "", "engine": engine,
-                   "style": ENGINES[engine]["defaultStyle"], "templateId":plan.get("templateId",""), "aspect": aspect, "duration": plan["duration"],
+                   "style": ENGINES[engine]["defaultStyle"], "templateId":plan.get("templateId",""), "captionStyle":plan.get("captionStyle", "clean"), "autoMedia":False, "autoRender":False, "aspect": aspect, "duration": plan["duration"],
                    "model": source.get("model", LLM_MODEL), "status": "awaiting_scene_plan", "step": "Review layout rasio baru sebelum render",
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
                    "storyboard": None, "video": None, "revision": 0, "approvals": {},
@@ -1088,14 +1091,25 @@ def start_job(payload: dict) -> dict:
     model = str(payload.get("model") or fallback_model); model = model if model in ALLOWED_MODEL_IDS else fallback_model
     engine = str(payload.get("engine") or "opuscar")
     if engine not in ENGINES or ENGINES[engine].get("disabled"): raise ValueError("Render Adapter belum tersedia")
+    for option in ("smartTemplate", "autoMedia", "autoRender"):
+        if option in payload and type(payload[option]) is not bool:
+            raise ValueError("Opsi otomatis harus boolean")
+    smart_template = payload.get("smartTemplate", False)
+    auto_media_enabled = payload.get("autoMedia", False)
+    auto_render = payload.get("autoRender", False)
+    if (auto_media_enabled or auto_render or smart_template) and engine != "remotion":
+        raise ValueError("Mode otomatis lengkap membutuhkan renderer Remotion")
+    caption_style = caption_design.validate(payload.get("captionStyle"))
     template_id = payload.get("templateId") or ""
+    if smart_template and not template_id:
+        template_id = video_templates.recommend(topic)["id"]
     template = video_templates.get(template_id) if template_id else None
     if template and engine != template["engine"]:
         raise ValueError("Template ini hanya mendukung Remotion; pilih adapter Remotion")
     fps = frame_rate.validate(payload.get("fps", frame_rate.DEFAULT))
     style = ENGINES[engine]["defaultStyle"]
     job_id = uuid.uuid4().hex
-    job = {"jobId": job_id, "pipelineVersion":2, "creativeBrief":creative_brief.strip(), "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "templateId": template_id, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
+    job = {"jobId": job_id, "pipelineVersion":2, "creativeBrief":creative_brief.strip(), "fps": fps, "topic": topic, "script": script, "researchMode":research_mode, "engine": engine, "style": style, "templateId": template_id, "autoMedia": auto_media_enabled, "autoRender": auto_render, "captionStyle": caption_style, "aspect": aspect, "duration": duration, "model": model, "status": "queued", "step": "Menyiapkan rencana", "progress": 5, "error": None, "research": None, "scenePlan": None, "storyboard": None, "video": None, "revision": 0, "approvals": {}}
     if payload.get('voiceMode')!='music':job['speech']=speech_settings.build(payload.get('speechLanguage','id'),payload.get('voiceMode','tts'),payload.get('sfx',True))
     if engine=='remotion':
         if payload.get('voiceMode','tts') not in ('music','tts','none'):raise ValueError('Audio harus music atau tts')
@@ -1302,6 +1316,18 @@ def _run_job(job_id: str) -> None:
         prompt=build_scene_prompt(job['topic'],planning_input,job['duration'],job['aspect'])
         prompt+='\nBahasa judul layar: '+job.get('speech',{}).get('language','id')+'. Pertahankan naskah pengguna; jangan menerjemahkan narasi terkunci.\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
         prompt+=renderer_contract.planner_instruction(job['engine'])
+        if job.get('engine')=='remotion':
+            prompt+=("\nATURAN ANTI-SLIDESHOW: utamakan subjek konkret yang konsisten antarscene dan berubah melalui sebab-akibat. "
+                     "Jangan membuat satu gambar + headline + fade yang sama pada semua scene. "
+                     "Gunakan perbedaan ukuran shot, perubahan perhatian visual, dan perpindahan kamera yang bermakna; "
+                     "batasi maksimal dua tingkat teks penting pada setiap frame. "
+                     "Setiap shot harus punya alasan visual dan aksi, bukan efek acak; hindari radar dan orbit generik berulang. "
+                     "Field subject wajib 1–4 kata benda spesifik yang dapat dicari sebagai gambar dokumenter, bukan instruksi atau kalimat. "
+                     "Jika adegan menyangkut fakta/peristiwa nyata, bedakan ilustrasi umum dari bukti dokumenter, jangan menyatakan gambar umum sebagai foto peristiwa.")
+            if job.get("autoMedia"):
+                prompt+=("\nMEDIA OTOMATIS: pilih subject konkret dan singkat, bila memungkinkan gunakan istilah objek internasional "
+                         "yang umum dipakai pada katalog Wikimedia Commons. Tetap pertahankan bahasa narasi yang diminta. "
+                         "Jangan meminta atau mengklaim foto tokoh/peristiwa spesifik tanpa sumber.")
         if job.get("templateId"):
             chosen=video_templates.get(job["templateId"])
             prompt+="\nVISUAL TEMPLATE "+chosen["name"]+": "+chosen["direction"]+" Sesuaikan setiap scene dengan cerita; jangan gunakan satu motif berulang."
@@ -1318,6 +1344,7 @@ def _run_job(job_id: str) -> None:
         if job.get("creativeBrief"):data["creativeBrief"]=job["creativeBrief"]
         data["fps"]=frame_rate.get(job)
         if job.get("templateId"):data["templateId"]=job["templateId"]
+        if job.get("captionStyle"):data["captionStyle"]=job["captionStyle"]
         plan = normalize_scene_plan(data, job["topic"], job["script"], job["duration"])
         preproduction.verify_narration(draft,plan)
         if not explicit:preproduction.verify_timing(plan,job["duration"])
@@ -1327,8 +1354,15 @@ def _run_job(job_id: str) -> None:
         if job.get('engine') not in {'opuscar','threejs','remotion'} and any('renderControls' in scene for scene in plan['scenes']):
             raise ValueError('Model mengembalikan kontrol render yang tidak didukung adapter ini')
         if job.get('brand'):plan['brand']=copy.deepcopy(job['brand'])
-        _update_job(job_id, {"status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan,"rendererReview":renderer_contract.inspect(plan,job["engine"]),
+        media_report=None
+        if job.get("autoMedia") and job["engine"] == "remotion":
+            _update_job(job_id, {"step": "Mencari gambar domain publik yang relevan untuk adegan", "progress": 32})
+            media_report=auto_media.suggest(plan)
+        _update_job(job_id, {"autoMediaReport":media_report,
+            "status": "awaiting_scene_plan", "step": "Riset dan Scene Plan menunggu persetujuan", "progress": 35, "scenePlan": plan,"rendererReview":renderer_contract.inspect(plan,job["engine"]),
             "facelessQuality":faceless_quality.inspect(plan) if job.get("templateId") else None})
+        if job.get("autoRender"):
+            approve_job(job_id, "scene_plan")
     except Exception as exc:
         _update_job(job_id, {"status": "failed", "step": f"Gagal: {exc}", "progress": 100, "error": str(exc)})
 
@@ -1353,6 +1387,8 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
                     'visualFrames':[f'/api/videos/{preview.name}/{name}' for name in report['frames']],
                     'visualContactSheet':f'/api/videos/{preview.name}/contact-sheet.png' if report.get('contactSheet') else None})
             _update_job(job_id, {"status": "awaiting_storyboard", "step": "Storyboard menunggu persetujuan", "progress": 45, "storyboard": storyboard})
+            if job.get("autoRender"):
+                approve_job(job_id, "storyboard")
             return
         plan = job["scenePlan"]
         if job.get('pipelineVersion')==2:preproduction.verify_packet(job.get('productionPacket'),plan,job['engine'],job['aspect'])

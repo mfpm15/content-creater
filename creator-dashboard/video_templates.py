@@ -66,3 +66,25 @@ def get(template_id: str) -> dict:
 
 def catalogue() -> list[dict]:
     return [get(template_id) for template_id in TEMPLATES]
+
+
+def recommend(topic: str) -> dict:
+    """Rule-based, reproducible suggestion. Never claims to infer the content of a video."""
+    if not isinstance(topic, str) or not topic.strip():
+        raise ValueError("Judul video wajib diisi")
+    t = " " + topic.casefold() + " "
+    groups = (
+        (("cyber", "siber", "phishing", "ransomware", "hack", "keamanan", "security"), "cyber-news"),
+        (("ai ", "artificial intelligence", "teknologi", "software", "startup", "teknik"), "tech-future"),
+        (("sejarah", "kerajaan", "perang dunia", "abad ", "heritage"), "sejarah-arsip"),
+        (("medis", "kesehatan", "dokter", "penyakit", "sains tubuh"), "medis-fakta"),
+        (("bisnis", "ekonomi", "saham", "uang", "keuangan", "investasi"), "ekonomi-gold"),
+        (("berita", "breaking", "headline", "terbaru", "news"), "news-alert"),
+        (("motivasi", "inspirasi", "semangat", "kisah hidup"), "motivasi-rose"),
+        (("belajar", "kelas", "tips", "tutorial", "panduan", "cara "), "kelas-cerah"),
+        (("alam", "hewan", "lingkungan", "hutan", "laut", "satwa"), "nature-story"),
+    )
+    for words, slug in groups:
+        if any(word in t for word in words):
+            return get(slug)
+    return get("creator-pop")

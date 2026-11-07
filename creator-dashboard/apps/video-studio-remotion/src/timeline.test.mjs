@@ -96,3 +96,20 @@ test('shot artwork only accepts trusted local media filenames',()=>{
     assert.throws(()=>validateManifest(bad));
   }
 });
+
+test('caption styles and authentic cue ranges are validated',()=>{
+  for (const style of ['clean','pop','pill','outline','highlight']) {
+    const value=example();value.captionStyle=style;
+    assert.equal(validateManifest(value).captionStyle,style);
+  }
+  const valid=example();
+  valid.captionStyle='highlight';
+  const c=valid.captions[0];
+  c.wordFrames=[{text:'kata',startFrame:c.startFrame,endFrame:c.endFrame}];
+  assert.equal(validateManifest(valid).captions[0].wordFrames.length,1);
+  const invalid=example();invalid.captionStyle='<script>';assert.throws(()=>validateManifest(invalid));
+  for(const bad of ['https://example.com','../../file']) {
+    const broken=example();broken.captions[0].wordFrames=[{text:bad,startFrame:0,endFrame:900000}];
+    assert.throws(()=>validateManifest(broken));
+  }
+});
