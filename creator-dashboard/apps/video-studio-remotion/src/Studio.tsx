@@ -2,7 +2,8 @@ import React from 'react';
 import {AbsoluteFill, Composition, Img, registerRoot, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {validateManifest} from './timeline.mjs';
 import {Illustration} from './Visuals';
-import {MotifScene, Backdrop} from './Scenes';
+import {MotifScene, Backdrop, luma} from './Scenes';
+import {Decor} from './Decor';
 import type {StudioProps} from './types';
 
 export const Studio: React.FC<StudioProps> = props => {
@@ -49,11 +50,11 @@ export const Studio: React.FC<StudioProps> = props => {
   const centered=layout==='center';
   const headline=layout==='headline';
   const split=layout==='split';
-  const titleMargin=showPoster?height*.39:headline?height*.055:split?height*.04:height*.035;
-  const artTop=showPoster?'12%':headline?'30%':centered?'27%':split?'28%':'24%';
-  const artHeight=showPoster?'40%':headline?'38%':centered?'40%':split?'38%':'41%';
+  const titleMargin=showPoster?height*.43:headline?height*.055:split?height*.04:height*.035;
+  const artTop=showPoster?'9%':headline?'30%':centered?'27%':split?'28%':'24%';
+  const artHeight=showPoster?'35%':headline?'43%':centered?'44%':split?'43%':'41%';
   const captionBottom=showPoster?'14%':headline?'13%':centered?'13%':split?'15%':'24%';
-  const artSide=split?'18%':showPoster?'11%':centered?'11%':'8%';
+  const artSide=split?'11%':showPoster?'11%':centered?'11%':'8%';
   React.useLayoutEffect(()=>{
     const root=rootRef.current?.getBoundingClientRect();
     // Remotion also mounts hidden calculator trees at y=-1,000,000 with zero
@@ -80,6 +81,7 @@ export const Studio: React.FC<StudioProps> = props => {
   return <div ref={rootRef} style={{position:'absolute',inset:0,background:props.brand.background,color:props.brand.text,fontFamily:props.brand.font,overflow:'hidden'}}>
     <AbsoluteFill style={{background:`radial-gradient(ellipse at ${70+cinematicDrift}% 23%, ${props.brand.accent}2d, transparent 62%), linear-gradient(155deg, transparent 40%, ${props.brand.accent}08 100%)`}}/>
     <Backdrop effect={effect} accent={props.brand.accent} t={frame/fps} width={width} height={height} unit={scaleUnit}/>
+    <Decor effect={effect} accent={props.brand.accent} ink={props.brand.text} t={frame/fps} width={width} height={height} unit={scaleUnit} index={index} topic={props.topic} light={luma(props.brand.background)>.55}/>
     <AbsoluteFill style={{opacity:ambientOpacity,backgroundImage:`radial-gradient(${props.brand.accent} 1px, transparent 1px)`,backgroundSize:`${Math.max(26,38*scaleUnit)}px ${Math.max(26,38*scaleUnit)}px`,transform:`translate(${cinematicDrift}px,${-cinematicDrift*.4}px) scale(${glowScale})`}}/>
 
     {effect==='technical' && <AbsoluteFill style={{pointerEvents:'none',opacity:.2}}>
@@ -100,7 +102,7 @@ export const Studio: React.FC<StudioProps> = props => {
               transformOrigin:index%2?'40% 55%':'65% 45%'}}/>
             <div style={{position:'absolute',inset:0,background:`linear-gradient(0deg,${props.brand.background}b8,transparent 40%,${props.brand.background}35)`}}/>
           </div>
-        </> : shot.motif ? <MotifScene motif={shot.motif} progress={progress} time={frame/fps} accent={props.brand.accent} bg={props.brand.background} ink={props.brand.text} index={index}/>
+        </> : shot.motif ? <MotifScene motif={shot.motif} progress={progress} time={frame/fps} accent={props.brand.accent} bg={props.brand.background} ink={props.brand.text} index={index} portrait={portrait}/>
           : <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>}
       </div>
       {caption && captionStyle==='karaoke' ? <div ref={captionRef} style={{position:'absolute',left:'6%',right:'14%',bottom:captionBottom,textAlign:'center',

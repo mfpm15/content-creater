@@ -11,7 +11,7 @@ export function validateManifest(value) {
   const plain = o => o && typeof o === 'object' && Object.getPrototypeOf(o) === Object.prototype;
   if (!plain(value)) fail();
   const keys = ['version','width','height','fps','totalFrames','topic','layout','effect','captionStyle','brand','shots','captions'];
-  const MOTIFS = ['elephant','landmark','birds','map','sunrise','mountain','city','people','tech','nature','water','fire','book','idea','globe','money','heart','clock','shield','abstract'];
+  const MOTIFS = ['elephant','landmark','temple','birds','map','sunrise','mountain','city','people','tech','nature','water','fire','book','idea','globe','money','heart','clock','shield','abstract'];
   if (Object.keys(value).some(key => !keys.includes(key))) fail();
   if (value.version !== 1 || ![30,60].includes(value.fps) || !integer(value.totalFrames) || value.totalFrames < 1 || value.totalFrames > 600*value.fps) fail();
   if (![value.width,value.height].every(n => integer(n) && n >= 128 && n <= 3840 && n % 2 === 0) || !text(value.topic,500)) fail();

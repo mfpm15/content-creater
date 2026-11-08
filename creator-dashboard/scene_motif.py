@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import re
 
-MOTIFS = ("elephant", "landmark", "birds", "map", "sunrise", "mountain", "city", "people", "tech", "nature",
+MOTIFS = ("elephant", "landmark", "temple", "birds", "map", "sunrise", "mountain", "city", "people", "tech", "nature",
           "water", "fire", "book", "idea", "globe", "money", "heart", "clock", "shield", "abstract")
 
 KEYWORDS = {
     "elephant": "gajah elephant safari savana satwa hewan binatang animal wildlife kebun binatang",
-    "landmark": "kabah ka'bah masjid mosque candi temple monumen monument gereja church museum istana palace menara tower landmark bangunan bersejarah",
+    # ponytail: landmark = the Ka'bah-style cube only; generic buildings use the neutral stepped monument below.
+    "landmark": "kabah ka'bah makkah mekah mecca",
+    "temple": "candi borobudur prambanan temple pagoda stupa relief situs warisan heritage purbakala arkeologi pemugaran bangunan bersejarah monumen monument museum istana palace menara tower gereja church masjid mosque landmark",
     "birds": "burung bird terbang fly flock ababil sayap wings pesawat angkasa",
     "map": "peta map rute route perjalanan journey travel wisata lokasi negara jazirah wilayah navigasi petualangan destinasi",
     "sunrise": "fajar pagi sunrise terbit morning harapan awal dawn senja sunset cahaya sinar harapan",

@@ -10,7 +10,7 @@ const ease=(n:number)=>1-Math.pow(1-clamp(n),3);
 const lerp=(a:number,b:number,k:number)=>a+(b-a)*k;
 const rnd=(i:number)=>{const x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x);};
 const parse=(h:string)=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
-const luma=(h:string)=>{const [r,g,b]=parse(h);return (0.2126*r+0.7152*g+0.0722*b)/255;};
+export const luma=(h:string)=>{const [r,g,b]=parse(h);return (0.2126*r+0.7152*g+0.0722*b)/255;};
 export const mix=(a:string,b:string,k:number)=>{const x=parse(a),y=parse(b);return '#'+x.map((v,i)=>Math.round(v+(y[i]-v)*k).toString(16).padStart(2,'0')).join('');};
 /** Scenery always renders on its own mid-dark "stage" derived from the template accent,
  *  so illustrations stay punchy on both dark and light templates. */
@@ -21,7 +21,7 @@ export const palette=(bg:string,accent:string,ink:string):Pal=>{
     near:mix(stage,'#000000',.4),ground:mix(stage,'#000000',.32),light:mix(accent,'#ffffff',.7),warm:mix(accent,'#ffd27a',.6)};
 };
 
-export const MOTIFS=['elephant','landmark','birds','map','sunrise','mountain','city','people','tech','nature','water','fire','book','idea','globe','money','heart','clock','shield','abstract'] as const;
+export const MOTIFS=['elephant','landmark','temple','birds','map','sunrise','mountain','city','people','tech','nature','water','fire','book','idea','globe','money','heart','clock','shield','abstract'] as const;
 
 const Cloud:React.FC<{x:number;y:number;s:number;c:string}>=({x,y,s,c})=><g transform={`translate(${x} ${y}) scale(${s})`} fill={c}>
   <ellipse cx="0" cy="0" rx="46" ry="20"/><ellipse cx="-28" cy="8" rx="30" ry="15"/><ellipse cx="30" cy="8" rx="34" ry="16"/><ellipse cx="8" cy="-14" rx="28" ry="18"/></g>;
@@ -85,6 +85,34 @@ const Landmark:React.FC<S>=({t,pal})=>{
     {Array.from({length:9},(_,i)=><rect key={i} x={332+i*16.5} y="217" width="9" height="14" rx="2" fill="#0d0d12" opacity=".55"/>)}
     <rect x="380" y="298" width="40" height="86" rx="4" fill={pal.warm}/><rect x="387" y="306" width="26" height="78" rx="3" fill="#15110a"/>
     {dots.filter(d=>d.z>=0).map(dot)}
+  </g>;
+};
+
+/* ---------- stepped temple with stupas (generic heritage building, not a specific faith's shrine) ---------- */
+const Temple:React.FC<S>=({p,t,pal})=>{
+  const tiers=[{w:470,h:34},{w:380,h:34},{w:290,h:34},{w:200,h:32}];
+  let y=392;
+  const stupas=[0,1,2,3,4].map(i=>({x:226+i*87,i}));
+  return <g>
+    <Stars t={t} pal={pal} n={30} h={190}/>
+    <g transform={`rotate(${t*5} 400 200)`} opacity=".14" fill={pal.warm}>{Array.from({length:9},(_,i)=>{const a=i/9*Math.PI*2;return <polygon key={i} points={`400,200 ${400+Math.cos(a-.08)*560},${200+Math.sin(a-.08)*560} ${400+Math.cos(a+.08)*560},${200+Math.sin(a+.08)*560}`}/>;})}</g>
+    <circle cx="400" cy="230" r={200+Math.sin(t*1.6)*8} fill="url(#glow)"/>
+    <Sun x={640} y={lerp(150,120,ease(p))} r={32} t={t} pal={pal} rays={false}/>
+    <Clouds t={t} pal={pal} y={70} o={.14}/>
+    <path d="M0 400 C150 384 300 410 450 396 C600 382 700 408 800 394 V500 H0Z" fill={pal.ground}/>
+    <ellipse cx="400" cy="402" rx="300" ry="14" fill="#000" opacity=".35"/>
+    {tiers.map((tier,i)=>{const top=y-tier.h;const x=400-tier.w/2;const g=<g key={i}>
+        <rect x={x} y={top} width={tier.w} height={tier.h} fill={mix(pal.bg,pal.accent,.2+i*.08)} stroke={pal.accent} strokeOpacity=".5" strokeWidth="2"/>
+        <rect x={x} y={top} width={tier.w} height="7" fill={mix(pal.accent,pal.light,.4)} opacity=".7"/>
+        {Array.from({length:Math.round(tier.w/48)},(_,k)=><rect key={k} x={x+14+k*48} y={top+14} width="20" height="16" rx="8" fill={pal.bg} opacity=".7"/>)}
+      </g>;y=top;return g;})}
+    <g>{stupas.map(({x,i})=>{const bob=Math.sin(t*1.8+i)*1.5;return <g key={i} transform={`translate(${x} ${y+bob})`}>
+      <path d="M-26 0 Q-26 -44 0 -48 Q26 -44 26 0Z" fill={mix(pal.bg,pal.accent,.42)} stroke={pal.accent} strokeOpacity=".6" strokeWidth="2"/>
+      <path d="M-10 -18 H10" stroke={pal.bg} strokeWidth="5" opacity=".6"/>
+      <line x1="0" y1="-48" x2="0" y2="-64" stroke={pal.warm} strokeWidth="4" strokeLinecap="round"/></g>;})}</g>
+    <g transform={`translate(400 ${y-8})`}><path d="M-34 0 Q-34 -64 0 -76 Q34 -64 34 0Z" fill={mix(pal.bg,pal.accent,.5)} stroke={pal.light} strokeOpacity=".7" strokeWidth="3"/>
+      <line x1="0" y1="-76" x2="0" y2="-108" stroke={pal.warm} strokeWidth="5" strokeLinecap="round"/><circle cx="0" cy="-112" r={5+Math.sin(t*3)*1.2} fill={pal.warm}/></g>
+    {Array.from({length:14},(_,i)=>{const k=((t*.35+rnd(i)*3)%1);return <circle key={i} cx={150+rnd(i+9)*500} cy={420-k*190} r={2+rnd(i+3)*3} fill={pal.warm} opacity={.5*Math.sin(k*Math.PI)}/>;})}
   </g>;
 };
 
@@ -346,27 +374,28 @@ const Abstract:React.FC<S>=({p,t,pal})=><g>
   <circle cx="400" cy="250" r={46+Math.sin(t*2)*4+p*10} fill={pal.accent}/><circle cx="400" cy="250" r="22" fill={pal.light}/>
 </g>;
 
-const SCENES:Record<string,React.FC<S>>={elephant:Elephants,landmark:Landmark,birds:Birds,map:MapScene,sunrise:Sunrise,mountain:Mountain,city:City,people:People,tech:Tech,
+const SCENES:Record<string,React.FC<S>>={elephant:Elephants,landmark:Landmark,temple:Temple,birds:Birds,map:MapScene,sunrise:Sunrise,mountain:Mountain,city:City,people:People,tech:Tech,
   nature:Nature,water:Water,fire:Fire,book:Book,idea:Idea,globe:Globe,money:Money,heart:Heart,clock:Clock,shield:Shield,abstract:Abstract};
 
-export const MotifScene:React.FC<{motif:string;progress:number;time:number;accent:string;bg:string;ink:string;index:number}>=({motif,progress,time,accent,bg,ink,index})=>{
+export const MotifScene:React.FC<{motif:string;progress:number;time:number;accent:string;bg:string;ink:string;index:number;portrait?:boolean}>=({motif,progress,time,accent,bg,ink,index,portrait})=>{
   const pal=palette(bg,accent,ink);
   const Scene=SCENES[motif]||Abstract;
   const enter=ease(progress/.12);
-  return <svg viewBox="0 0 800 500" width="100%" height="100%" role="img" aria-label={'Ilustrasi '+motif}>
+  const x0=portrait?70:0, w=portrait?660:800; // portrait crops side margins so the card fills a tall slot
+  return <svg viewBox={`${x0} 0 ${w} 500`} width="100%" height="100%" role="img" aria-label={'Ilustrasi '+motif}>
     <defs>
       <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={pal.sky}/><stop offset="1" stopColor={pal.skyLow}/></linearGradient>
       <radialGradient id="glow"><stop offset="0" stopColor={accent} stopOpacity=".5"/><stop offset="1" stopColor={accent} stopOpacity="0"/></radialGradient>
       <radialGradient id="warm"><stop offset="0" stopColor={pal.warm} stopOpacity=".6"/><stop offset="1" stopColor={pal.warm} stopOpacity="0"/></radialGradient>
       <radialGradient id="vig" cx=".5" cy=".5" r=".8"><stop offset=".6" stopColor="#000" stopOpacity="0"/><stop offset="1" stopColor="#000" stopOpacity=".22"/></radialGradient>
-      <clipPath id="card"><rect width="800" height="500" rx="38"/></clipPath>
+      <clipPath id="card"><rect x={x0} width={w} height="500" rx="38"/></clipPath>
     </defs>
     <g clipPath="url(#card)" opacity={enter}>
-      <rect width="800" height="500" fill="url(#sky)"/>
+      <rect x={x0} width={w} height="500" fill="url(#sky)"/>
       <g transform={`translate(400 250) scale(${1+progress*.05}) translate(-400 -250)`}><Scene p={progress} t={time} pal={pal} index={index}/></g>
-      <rect width="800" height="500" fill="url(#vig)"/>
+      <rect x={x0} width={w} height="500" fill="url(#vig)"/>
     </g>
-    <rect x="1.5" y="1.5" width="797" height="497" rx="37" fill="none" stroke={accent} strokeOpacity=".5" strokeWidth="3"/>
+    <rect x={x0+1.5} y="1.5" width={w-3} height="497" rx="37" fill="none" stroke={accent} strokeOpacity=".7" strokeWidth="4"/>
   </svg>;
 };
 

@@ -16,6 +16,7 @@ class SceneMotifTests(unittest.TestCase):
             "tech": scenes(("Server data", "Cara kerja AI", "Komputer belajar dari data"))[0],
             "mountain": scenes(("Gunung", "Puncak", "Pendakian"))[0],
             "elephant": scenes(("Gajah", "Pasukan gajah", ""))[0],
+            "temple": scenes(("Candi Borobudur", "Pemugaran situs warisan", ""))[0],
             "water": scenes(("Laut", "Kapal berlayar", ""))[0],
             "heart": scenes(("Jantung", "Kesehatan", "Donor darah"))[0],
         }
