@@ -1,5 +1,5 @@
 export type Shot = {
-  id: string; startFrame: number; endFrame: number; title: string; subject: string;
+  id: string; startFrame: number; endFrame: number; title: string; subject: string; motif?: string;
   assetFile?: string;
   diagram?: {kind: 'process' | 'comparison'; labels: string[]};
   family: 'process' | 'data' | 'comparison' | 'concept';
@@ -8,6 +8,6 @@ export type Shot = {
 };
 export type StudioProps = {
   version: 1; width: number; height: number; fps: 30 | 60; totalFrames: number;
-  topic: string; captionStyle?: 'clean' | 'pop' | 'pill' | 'outline' | 'highlight'; layout?: 'editorial' | 'headline' | 'split' | 'poster' | 'center'; effect?: 'minimal' | 'cinematic' | 'technical' | 'kinetic' | 'calm' | 'urgent'; brand: {background: string; accent: string; text: string; wordmark: string; font: string};
+  topic: string; captionStyle?: 'clean' | 'pop' | 'pill' | 'outline' | 'highlight' | 'karaoke'; layout?: 'editorial' | 'headline' | 'split' | 'poster' | 'center'; effect?: 'minimal' | 'cinematic' | 'technical' | 'kinetic' | 'calm' | 'urgent'; brand: {background: string; accent: string; text: string; wordmark: string; font: string};
   shots: Shot[]; captions: {startFrame: number; endFrame: number; text: string; wordFrames?: {text: string; startFrame: number; endFrame: number}[]}[];
 };

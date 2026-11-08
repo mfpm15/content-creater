@@ -17,6 +17,7 @@ from pathlib import Path
 import creative_profile
 import scene_render
 import video_templates
+import scene_motif
 import caption_design
 import media_library
 from runtime_config import find_browser
@@ -49,7 +50,8 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
     if any(type(n) is not int or not 128<=n<=3840 or n%2 for n in (width,height)):raise ValueError('Kanvas Remotion tidak valid')
     shots,captions,methods=[],[],[]
     cursor=0
-    for scene in plan['scenes']:
+    motifs=scene_motif.assign(plan['scenes'])
+    for scene,motif in zip(plan['scenes'],motifs):
         start,end=frame(scene['start']),frame(scene['end'])
         if start!=cursor or end<=start or end>total:raise ValueError('Adegan Remotion wajib menutup durasi tanpa gap/overlap, minimal satu frame per adegan')
         controls=scene_render.validate(scene.get('renderControls',{}))
@@ -60,7 +62,7 @@ def manifest(plan: dict, aspect: dict) -> tuple[dict,dict]:
         numbers=renderer_contract.literal_numbers(scene)
         subject=' '.join(n for n in numbers[:3] if len(n)<=30) if family=='data' else str(scene.get('subject',''))[:200]
         shots.append({'id':scene['id'],'startFrame':start,'endFrame':end,'title':scene['onScreenText'],
-                      'subject':subject,'family':family,**controls})
+                      'subject':subject,'motif':motif,'family':family,**controls})
         if 'diagram' in scene:shots[-1]['diagram']=scene_diagram.validate(scene['diagram'])
         if scene.get('assetId'):
             meta,_ = media_library.get(scene['assetId'])

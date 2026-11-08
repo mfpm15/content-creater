@@ -36,6 +36,7 @@ import tavily_research
 from video_job_store import save_job, recover_jobs
 from runtime_config import resolve_python
 import creative_profile
+import scene_motif
 import continuous_motion
 import animation_clock
 import scene_render
@@ -281,6 +282,7 @@ def normalize_scene_plan(data: dict, topic: str, script: str, duration: int) -> 
             "visualFamily": family, "subject": subject,
             "directionSubject": str(raw.get("directionSubject") or raw_subject),
             "continuityToken": str(raw.get("continuityToken") or ""),
+            "motif": scene_motif.pick({"motif": raw.get("motif")}) if raw.get("motif") else "",
             "action": str(raw.get("action") or motion["direction"]), "setting": str(raw.get("setting") or ""),
             "metaphor": str(raw.get("metaphor") or ""), "camera": str(raw.get("camera") or motion["direction"]),
             "transition": str(raw.get("transition") or motion["transition"]), "colorMood": str(raw.get("colorMood") or "adaptive"),
@@ -921,7 +923,7 @@ def create_aspect_jobs(slug: str, aspects: list[str]) -> list[dict]:
         for aspect in dict.fromkeys(aspects):
             key = uuid.uuid4().hex
             job = {"jobId": key, "pipelineVersion":2, "fps": frame_rate.get(plan), "topic": plan["topic"], "script": "", "engine": engine,
-                   "style": ENGINES[engine]["defaultStyle"], "templateId":plan.get("templateId",""), "captionStyle":plan.get("captionStyle", "clean"), "autoMedia":False, "autoRender":False, "aspect": aspect, "duration": plan["duration"],
+                   "style": ENGINES[engine]["defaultStyle"], "templateId":plan.get("templateId",""), "captionStyle":plan.get("captionStyle", caption_design.DEFAULT), "autoMedia":False, "autoRender":False, "aspect": aspect, "duration": plan["duration"],
                    "model": source.get("model", LLM_MODEL), "status": "awaiting_scene_plan", "step": "Review layout rasio baru sebelum render",
                    "progress": 35, "error": None, "research": source.get("research"), "scenePlan": copy.deepcopy(plan),
                    "storyboard": None, "video": None, "revision": 0, "approvals": {},
@@ -1197,6 +1199,43 @@ def _write_procedural_audio(path: Path, plan: dict, sample_rate: int = 48000) ->
         output.writeframes(frames)
 
 
+def _retime_plan_to_voice(plan: dict, voice_durations: dict[str, float], padding: float = 0.15) -> dict:
+    """Fit scene slots to measured narration so no voice is cut and no slot overlaps.
+
+    Scenes that are too short grow to voice+padding. The extra time is taken from scenes with
+    spare room (never below their own need). If the film still does not fit, the total grows
+    (up to MAX_PLAN_SECONDS). Narration text is never changed. Mutates and returns a report.
+    """
+    scenes = plan["scenes"]
+    need = [max(0.5, float(voice_durations.get(scene["id"], 0.0)) + padding) if scene["narration"].strip() else 0.5 for scene in scenes]
+    have = [float(scene["end"]) - float(scene["start"]) for scene in scenes]
+    requested = float(plan["duration"])
+    deficit = sum(max(0.0, n - h) for n, h in zip(need, have))
+    spare = [max(0.0, h - n) for n, h in zip(need, have)]
+    take = min(1.0, deficit / sum(spare)) if deficit and sum(spare) else 0.0
+    lengths = [max(n, h - s * take) if n > h or s else h for n, h, s in zip(need, have, spare)]
+    lengths = [max(length, n) for length, n in zip(lengths, need)]
+    total = sum(lengths)
+    extended = total > requested + 1e-6
+    final_total = float(math.ceil(total)) if extended else requested
+    if final_total > MAX_PLAN_SECONDS:
+        raise RuntimeError(f"Narasi memerlukan sedikitnya {total:.1f} detik, melebihi batas {MAX_PLAN_SECONDS} detik")
+    if final_total > total:  # spread slack proportionally so the film still ends exactly on the total
+        scale = final_total / total
+        lengths = [length * scale for length in lengths]
+    cursor = 0.0
+    before = [(scene["start"], scene["end"]) for scene in scenes]
+    for index, (scene, length) in enumerate(zip(scenes, lengths)):
+        end = final_total if index == len(scenes) - 1 else round(cursor + length, 3)
+        scene.update(start=round(cursor, 3), end=end, duration=round(end - cursor, 3))
+        # Word cues belong to the previous timing; the voice worker produces fresh ones afterwards.
+        cursor = end
+    plan["duration"] = int(final_total) if float(final_total).is_integer() else final_total
+    return {"extended": extended, "requestedDuration": requested, "duration": plan["duration"],
+            "changed": [{"id": s["id"], "from": list(b), "to": [s["start"], s["end"]]} for s, b in zip(scenes, before) if (s["start"], s["end"]) != b],
+            "voiceSeconds": {k: round(v, 2) for k, v in voice_durations.items()}}
+
+
 def _build_audio(target: Path, plan: dict) -> Path:
     """Synthesize narration per scene, align it, mix music/foley, and normalize."""
     ffmpeg = shutil.which("ffmpeg") or str(ROOT / "bin" / "ffmpeg.exe")
@@ -1236,14 +1275,15 @@ def _build_audio(target: Path, plan: dict) -> Path:
     inputs: list[str] = []
     filters: list[str] = []
     labels: list[str] = []
-    for index, scene in enumerate(voiced):
-        voice_file = voice_dir / f"{scene['id']}.wav"
+    measured: dict[str, float] = {}
+    for scene in voiced:
         # Never turn an empty/silent provider response into an apparently successful dubbed film.
         # The gate checks signal presence; correct spoken words still require human review.
-        check = voice_quality.require_audible(voice_file)
-        voice_duration = check["duration"]
-        if voice_duration > float(scene["end"]) - float(scene["start"]) + 0.05:
-            raise RuntimeError(f"Narasi {scene['id']} melebihi slot adegan; revisi timing atau narasi sebelum render")
+        measured[scene["id"]] = voice_quality.require_audible(voice_dir / f"{scene['id']}.wav")["duration"]
+    report = _retime_plan_to_voice(plan, measured)
+    (target / "timing-adjustment.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    for index, scene in enumerate(voiced):
+        voice_file = voice_dir / f"{scene['id']}.wav"
         inputs.extend(["-i", str(voice_file)])
         delay = round(scene["start"] * 1000)
         label = f"v{index}"
@@ -1346,6 +1386,9 @@ def _run_job(job_id: str) -> None:
         prompt+='\nBahasa judul layar: '+job.get('speech',{}).get('language','id')+'. Pertahankan naskah pengguna; jangan menerjemahkan narasi terkunci.\nArahan produksi (bukan narasi): '+job.get('creativeBrief','')+'\nAdapter yang dipilih: '+job['engine']+'.'+preproduction.scene_instruction(draft)
         prompt+=renderer_contract.planner_instruction(job['engine'])
         if job.get('engine')=='remotion':
+            prompt+=("\nILUSTRASI: untuk setiap scene isi field motif dengan SATU nilai dari ["+", ".join(scene_motif.MOTIFS)+"] "
+                     "yang paling cocok dengan isi narasi scene itu (bukan topik umum video); variasikan antarscene. "
+                     "Isi juga subject dengan 1–4 kata benda konkret yang mewakili isi scene. ")
             prompt+=("\nATURAN ANTI-SLIDESHOW: utamakan subjek konkret yang konsisten antarscene dan berubah melalui sebab-akibat. "
                      "Jangan membuat satu gambar + headline + fade yang sama pada semua scene. "
                      "Gunakan perbedaan ukuran shot, perubahan perhatian visual, dan perpindahan kamera yang bermakna; "
@@ -1451,6 +1494,12 @@ def _continue_job(job_id: str, approved_stage: str) -> None:
         engine_label = ENGINES[job['engine']]['name']
         _update_job(job_id, {"status": "rendering", "step": "Membuat musik/foley lokal tanpa dubbing" if plan.get('audioMode')=='music' or plan.get("motionDesign",{}).get("voiceMode")=="music" else "Membuat dubbing, musik, foley, dan subtitle sebelum render visual", "progress": 55})
         final_audio = _build_audio(target, plan)
+        # Voice may have extended/rebalanced scene slots: persist every timing-dependent artifact
+        # before any renderer reads it, and show the user the plan that is actually rendered.
+        (target / "scene-plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+        (target / "audio-manifest.json").write_text(json.dumps(audio_manifest(plan), ensure_ascii=False, indent=2), encoding="utf-8")
+        write_subtitles(target / "subtitles.srt", plan)
+        _update_job(job_id, {"scenePlan": plan, "storyboard": _storyboard(plan), "duration": plan["duration"]})
         render_plan = plan
         word_report = None
         if job["engine"] == "remotion" and plan.get("speech", {}).get("mode") == "tts":

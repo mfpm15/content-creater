@@ -97,8 +97,14 @@ test('shot artwork only accepts trusted local media filenames',()=>{
   }
 });
 
+test('motif is an allowlisted illustration key',()=>{
+  const ok=example();ok.shots[0].motif='elephant';
+  assert.equal(validateManifest(ok).shots[0].motif,'elephant');
+  const bad=example();bad.shots[0].motif='<script>';assert.throws(()=>validateManifest(bad));
+});
+
 test('caption styles and authentic cue ranges are validated',()=>{
-  for (const style of ['clean','pop','pill','outline','highlight']) {
+  for (const style of ['clean','pop','pill','outline','highlight','karaoke']) {
     const value=example();value.captionStyle=style;
     assert.equal(validateManifest(value).captionStyle,style);
   }

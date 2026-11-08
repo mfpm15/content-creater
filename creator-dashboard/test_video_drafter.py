@@ -40,6 +40,32 @@ class VideoDrafterTest(unittest.TestCase):
         self.assertFalse(any("gemini" in model.lower() or "opus" in model.lower() for model in model_ids))
         self.assertEqual(opts["defaultModel"], "cc/claude-sonnet-5-5")
 
+    def test_measured_voice_retiming_fits_any_topic_without_cutting_voice(self):
+        plan = video_drafter.normalize_scene_plan({"scenes": [
+            {"start": 0, "end": 3.5, "narration": "Satu"}, {"start": 3.5, "end": 8, "narration": "Dua"}]}, "Tes", "", 8)
+        report = video_drafter._retime_plan_to_voice(plan, {"scene-1": 4.401, "scene-2": 4.512})
+        self.assertTrue(report["extended"])
+        self.assertEqual(plan["scenes"][0]["start"], 0)
+        self.assertEqual(plan["scenes"][0]["end"], plan["scenes"][1]["start"])
+        self.assertEqual(plan["scenes"][-1]["end"], plan["duration"])
+        self.assertGreaterEqual(plan["scenes"][0]["duration"], 4.401)
+        self.assertGreaterEqual(plan["scenes"][1]["duration"], 4.512)
+
+    def test_measured_voice_retiming_borrows_spare_time_before_extending(self):
+        plan = video_drafter.normalize_scene_plan({"scenes": [
+            {"start": 0, "end": 3, "narration": "Satu"}, {"start": 3, "end": 12, "narration": "Dua"}]}, "Tes", "", 12)
+        report = video_drafter._retime_plan_to_voice(plan, {"scene-1": 4.0, "scene-2": 3.0})
+        self.assertFalse(report["extended"])
+        self.assertEqual(plan["duration"], 12)
+        self.assertGreaterEqual(plan["scenes"][0]["duration"], 4.0)
+        self.assertGreaterEqual(plan["scenes"][1]["duration"], 3.0)
+        self.assertEqual(plan["scenes"][-1]["end"], 12)
+
+    def test_measured_voice_retiming_rejects_beyond_production_limit(self):
+        plan = video_drafter.normalize_scene_plan({"scenes": [{"start": 0, "end": 1, "narration": "Satu"}]}, "Tes", "", 1)
+        with self.assertRaisesRegex(RuntimeError, "melebihi batas"):
+            video_drafter._retime_plan_to_voice(plan, {"scene-1": video_drafter.MAX_PLAN_SECONDS + 5})
+
     def test_legacy_or_unsupported_video_model_falls_back_to_default_sonnet(self):
         with patch.object(video_drafter, "LLM_MODEL", "ag/gemini-3.8-flash-high"), \
              patch.object(video_drafter.threading.Thread, "start"):

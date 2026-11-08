@@ -11,20 +11,22 @@ export function validateManifest(value) {
   const plain = o => o && typeof o === 'object' && Object.getPrototypeOf(o) === Object.prototype;
   if (!plain(value)) fail();
   const keys = ['version','width','height','fps','totalFrames','topic','layout','effect','captionStyle','brand','shots','captions'];
+  const MOTIFS = ['elephant','landmark','birds','map','sunrise','mountain','city','people','tech','nature','water','fire','book','idea','globe','money','heart','clock','shield','abstract'];
   if (Object.keys(value).some(key => !keys.includes(key))) fail();
   if (value.version !== 1 || ![30,60].includes(value.fps) || !integer(value.totalFrames) || value.totalFrames < 1 || value.totalFrames > 600*value.fps) fail();
   if (![value.width,value.height].every(n => integer(n) && n >= 128 && n <= 3840 && n % 2 === 0) || !text(value.topic,500)) fail();
   const brand = value.brand;
   if (!plain(brand) || Object.keys(brand).some(k => !['background','accent','text','wordmark','font'].includes(k)) ||
       !['background','accent','text'].every(k => /^#[0-9a-fA-F]{6}$/.test(brand[k])) || !text(brand.wordmark,100) || !['Arial','Verdana','Georgia','Tahoma'].includes(brand.font)) fail();
-  if (value.captionStyle !== undefined && !['clean','pop','pill','outline','highlight'].includes(value.captionStyle)) fail();
+  if (value.captionStyle !== undefined && !['clean','pop','pill','outline','highlight','karaoke'].includes(value.captionStyle)) fail();
   if (value.layout !== undefined && !['editorial','headline','split','poster','center'].includes(value.layout)) fail();
   if (value.effect !== undefined && !['minimal','cinematic','technical','kinetic','calm','urgent'].includes(value.effect)) fail();
   if (!Array.isArray(value.shots) || value.shots.length < 1 || value.shots.length > 200 || !Array.isArray(value.captions) || value.captions.length > 10000) fail();
   let end = 0;
   const ids = new Set();
   for (const shot of value.shots) {
-    if (!plain(shot) || Object.keys(shot).some(k => !['id','startFrame','endFrame','title','subject','family','camera','strength','lighting','transition','diagram','assetFile'].includes(k))) fail();
+    if (!plain(shot) || Object.keys(shot).some(k => !['id','startFrame','endFrame','title','subject','motif','family','camera','strength','lighting','transition','diagram','assetFile'].includes(k))) fail();
+    if (shot.motif !== undefined && !MOTIFS.includes(shot.motif)) fail();
     if (!text(shot.id,80) || ids.has(shot.id) || !integer(shot.startFrame) || !integer(shot.endFrame) || shot.startFrame !== end || shot.endFrame <= end || shot.endFrame > value.totalFrames) fail();
     if (!text(shot.title,500) || !text(shot.subject,200) || !['process','data','comparison','concept'].includes(shot.family)) fail();
     if (!['legacy','locked','push-in','pull-out','pan-left','pan-right','orbit'].includes(shot.camera) ||

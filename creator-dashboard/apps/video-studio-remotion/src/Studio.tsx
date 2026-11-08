@@ -2,6 +2,7 @@ import React from 'react';
 import {AbsoluteFill, Composition, Img, registerRoot, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {validateManifest} from './timeline.mjs';
 import {Illustration} from './Visuals';
+import {MotifScene, Backdrop} from './Scenes';
 import type {StudioProps} from './types';
 
 export const Studio: React.FC<StudioProps> = props => {
@@ -49,8 +50,8 @@ export const Studio: React.FC<StudioProps> = props => {
   const headline=layout==='headline';
   const split=layout==='split';
   const titleMargin=showPoster?height*.39:headline?height*.055:split?height*.04:height*.035;
-  const artTop=showPoster?'12%':headline?'33%':centered?'32%':split?'32%':'26%';
-  const artHeight=showPoster?'34%':headline?'31%':centered?'35%':split?'34%':'40%';
+  const artTop=showPoster?'12%':headline?'30%':centered?'27%':split?'28%':'24%';
+  const artHeight=showPoster?'40%':headline?'38%':centered?'40%':split?'38%':'41%';
   const captionBottom=showPoster?'14%':headline?'13%':centered?'13%':split?'15%':'24%';
   const artSide=split?'18%':showPoster?'11%':centered?'11%':'8%';
   React.useLayoutEffect(()=>{
@@ -59,7 +60,7 @@ export const Studio: React.FC<StudioProps> = props => {
     // width. They are not the rendered composition and must never be measured.
     if(!root || root.width<1 || root.height<1 || root.bottom<=0 || root.right<=0 || root.top>=window.innerHeight || root.left>=window.innerWidth)return;
     if(titleRef.current)titleRef.current.style.fontSize=((portrait?88:70)*scaleUnit*Math.min(1,Math.sqrt(42/Math.max(42,shot.title.length))))+'px';
-    if(captionRef.current)captionRef.current.style.fontSize=(40*scaleUnit)+'px';
+    if(captionRef.current)captionRef.current.style.fontSize=((captionStyle==='karaoke'?46:40)*scaleUnit)+'px';
     for(const [element,budget] of [[titleRef.current,.13],[captionRef.current,.12]] as const){
       if(!element)continue;
       let fs=parseFloat(getComputedStyle(element).fontSize);
@@ -78,6 +79,7 @@ export const Studio: React.FC<StudioProps> = props => {
   },[frame,width,height,shot.id]);
   return <div ref={rootRef} style={{position:'absolute',inset:0,background:props.brand.background,color:props.brand.text,fontFamily:props.brand.font,overflow:'hidden'}}>
     <AbsoluteFill style={{background:`radial-gradient(ellipse at ${70+cinematicDrift}% 23%, ${props.brand.accent}2d, transparent 62%), linear-gradient(155deg, transparent 40%, ${props.brand.accent}08 100%)`}}/>
+    <Backdrop effect={effect} accent={props.brand.accent} t={frame/fps} width={width} height={height} unit={scaleUnit}/>
     <AbsoluteFill style={{opacity:ambientOpacity,backgroundImage:`radial-gradient(${props.brand.accent} 1px, transparent 1px)`,backgroundSize:`${Math.max(26,38*scaleUnit)}px ${Math.max(26,38*scaleUnit)}px`,transform:`translate(${cinematicDrift}px,${-cinematicDrift*.4}px) scale(${glowScale})`}}/>
 
     {effect==='technical' && <AbsoluteFill style={{pointerEvents:'none',opacity:.2}}>
@@ -98,9 +100,25 @@ export const Studio: React.FC<StudioProps> = props => {
               transformOrigin:index%2?'40% 55%':'65% 45%'}}/>
             <div style={{position:'absolute',inset:0,background:`linear-gradient(0deg,${props.brand.background}b8,transparent 40%,${props.brand.background}35)`}}/>
           </div>
-        </> : <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>}
+        </> : shot.motif ? <MotifScene motif={shot.motif} progress={progress} time={frame/fps} accent={props.brand.accent} bg={props.brand.background} ink={props.brand.text} index={index}/>
+          : <Illustration shot={shot} progress={progress} accent={props.brand.accent} index={index}/>}
       </div>
-      {caption && <div ref={captionRef} style={{position:'absolute',left:centered?'14%':'8%',right:centered?'14%':'16%',bottom:captionBottom,
+      {caption && captionStyle==='karaoke' ? <div ref={captionRef} style={{position:'absolute',left:'6%',right:'14%',bottom:captionBottom,textAlign:'center',
+        background:`${props.brand.background}d9`,borderRadius:22*scaleUnit,padding:`${14*scaleUnit}px ${16*scaleUnit}px`,
+        boxShadow:`0 ${10*scaleUnit}px ${30*scaleUnit}px #0000003d`,
+        fontSize:(showPoster?44:52)*scaleUnit,lineHeight:1.28,fontWeight:900,letterSpacing:.2*scaleUnit,overflowWrap:'anywhere',
+        opacity:Math.min(1,(frame-caption.startFrame+1)/Math.max(1,fps*.12))}}>
+        {(caption.wordFrames?.length?caption.wordFrames:caption.text.split(/\s+/).map((text,i,all)=>({text,startFrame:caption.startFrame+Math.floor((caption.endFrame-caption.startFrame)*i/all.length),endFrame:caption.startFrame+Math.floor((caption.endFrame-caption.startFrame)*(i+1)/all.length)}))).map((word,i)=>{
+          const active=frame>=word.startFrame && frame<word.endFrame, spoken=frame>=word.endFrame;
+          const k=active?Math.min(1,(frame-word.startFrame+1)/Math.max(1,fps*.1)):0, pop=1+.22*Math.sin(k*Math.PI)+(active?.04:0);
+          return <span key={i} style={{display:'inline-block',margin:`0 ${.14*52*scaleUnit}px`,padding:`${3*scaleUnit}px ${10*scaleUnit}px`,borderRadius:12*scaleUnit,
+            color:active?'#ffffff':spoken?props.brand.text:props.brand.text+'99',
+            background:active?props.brand.accent:'transparent',
+            transform:`scale(${pop}) translateY(${active?-4*scaleUnit:0}px)`,
+            textShadow:active?`0 ${2*scaleUnit}px ${6*scaleUnit}px #0008`:'none',
+            boxShadow:active?`0 ${6*scaleUnit}px ${22*scaleUnit}px ${props.brand.accent}88`:undefined}}>{word.text}</span>;})}
+      </div> : null}
+      {caption && captionStyle!=='karaoke' && <div ref={captionRef} style={{position:'absolute',left:centered?'14%':'8%',right:centered?'14%':'16%',bottom:captionBottom,
         padding:`${(captionStyle==='pill'?19:24)*scaleUnit}px ${30*scaleUnit}px`,
         borderLeft:captionStyle==='clean'||captionStyle==='highlight'?`${5*scaleUnit}px solid ${props.brand.accent}`:undefined,
         borderBottom:centered?`${3*scaleUnit}px solid ${props.brand.accent}`:undefined,
